@@ -1,45 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getDevCandidates } from '@/app/api/admin/candidates/route';
 
 export const dynamic = 'force-dynamic';
-
-const DEV_FALLBACK_CANDIDATES = [
-  {
-    id: '00000000-0000-0000-0000-000000000000',
-    candidate_number: 0,
-    leader_name: 'Kotak Kosong',
-    vice_leader_name: 'Tidak Memilih Calon',
-    vision: 'Opsi konstitusional sah berasaskan LUBER JURDIL.',
-    mission: ['Menampung suara pemilih yang menyatakan tidak memilih pasangan calon yang terdaftar.'],
-    photo_url: null,
-  },
-  {
-    id: '11111111-1111-1111-1111-111111111111',
-    candidate_number: 1,
-    leader_name: 'Arya Narendra Putra',
-    vice_leader_name: 'Rayhan Al-Fayeed',
-    vision: 'Terwujudnya HMIF yang adaptif, kolaboratif, dan inklusif berlandaskan inovasi teknologi.',
-    mission: [
-      'Membangun ekosistem riset mahasiswa terpadu.',
-      'Memperluas relasi industri strategis nasional dan inkubasi technopreneur.',
-      'Advokasi akademik cepat tanggap berkeadilan.',
-    ],
-    photo_url: null,
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222222',
-    candidate_number: 2,
-    leader_name: 'Dimas Satria Wicaksana',
-    vice_leader_name: 'Cynthia Maharani',
-    vision: 'Sinergi Informatika berdaya saing global yang berintegritas dan berjiwa technopreneur.',
-    mission: [
-      'Mengoptimalkan inkubasi bakat informatika.',
-      'Digitalisasi layanan kemahasiswaan satu pintu.',
-      'Pengabdian masyarakat berbasis teknologi tepat guna.',
-    ],
-    photo_url: null,
-  },
-];
 
 export async function GET() {
   try {
@@ -98,7 +61,7 @@ export async function GET() {
         startTime: new Date(Date.now() - 3600000).toISOString(),
         endTime: new Date(Date.now() + 28800000).toISOString(),
       },
-      candidates: DEV_FALLBACK_CANDIDATES,
+      candidates: getDevCandidates().filter((c) => c.is_active),
     });
   }
 
