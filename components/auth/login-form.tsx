@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { DummyAccount } from '@/lib/auth/dummy';
+import { ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react';
 
 export function LoginForm() {
   const searchParams = useSearchParams();
@@ -74,69 +75,92 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-4">
       {/* Banner Notifikasi Error */}
       {(errorMessage || customError) && (
-        <div className="mb-6 rounded-xl border border-hmif-red/40 bg-hmif-red/10 p-4 text-xs text-hmif-red">
-          <div className="font-bold">
-            {errorCode ? `Akses Ditolak [${errorCode}]` : 'Perhatian'}
+        <div className="rounded-xl border border-hmif-red/40 bg-red-50 p-3.5 text-xs text-hmif-red flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-bold">
+              {errorCode ? `Akses Ditolak [${errorCode}]` : 'Perhatian'}
+            </div>
+            <div className="mt-0.5 text-neutral-700">{customError || errorMessage}</div>
           </div>
-          <div className="mt-1">{customError || errorMessage}</div>
         </div>
       )}
 
-      {/* Tombol Login SSO Utama */}
+      {/* Tombol Login SSO Utama Microsoft Entra */}
       <button
         type="button"
         disabled={isSubmitting}
         onClick={handleEntraLogin}
-        className="flex w-full items-center justify-center gap-3 rounded-xl bg-hmif-blue px-5 py-3.5 text-sm font-bold text-hmif-white shadow-sm transition hover:bg-hmif-blue/90 disabled:opacity-50"
+        className="w-full h-12 px-5 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-sm font-semibold flex items-center justify-center gap-3 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-hmif-blue disabled:opacity-75 disabled:cursor-not-allowed"
       >
-        <svg className="h-5 w-5" viewBox="0 0 21 21" fill="none">
-          <path d="M10 0H0V10H10V0Z" fill="#F25022" />
-          <path d="M21 0H11V10H21V0Z" fill="#7FBA00" />
-          <path d="M10 11H0V21H10V11Z" fill="#00A4EF" />
-          <path d="M21 11H11V21H21V11Z" fill="#FFB900" />
-        </svg>
-        <span>
-          {isSubmitting ? 'Mengarahkan ke Microsoft...' : 'Masuk dengan Akun Kampus (Microsoft Entra)'}
-        </span>
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+            <span>Mengarahkan ke Microsoft Entra...</span>
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+              <rect fill="#F25022" height="9" width="9" x="1" y="1" />
+              <rect fill="#7FBA00" height="9" width="9" x="11" y="1" />
+              <rect fill="#00A4EF" height="9" width="9" x="1" y="11" />
+              <rect fill="#FFB900" height="9" width="9" x="11" y="11" />
+            </svg>
+            <span>Masuk dengan Akun Kampus</span>
+          </>
+        )}
       </button>
+
+      {/* Domain Notice */}
+      <p className="text-center text-xs text-neutral-500 font-medium pt-1">
+        Khusus mahasiswa aktif via <span className="font-semibold text-neutral-800">@student.telkomuniversity.ac.id</span>
+      </p>
+
+      {/* DPT Verification Badge */}
+      <div className="flex items-center gap-2 text-xs text-neutral-500 justify-center text-center pt-2">
+        <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+        <span>
+          Hak pilih diverifikasi melalui <strong className="text-neutral-700 font-semibold">Daftar Pemilih Tetap (DPT)</strong>.
+        </span>
+      </div>
 
       {/* Panel Pengujian Mode Dummy (Khusus Development / Testing) */}
       {dummyEnabled && (
-        <div className="mt-8 rounded-2xl border border-hmif-gold/40 bg-hmif-cream/60 p-5">
-          <div className="flex items-center justify-between border-b border-hmif-gold/30 pb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-hmif-dark">
-              🛠️ Panel Dummy Auth (Development Only)
+        <div className="mt-6 rounded-2xl border border-hmif-gold/40 bg-neutral-900 text-white p-4">
+          <div className="flex items-center justify-between border-b border-neutral-700 pb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-hmif-gold flex items-center gap-1.5">
+              🛠️ Dummy Auth Mock
             </span>
-            <span className="rounded-full bg-hmif-gold/20 px-2 py-0.5 text-[10px] font-bold text-hmif-dark">
-              MOCK MODE
+            <span className="rounded-full bg-hmif-gold/20 px-2 py-0.5 text-[10px] font-bold text-hmif-gold">
+              DEV MODE
             </span>
           </div>
-          <p className="mt-2 text-[11px] text-hmif-gray-dark">
-            Simulasi login instan tanpa internet/Entra untuk menguji seluruh skenario DPT & RBAC:
+          <p className="mt-2 text-[11px] text-neutral-400">
+            Pilih akun simulasi untuk menguji bilik suara & dashboard RBAC:
           </p>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
             {dummyAccounts.map((account) => (
               <button
                 key={account.id}
                 type="button"
                 disabled={loadingAccountId !== null}
                 onClick={() => handleDummyLogin(account.id)}
-                className="flex w-full flex-col items-start rounded-xl border border-hmif-gray-light/30 bg-hmif-white p-2.5 text-left transition hover:border-hmif-gold hover:shadow-xs disabled:opacity-50"
+                className="flex w-full flex-col items-start rounded-xl border border-neutral-800 bg-neutral-800/80 p-2 text-left transition hover:border-hmif-gold hover:bg-neutral-800 disabled:opacity-50"
               >
-                <div className="flex w-full items-center justify-between text-xs font-bold text-hmif-dark">
+                <div className="flex w-full items-center justify-between text-xs font-bold text-white">
                   <span>{account.name}</span>
-                  <span className="rounded bg-hmif-gray-light/20 px-1.5 py-0.5 text-[10px] uppercase font-semibold text-hmif-gray-dark">
+                  <span className="rounded bg-neutral-700 px-1.5 py-0.2 text-[10px] uppercase font-semibold text-hmif-gold">
                     {account.role}
                   </span>
                 </div>
-                <div className="text-[11px] text-hmif-gray-dark">
-                  {account.email} {account.nim ? `• NIM: ${account.nim}` : ''}
+                <div className="text-[11px] text-neutral-400">
+                  {account.email} {account.nim ? `• ${account.nim}` : ''}
                 </div>
-                <div className="mt-1 text-[10px] text-hmif-gray-dark/80 italic">
+                <div className="text-[10px] text-neutral-500 italic mt-0.5">
                   {account.description}
                 </div>
               </button>

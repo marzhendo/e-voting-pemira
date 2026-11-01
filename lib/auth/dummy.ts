@@ -110,11 +110,49 @@ export async function authenticateDummyUser(accountId: string): Promise<Identity
     };
   }
 
-  // Menjalankan alur resolusi identitas server-side yang sama persis dengan Microsoft Entra
-  return resolveUserIdentity({
-    email: account.email,
-    name: account.name,
-    entraTenantId: '00000000-0000-0000-0000-000000000001',
-    entraObjectId: `00000000-0000-0000-0000-${account.id.padEnd(12, '0')}`,
-  });
+  // Coba jalankan alur resolusi identitas database Supabase jika online
+  try {
+    const dbResult = await resolveUserIdentity({
+      email: account.email,
+      name: account.name,
+      entraTenantId: '00000000-0000-0000-0000-000000000001',
+      entraObjectId: `00000000-0000-0000-0000-${account.id.padEnd(12, '0')}`,
+    });
+
+    if (dbResult.success || dbResult.code === 'ALREADY_VOTED' || dbResult.code === 'NOT_FOUND') {
+      return dbResult;
+    }
+  } catch (err) {
+    console.warn('[DummyAuth] Database offline or unreachable, falling back to in-memory mock account:', err);
+  }
+
+  // MOCK FALLBACK (Khusus pengujian dev lokal tanpa database Supabase):
+  if (account.id === 'unregistered') {
+    return {
+      success: false,
+      code: 'NOT_FOUND',
+      message: 'Akun Anda tidak terdaftar dalam Daftar Pemilih Tetap (DPT) resmi KEMA HMIF.',
+    };
+  }
+
+  const isDpt = account.role === 'voter';
+  const hasVoted = account.id === 'voter2';
+
+  return {
+    success: true,
+    code: hasVoted ? 'ALREADY_VOTED' : 'ELIGIBLE',
+    message: 'Login simulasi berhasil (Mode Pengujian Lokal).',
+    user: {
+      id: `mock-${account.id}`,
+      email: account.email,
+      name: account.name,
+      nim: account.nim,
+      role: account.role,
+      isDptVerified: isDpt,
+      hasVoted,
+      generation: account.generation || 2023,
+      entraTenantId: '00000000-0000-0000-0000-000000000001',
+      entraObjectId: `00000000-0000-0000-0000-${account.id.padEnd(12, '0')}`,
+    },
+  };
 }

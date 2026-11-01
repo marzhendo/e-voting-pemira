@@ -2,14 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 30, 30, 30;
-  --background-start-rgb: 248, 250, 224;
-  --background-end-rgb: 255, 255, 255;
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    overscroll-behavior: none;
+    background-color: #131313;
+    color: #e5e2e1;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background-color: #F8FAE0;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+::-webkit-scrollbar {
+  display: none;
 }
