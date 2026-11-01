@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { getSession, createSessionToken, setSessionCookie, type SessionUser } from '@/lib/auth/session';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { generateReceipt } from '@/lib/receipt/generator';
 
 const candidateIdSchema = z.string().uuid('ID kandidat harus berformat UUID yang valid.');
@@ -61,60 +61,45 @@ export async function castBallotAction(candidateId: string): Promise<CastBallotA
 
   try {
     const receipt = generateReceipt();
-    const adminSupabase = createAdminClient();
 
-    // Panggil Stored Procedure Atomik
-    const { data: rpcResult, error: rpcError } = await adminSupabase.rpc('cast_ballot_secure', {
-      p_nim: session.nim,
-      p_candidate_id: candidateId,
-      p_receipt_hash: receipt.receiptHash,
-    });
+    if (isSupabaseConfigured()) {
+      const adminSupabase = createAdminClient();
 
-    if (rpcError) {
-      console.warn('[CastBallotAction] Database RPC error:', rpcError);
+      // Panggil Stored Procedure Atomik
+      const { data: rpcResult, error: rpcError } = await adminSupabase.rpc('cast_ballot_secure', {
+        p_nim: session.nim,
+        p_candidate_id: candidateId,
+        p_receipt_hash: receipt.receiptHash,
+      });
 
-      // Dev mock fallback jika database Supabase belum terhubung saat pengujian lokal
-      if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
-        const updatedUser: SessionUser = { ...session, hasVoted: true };
-        const updatedToken = await createSessionToken(updatedUser);
-        setSessionCookie(updatedToken);
-
+      if (rpcError) {
+        console.warn('[CastBallotAction] Database RPC error:', rpcError);
         return {
-          success: true,
-          code: 'SUCCESS',
-          message: 'Suara Anda berhasil dicatat secara sah (Mode Pengujian Lokal).',
-          receipt: {
-            token: receipt.rawToken,
-            date: receipt.sessionDate,
-          },
+          success: false,
+          code: 'TRANSACTION_FAILED',
+          message: 'Terjadi kegagalan transaksi pada basis data.',
         };
       }
 
-      return {
-        success: false,
-        code: 'TRANSACTION_FAILED',
-        message: 'Terjadi kegagalan transaksi pada basis data.',
-      };
-    }
+      if (!rpcResult || !rpcResult.success) {
+        const code = rpcResult?.code || 'UNKNOWN_ERROR';
+        const message = rpcResult?.message || 'Gagal merekam suara ke bilik suara.';
 
-    if (!rpcResult || !rpcResult.success) {
-      const code = rpcResult?.code || 'UNKNOWN_ERROR';
-      const message = rpcResult?.message || 'Gagal merekam suara ke bilik suara.';
+        if (code === 'ALREADY_VOTED') {
+          const updatedUser: SessionUser = { ...session, hasVoted: true };
+          const updatedToken = await createSessionToken(updatedUser);
+          setSessionCookie(updatedToken);
+        }
 
-      if (code === 'ALREADY_VOTED') {
-        const updatedUser: SessionUser = { ...session, hasVoted: true };
-        const updatedToken = await createSessionToken(updatedUser);
-        setSessionCookie(updatedToken);
+        return {
+          success: false,
+          code,
+          message,
+        };
       }
-
-      return {
-        success: false,
-        code,
-        message,
-      };
     }
 
-    // Update sesi pemilih
+    // Dev mock fallback jika database Supabase belum terhubung saat pengujian lokal
     const updatedUser: SessionUser = { ...session, hasVoted: true };
     const updatedToken = await createSessionToken(updatedUser);
     setSessionCookie(updatedToken);
@@ -128,12 +113,12 @@ export async function castBallotAction(candidateId: string): Promise<CastBallotA
         date: receipt.sessionDate,
       },
     };
-  } catch (err) {
-    console.error('[CastBallotAction] Unexpected exception:', err);
+  } catch (error) {
+    console.error('[CastBallotAction] Unexpected exception:', error);
     return {
       success: false,
-      code: 'INTERNAL_ERROR',
-      message: 'Terjadi kegagalan server yang tidak terduga.',
+      code: 'SERVER_ERROR',
+      message: 'Terjadi kegagalan server saat mengirim suara.',
     };
   }
 }

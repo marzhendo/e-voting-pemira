@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,21 +85,23 @@ export async function GET() {
     );
   }
 
-  try {
-    const adminSupabase = createAdminClient();
-    const { data: candidates, error } = await adminSupabase
-      .from('candidates')
-      .select('*')
-      .order('candidate_number', { ascending: true });
+  if (isSupabaseConfigured()) {
+    try {
+      const adminSupabase = createAdminClient();
+      const { data: candidates, error } = await adminSupabase
+        .from('candidates')
+        .select('*')
+        .order('candidate_number', { ascending: true });
 
-    if (!error && candidates && candidates.length > 0) {
-      return NextResponse.json({ success: true, candidates });
+      if (!error && candidates && candidates.length > 0) {
+        return NextResponse.json({ success: true, candidates });
+      }
+    } catch (err) {
+      console.warn('[AdminCandidatesRoute] Database offline, checking dev storage:', err);
     }
-  } catch (err) {
-    console.warn('[AdminCandidatesRoute] Database offline, checking dev storage:', err);
   }
 
-  if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
+  if (process.env.APP_ENV !== 'production') {
     return NextResponse.json({ success: true, candidates: DEV_CANDIDATES });
   }
 
@@ -130,32 +132,34 @@ export async function POST(req: NextRequest) {
 
     const newCandidate = parsed.data;
 
-    try {
-      const adminSupabase = createAdminClient();
-      const { data, error } = await adminSupabase
-        .from('candidates')
-        .insert([
-          {
-            candidate_number: newCandidate.candidate_number,
-            leader_name: newCandidate.leader_name,
-            vice_leader_name: newCandidate.vice_leader_name,
-            vision: newCandidate.vision,
-            mission: newCandidate.mission,
-            photo_url: newCandidate.photo_url || '',
-            is_active: newCandidate.is_active,
-          },
-        ])
-        .select()
-        .single();
+    if (isSupabaseConfigured()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const { data, error } = await adminSupabase
+          .from('candidates')
+          .insert([
+            {
+              candidate_number: newCandidate.candidate_number,
+              leader_name: newCandidate.leader_name,
+              vice_leader_name: newCandidate.vice_leader_name,
+              vision: newCandidate.vision,
+              mission: newCandidate.mission,
+              photo_url: newCandidate.photo_url || '',
+              is_active: newCandidate.is_active,
+            },
+          ])
+          .select()
+          .single();
 
-      if (!error && data) {
-        return NextResponse.json({ success: true, candidate: data });
+        if (!error && data) {
+          return NextResponse.json({ success: true, candidate: data });
+        }
+      } catch (dbErr) {
+        console.warn('[AdminCandidatesRoute] DB offline during insert, using dev memory store:', dbErr);
       }
-    } catch (dbErr) {
-      console.warn('[AdminCandidatesRoute] DB offline during insert, using dev memory store:', dbErr);
     }
 
-    if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
+    if (process.env.APP_ENV !== 'production') {
       const created: CandidateRecord = {
         id: `dev-cand-${Date.now()}`,
         candidate_number: newCandidate.candidate_number,
@@ -199,23 +203,25 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'ID kandidat wajib disertakan.' }, { status: 400 });
     }
 
-    try {
-      const adminSupabase = createAdminClient();
-      const { data, error } = await adminSupabase
-        .from('candidates')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+    if (isSupabaseConfigured()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const { data, error } = await adminSupabase
+          .from('candidates')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
 
-      if (!error && data) {
-        return NextResponse.json({ success: true, candidate: data });
+        if (!error && data) {
+          return NextResponse.json({ success: true, candidate: data });
+        }
+      } catch (dbErr) {
+        console.warn('[AdminCandidatesRoute] DB offline during update, using dev memory store:', dbErr);
       }
-    } catch (dbErr) {
-      console.warn('[AdminCandidatesRoute] DB offline during update, using dev memory store:', dbErr);
     }
 
-    if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
+    if (process.env.APP_ENV !== 'production') {
       DEV_CANDIDATES = DEV_CANDIDATES.map((c) => (c.id === id ? { ...c, ...updates } : c));
       const updated = DEV_CANDIDATES.find((c) => c.id === id);
       return NextResponse.json({ success: true, candidate: updated });
@@ -252,21 +258,23 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Opsi Kotak Kosong adalah opsi konstitusional dasar dan tidak dapat dihapus.' }, { status: 400 });
     }
 
-    try {
-      const adminSupabase = createAdminClient();
-      const { error } = await adminSupabase
-        .from('candidates')
-        .delete()
-        .eq('id', id);
+    if (isSupabaseConfigured()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const { error } = await adminSupabase
+          .from('candidates')
+          .delete()
+          .eq('id', id);
 
-      if (!error) {
-        return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus.' });
+        if (!error) {
+          return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus.' });
+        }
+      } catch (dbErr) {
+        console.warn('[AdminCandidatesRoute] DB offline during delete, using dev memory store:', dbErr);
       }
-    } catch (dbErr) {
-      console.warn('[AdminCandidatesRoute] DB offline during delete, using dev memory store:', dbErr);
     }
 
-    if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
+    if (process.env.APP_ENV !== 'production') {
       DEV_CANDIDATES = DEV_CANDIDATES.filter((c) => c.id !== id);
       return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus (Dev Mode).' });
     }

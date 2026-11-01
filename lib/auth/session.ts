@@ -25,7 +25,7 @@ interface SessionJwtPayload extends SessionUser {
 
 function getSessionSecret(): Uint8Array {
   const secret = process.env.SESSION_SECRET || 'dev-session-secret-must-be-changed-in-production-at-least-32-chars';
-  if (process.env.NODE_ENV === 'production' && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)) {
+  if (process.env.APP_ENV === 'production' && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)) {
     throw new Error('FATAL SECURITY ERROR: SESSION_SECRET must be at least 32 characters in production.');
   }
   return new TextEncoder().encode(secret);
@@ -76,11 +76,13 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
  */
 export function setSessionCookie(token: string) {
   const cookieStore = cookies();
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProductionHttps =
+    process.env.APP_ENV === 'production' &&
+    !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: isProduction,
+    secure: isProductionHttps,
     sameSite: 'lax', // Lax enables session preservation after OAuth redirect from Entra
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: '/',
@@ -104,9 +106,13 @@ export async function getSession(): Promise<SessionUser | null> {
  */
 export function clearSessionCookie() {
   const cookieStore = cookies();
+  const isProductionHttps =
+    process.env.APP_ENV === 'production' &&
+    !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
+
   cookieStore.set(SESSION_COOKIE_NAME, '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProductionHttps,
     sameSite: 'lax',
     maxAge: 0,
     path: '/',

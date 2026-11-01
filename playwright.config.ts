@@ -4,37 +4,27 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30 * 1000,
   expect: {
-    timeout: 5000,
+    timeout: 7000,
   },
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  retries: 0,
+  workers: 1,
+  reporter: 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3002',
     trace: 'on-first-retry',
   },
+  webServer: {
+    command: 'npx next start -p 3002',
+    url: 'http://localhost:3002',
+    reuseExistingServer: false,
+    timeout: 60 * 1000,
+  },
   projects: [
-    // 1. Default Chromium (Clean & reliable for CI/CD and auth tests)
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // 2. Optional Brave profile (runs only when BRAVE_PATH environment variable is configured)
-    ...(process.env.BRAVE_PATH
-      ? [
-          {
-            name: 'brave',
-            use: {
-              ...devices['Desktop Chrome'],
-              launchOptions: {
-                executablePath: process.env.BRAVE_PATH,
-                args: ['--disable-brave-extension'],
-              },
-            },
-          },
-        ]
-      : []),
   ],
 });

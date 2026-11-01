@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import type { DummyAccount } from '@/lib/auth/dummy';
 import { ShieldCheck, AlertTriangle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 export function LoginForm() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const errorMessage = searchParams.get('message');
   const errorCode = searchParams.get('error');
@@ -50,11 +49,11 @@ export function LoginForm() {
       }
 
       if (data.user?.role && data.user.role !== 'voter') {
-        router.push('/admin/dashboard');
+        window.location.href = '/admin/dashboard';
       } else if (data.user?.hasVoted) {
-        router.push('/receipt');
+        window.location.href = '/receipt';
       } else {
-        router.push('/vote');
+        window.location.href = '/vote';
       }
     } catch {
       setCustomError('Terjadi kesalahan koneksi saat login.');
@@ -100,7 +99,7 @@ export function LoginForm() {
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
               <rect fill="#F25022" height="9" width="9" x="1" y="1" />
               <rect fill="#7FBA00" height="9" width="9" x="11" y="1" />
-              <rect fill="#00A4EF" height="9" width="9" x="11" y="1" />
+              <rect fill="#00A4EF" height="9" width="9" x="11" y="11" />
               <rect fill="#FFB900" height="9" width="9" x="11" y="11" />
             </svg>
             <span>Masuk dengan Email Kampus</span>

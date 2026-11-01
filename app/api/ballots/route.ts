@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (rpcError) {
       console.warn('[CastBallotRoute] Database RPC error:', rpcError);
 
-      if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
+      if (process.env.APP_ENV !== 'production') {
         const updatedUser: SessionUser = { ...session, hasVoted: true };
         const updatedToken = await createSessionToken(updatedUser);
         setSessionCookie(updatedToken);

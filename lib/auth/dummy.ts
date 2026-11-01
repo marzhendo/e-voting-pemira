@@ -73,15 +73,11 @@ export const DUMMY_ACCOUNTS: DummyAccount[] = [
  * Checks whether dummy authentication is permitted.
  * 
  * STRICT INVARIANT:
- * Dummy authentication is strictly prohibited in production environments.
- * Must fail-closed if NODE_ENV or APP_ENV is 'production'.
+ * Dummy authentication is strictly prohibited when APP_ENV is 'production'.
+ * In non-production environments (development, staging, test), ENABLE_DUMMY_AUTH must be 'true'.
  */
 export function isDummyAuthAllowed(): boolean {
-  const isProduction =
-    process.env.NODE_ENV === 'production' ||
-    process.env.APP_ENV === 'production';
-
-  if (isProduction) {
+  if (process.env.APP_ENV === 'production') {
     return false;
   }
 
@@ -110,20 +106,28 @@ export async function authenticateDummyUser(accountId: string): Promise<Identity
     };
   }
 
-  // Coba jalankan alur resolusi identitas database Supabase jika online
-  try {
-    const dbResult = await resolveUserIdentity({
-      email: account.email,
-      name: account.name,
-      entraTenantId: '00000000-0000-0000-0000-000000000001',
-      entraObjectId: `00000000-0000-0000-0000-${account.id.padEnd(12, '0')}`,
-    });
+  // Coba jalankan alur database Supabase hanya jika kredensial terkonfigurasi nyata
+  const isSupabaseConfigured =
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id') &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    !process.env.SUPABASE_SERVICE_ROLE_KEY.includes('placeholder');
 
-    if (dbResult.success || dbResult.code === 'ALREADY_VOTED' || dbResult.code === 'NOT_FOUND') {
-      return dbResult;
+  if (isSupabaseConfigured) {
+    try {
+      const dbResult = await resolveUserIdentity({
+        email: account.email,
+        name: account.name,
+        entraTenantId: '00000000-0000-0000-0000-000000000001',
+        entraObjectId: `00000000-0000-0000-0000-${account.id.padEnd(12, '0')}`,
+      });
+
+      if (dbResult.success || dbResult.code === 'ALREADY_VOTED' || dbResult.code === 'NOT_FOUND') {
+        return dbResult;
+      }
+    } catch (err) {
+      console.warn('[DummyAuth] Database offline or unreachable, falling back to in-memory mock account:', err);
     }
-  } catch (err) {
-    console.warn('[DummyAuth] Database offline or unreachable, falling back to in-memory mock account:', err);
   }
 
   // MOCK FALLBACK (Khusus pengujian dev lokal tanpa database Supabase):
