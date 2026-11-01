@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,53 +16,55 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  try {
-    const { searchParams } = new URL(req.url);
-    const search = searchParams.get('q') || '';
-    const generation = searchParams.get('generation');
-    const status = searchParams.get('status'); // 'voted' | 'not_voted' | null
-    const limit = Math.min(Number(searchParams.get('limit') || '50'), 100);
-    const offset = Number(searchParams.get('offset') || '0');
+  if (isSupabaseConfigured()) {
+    try {
+      const { searchParams } = new URL(req.url);
+      const search = searchParams.get('q') || '';
+      const generation = searchParams.get('generation');
+      const status = searchParams.get('status'); // 'voted' | 'not_voted' | null
+      const limit = Math.min(Number(searchParams.get('limit') || '50'), 100);
+      const offset = Number(searchParams.get('offset') || '0');
 
-    const adminSupabase = createAdminClient();
+      const adminSupabase = createAdminClient();
 
-    let query = adminSupabase
-      .from('voters_whitelist')
-      .select('id, nim, name, email, generation, has_voted, updated_at', { count: 'exact' });
+      let query = adminSupabase
+        .from('voters_whitelist')
+        .select('id, nim, name, email, generation, has_voted, updated_at', { count: 'exact' });
 
-    if (search.trim()) {
-      query = query.or(`nim.ilike.%${search.trim()}%,name.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`);
+      if (search.trim()) {
+        query = query.or(`nim.ilike.%${search.trim()}%,name.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`);
+      }
+
+      if (generation && generation !== 'all') {
+        query = query.eq('generation', Number(generation));
+      }
+
+      if (status === 'voted') {
+        query = query.eq('has_voted', true);
+      } else if (status === 'not_voted') {
+        query = query.eq('has_voted', false);
+      }
+
+      query = query.order('nim', { ascending: true }).range(offset, offset + limit - 1);
+
+      const { data: voters, error, count } = await query;
+
+      if (!error && voters) {
+        return NextResponse.json({
+          success: true,
+          voters: voters || [],
+          total: count || 0,
+          limit,
+          offset,
+        });
+      }
+    } catch (err) {
+      console.warn('[AdminDptRoute] Database offline, checking dev fallback:', err);
     }
-
-    if (generation && generation !== 'all') {
-      query = query.eq('generation', Number(generation));
-    }
-
-    if (status === 'voted') {
-      query = query.eq('has_voted', true);
-    } else if (status === 'not_voted') {
-      query = query.eq('has_voted', false);
-    }
-
-    query = query.order('nim', { ascending: true }).range(offset, offset + limit - 1);
-
-    const { data: voters, error, count } = await query;
-
-    if (!error && voters) {
-      return NextResponse.json({
-        success: true,
-        voters: voters || [],
-        total: count || 0,
-        limit,
-        offset,
-      });
-    }
-  } catch (err) {
-    console.warn('[AdminDptRoute] Database offline, checking dev fallback:', err);
   }
 
   // Dev mock data jika DB belum online
-  if (process.env.NODE_ENV !== 'production' && process.env.APP_ENV !== 'production') {
+  if (process.env.APP_ENV !== 'production') {
     const mockVoters = [
       { id: '1', nim: '103012300001', name: 'Ahmad Rizky Pratama', email: 'voter1@student.telkomuniversity.ac.id', generation: 2023, has_voted: false, updated_at: new Date().toISOString() },
       { id: '2', nim: '103012300002', name: 'Budi Santoso', email: 'voter2@student.telkomuniversity.ac.id', generation: 2023, has_voted: true, updated_at: new Date().toISOString() },
