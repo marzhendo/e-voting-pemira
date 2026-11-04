@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   CheckCircle2,
@@ -95,8 +96,15 @@ export default function ReceiptPage() {
       <header className="w-full border-b border-outline-variant/20 bg-surface/90 backdrop-blur-md">
         <div className="h-16 max-w-4xl mx-auto px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-              HMIF
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+              <Image
+                src="/assets/img/hmif-logo.png"
+                alt="Logo HMIF"
+                width={36}
+                height={36}
+                priority
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <span className="text-xs sm:text-sm font-bold text-on-surface uppercase block">
@@ -131,10 +139,10 @@ export default function ReceiptPage() {
                   Pemira HMIF Telkom University Purwokerto
                 </span>
                 <h1 className="text-xl sm:text-2xl font-bold text-on-surface mt-0.5">
-                  Suara Berhasil Dikirim
+                  Suara Tercatat
                 </h1>
                 <p className="text-xs text-outline mt-1">
-                  Terima kasih atas partisipasi aktif Anda dalam suksesi kepengurusan HMIF.
+                  Hak suara Anda telah tercatat dalam sistem KPR.
                 </p>
               </div>
             </div>
@@ -177,7 +185,7 @@ export default function ReceiptPage() {
                   <span className="text-outline text-[11px] block">Status Pilihan:</span>
                   <span className="font-medium text-on-surface mt-0.5 flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                    Dirahasiakan (LUBER)
+                    Rahasia (Asas Luber)
                   </span>
                 </div>
               </div>
@@ -191,7 +199,7 @@ export default function ReceiptPage() {
                   className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-medium"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>{isVerifying ? 'Memeriksa...' : 'Verifikasi Keabsahan Token di Server'}</span>
+                  <span>{isVerifying ? 'Memeriksa...' : 'Cek Keabsahan Bukti Pemilihan'}</span>
                 </button>
 
                 {verifyStatus && (
@@ -205,7 +213,7 @@ export default function ReceiptPage() {
             {/* Note & Actions Footer */}
             <div className="p-6 pt-0 flex flex-col gap-3">
               <p className="text-[11px] text-outline text-center leading-relaxed">
-                Pilihan Anda bersifat rahasia dan tidak dapat diubah kembali. Simpan token ini sebagai bukti partisipasi.
+                Simpan token ini sebagai bukti partisipasi. Pilihan Anda bersifat rahasia.
               </p>
 
               <div className="flex flex-col gap-2 pt-2">
@@ -215,7 +223,7 @@ export default function ReceiptPage() {
                   className="w-full py-3 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Selesai &amp; Keluar</span>
+                  <span>Keluar dari Sesi</span>
                 </button>
 
                 <Link

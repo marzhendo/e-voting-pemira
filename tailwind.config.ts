@@ -66,6 +66,19 @@ const config: Config = {
         montserrat: ['var(--font-montserrat)', 'Montserrat', 'sans-serif'],
         sans: ['var(--font-montserrat)', 'system-ui', 'sans-serif'],
       },
+      keyframes: {
+        pageEnter: {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        'page-enter': 'pageEnter 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        shimmer: 'shimmer 1.8s infinite',
+      },
     },
   },
   plugins: [],

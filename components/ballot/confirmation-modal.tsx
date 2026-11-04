@@ -30,7 +30,7 @@ export function ConfirmationModal({
     : `Pasangan Calon ${numberStr}`;
 
   const subtitle = isKotakKosong
-    ? 'Opsi Tidak Memilih Pasangan Calon'
+    ? 'Opsi Kotak Kosong'
     : `${selectedCandidate.leader_name} & ${selectedCandidate.vice_leader_name}`;
 
   return (
@@ -47,7 +47,7 @@ export function ConfirmationModal({
                 Konfirmasi Pilihan
               </h2>
               <p className="text-xs text-outline">
-                Pastikan pilihan Anda sudah sesuai
+                Pilihan ini bersifat final dan tidak dapat diubah.
               </p>
             </div>
           </div>
@@ -85,7 +85,7 @@ export function ConfirmationModal({
 
         {/* Note */}
         <p className="text-xs text-on-surface-variant leading-relaxed">
-          Suara yang telah dikonfirmasi bersifat final dan tidak dapat diubah kembali.
+          Suara yang sudah dikunci tidak dapat diubah kembali.
         </p>
 
         {/* Action Buttons */}
@@ -108,10 +108,10 @@ export function ConfirmationModal({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
-                <span>Mengirim Suara...</span>
+                <span>Mengunci Suara...</span>
               </>
             ) : (
-              <span>Ya, Kirim Suara</span>
+              <span>Kunci Suara</span>
             )}
           </button>
         </div>

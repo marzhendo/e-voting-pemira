@@ -3,20 +3,43 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { DummyAccount } from '@/lib/auth/dummy';
-import { ShieldCheck, AlertTriangle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  ShieldCheck,
+  AlertTriangle,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  KeyRound,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  RefreshCw,
+} from 'lucide-react';
 
 export function LoginForm() {
   const searchParams = useSearchParams();
 
-  const errorMessage = searchParams.get('message');
-  const errorCode = searchParams.get('error');
+  const urlMessage = searchParams.get('message');
+  const urlError = searchParams.get('error');
 
+  // Step 1: 'nim' | Step 2: 'pin'
+  const [step, setStep] = useState<'nim' | 'pin'>('nim');
+  const [identifier, setIdentifier] = useState('');
+  const [pin, setPin] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+
+  // Dev Mock Accounts
   const [dummyAccounts, setDummyAccounts] = useState<DummyAccount[]>([]);
   const [dummyEnabled, setDummyEnabled] = useState(false);
   const [showDummyAccounts, setShowDummyAccounts] = useState(false);
   const [loadingAccountId, setLoadingAccountId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customError, setCustomError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/auth/dummy-login')
@@ -30,9 +53,107 @@ export function LoginForm() {
       .catch(() => {});
   }, []);
 
+  // Cooldown countdown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  // Request OTP (Step 1)
+  async function handleRequestOtp(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const cleanId = identifier.trim();
+
+    if (!cleanId || cleanId.length < 4) {
+      setErrorMessage('Silakan masukkan NIM atau email kampus yang valid.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setSuccessNotice(null);
+
+    try {
+      const res = await fetch('/api/auth/otp/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: cleanId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Gagal mengirim kode PIN verifikasi.');
+        if (data.cooldownSeconds) {
+          setCooldown(data.cooldownSeconds);
+        }
+        return;
+      }
+
+      setMaskedEmail(data.maskedEmail || 'email kampus Anda');
+      setCooldown(data.cooldownSeconds || 60);
+      setSuccessNotice(`Kode PIN 6-digit dikirim ke ${data.maskedEmail || 'Outlook kampus Anda'}.`);
+      setStep('pin');
+      setPin('');
+    } catch {
+      setErrorMessage('Terjadi kesalahan jaringan saat mengirim permintaan kode PIN.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Verify OTP (Step 2)
+  async function handleVerifyOtp(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const cleanPin = pin.trim();
+
+    if (!/^\d{6}$/.test(cleanPin)) {
+      setErrorMessage('Kode PIN harus tepat 6 digit angka.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setSuccessNotice(null);
+
+    try {
+      const res = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          pin: cleanPin,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Kode PIN tidak valid atau telah kedaluwarsa.');
+        if (typeof data.remainingAttempts === 'number') {
+          setRemainingAttempts(data.remainingAttempts);
+        }
+        return;
+      }
+
+      setSuccessNotice('Terverifikasi. Membuka bilik suara...');
+      setTimeout(() => {
+        window.location.href = data.redirectTo || '/vote';
+      }, 600);
+    } catch {
+      setErrorMessage('Terjadi gangguan jaringan saat memverifikasi kode PIN.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Handle Dummy Login (Instant Bypass for Dev Testing)
   async function handleDummyLogin(accountId: string) {
     setLoadingAccountId(accountId);
-    setCustomError(null);
+    setErrorMessage(null);
 
     try {
       const res = await fetch('/api/auth/dummy-login', {
@@ -44,7 +165,7 @@ export function LoginForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setCustomError(data.error || 'Login gagal.');
+        setErrorMessage(data.error || 'Login gagal.');
         return;
       }
 
@@ -56,69 +177,181 @@ export function LoginForm() {
         window.location.href = '/vote';
       }
     } catch {
-      setCustomError('Terjadi kesalahan koneksi saat login.');
+      setErrorMessage('Terjadi kesalahan koneksi saat login.');
     } finally {
       setLoadingAccountId(null);
     }
   }
 
-  function handleEntraLogin() {
-    setIsSubmitting(true);
-    window.location.href = '/api/auth/login';
-  }
-
   return (
     <div className="w-full space-y-4">
-      {/* Banner Notifikasi Error */}
-      {(errorMessage || customError) && (
-        <div className="rounded-xl border border-hmif-red/30 bg-red-50 p-3.5 text-xs text-hmif-red flex items-start gap-2.5">
+      {/* Banner Error / Notifikasi */}
+      {(errorMessage || urlMessage) && (
+        <div className="rounded-xl border border-hmif-red/30 bg-red-50 p-3.5 text-xs text-hmif-red flex items-start gap-2.5 animate-in fade-in duration-200">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <div>
+          <div className="flex-1">
             <div className="font-bold">
-              {errorCode ? `Akses Ditolak (${errorCode})` : 'Perhatian'}
+              {urlError ? `Akses Ditolak (${urlError})` : 'Gagal masuk'}
             </div>
-            <div className="mt-0.5 text-neutral-700">{customError || errorMessage}</div>
+            <div className="mt-0.5 text-neutral-700">{errorMessage || urlMessage}</div>
+            {remainingAttempts !== null && (
+              <div className="mt-1 font-semibold text-neutral-800">
+                Sisa kesempatan percobaan: {remainingAttempts} kali.
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Tombol Login SSO Microsoft Entra */}
-      <button
-        type="button"
-        disabled={isSubmitting}
-        onClick={handleEntraLogin}
-        className="w-full h-12 px-5 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-sm font-semibold flex items-center justify-center gap-3 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-hmif-blue disabled:opacity-75 disabled:cursor-not-allowed"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>Mengarahkan ke Microsoft SSO...</span>
-          </>
-        ) : (
-          <>
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-              <rect fill="#F25022" height="9" width="9" x="1" y="1" />
-              <rect fill="#7FBA00" height="9" width="9" x="11" y="1" />
-              <rect fill="#00A4EF" height="9" width="9" x="11" y="11" />
-              <rect fill="#FFB900" height="9" width="9" x="11" y="11" />
-            </svg>
-            <span>Masuk dengan Email Kampus</span>
-          </>
-        )}
-      </button>
+      {/* Banner Sukses Pengiriman */}
+      {successNotice && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-start gap-2.5 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600 shrink-0" />
+          <span className="flex-1 leading-relaxed">{successNotice}</span>
+        </div>
+      )}
 
-      {/* Domain Notice */}
-      <p className="text-center text-xs text-neutral-500 font-medium">
-        Khusus akun <span className="font-semibold text-neutral-800">@student.telkomuniversity.ac.id</span>
-      </p>
+      {/* STEP 1: INPUT NIM */}
+      {step === 'nim' && (
+        <form onSubmit={handleRequestOtp} className="space-y-4">
+          <div>
+            <label
+              htmlFor="identifier"
+              className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5"
+            >
+              NIM
+            </label>
+            <div className="relative">
+              <input
+                id="identifier"
+                type="text"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="Contoh: 103012300001"
+                disabled={isLoading}
+                className="w-full h-12 pl-11 pr-4 rounded-xl border border-neutral-300 bg-neutral-50 text-neutral-900 placeholder:text-neutral-400 text-sm font-medium focus:bg-white focus:border-hmif-blue focus:ring-2 focus:ring-hmif-blue/20 transition-all outline-none"
+              />
+              <Mail className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <p className="text-[11px] text-neutral-500 mt-1.5 leading-normal">
+              Kode PIN 6-digit dikirim ke email Outlook kampus Anda.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !identifier.trim()}
+            className="w-full h-12 px-5 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-hmif-blue disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Mengirim Kode PIN...</span>
+              </>
+            ) : (
+              <>
+                <span>Kirim Kode PIN</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </form>
+      )}
+
+      {/* STEP 2: INPUT 6-DIGIT PIN */}
+      {step === 'pin' && (
+        <form onSubmit={handleVerifyOtp} className="space-y-4 animate-in fade-in duration-200">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor="pin"
+                className="block text-xs font-bold uppercase tracking-wider text-neutral-700"
+              >
+                Masukkan Kode PIN 6-Digit
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('nim');
+                  setErrorMessage(null);
+                  setSuccessNotice(null);
+                }}
+                className="text-[11px] text-hmif-blue hover:underline flex items-center gap-1 font-medium"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                <span>Ganti NIM</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                id="pin"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                autoFocus
+                autoComplete="one-time-code"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="• • • • • •"
+                disabled={isLoading}
+                className="w-full h-14 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-neutral-300 bg-neutral-50 text-neutral-900 placeholder:text-neutral-300 focus:bg-white focus:border-hmif-blue focus:ring-2 focus:ring-hmif-blue/20 transition-all outline-none"
+              />
+              <KeyRound className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            <div className="flex items-center justify-between mt-2 text-[11px] text-neutral-500">
+              <span>Dikirim ke: <strong className="text-neutral-700">{maskedEmail}</strong></span>
+              <span>Masa aktif: <strong>10 Menit</strong></span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || pin.length !== 6}
+            className="w-full h-12 px-5 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-hmif-blue disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Memverifikasi Kode PIN...</span>
+              </>
+            ) : (
+              <>
+                <span>Masuk ke Bilik Suara</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+
+          {/* Tombol Kirim Ulang Kode PIN */}
+          <div className="pt-1 text-center">
+            <button
+              type="button"
+              disabled={cooldown > 0 || isLoading}
+              onClick={() => handleRequestOtp()}
+              className="text-xs text-neutral-600 hover:text-hmif-blue transition-colors font-medium inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>
+                {cooldown > 0
+                  ? `Kirim ulang PIN dalam ${cooldown} detik`
+                  : 'Belum menerima email? Kirim ulang PIN'}
+              </span>
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* DPT Verification Badge */}
-      <div className="flex items-center gap-2 text-xs text-neutral-500 justify-center text-center pt-1">
+      <div className="flex items-center gap-2 text-xs text-neutral-500 justify-center text-center pt-2">
         <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-        <span>Hak pilih divalidasi dengan Daftar Pemilih Tetap (DPT).</span>
+        <span>Hak pilih divalidasi dengan Daftar Pemilih Tetap resmi.</span>
       </div>
 
-      {/* Panel Pengujian Mode Dummy (Collapsible Drawer) */}
+      {/* Panel Pengujian Mode Dummy (Collapsible Drawer for Dev Testing) */}
       {dummyEnabled && (
         <div className="mt-4 rounded-xl border border-neutral-700 bg-neutral-900 overflow-hidden text-white">
           <button

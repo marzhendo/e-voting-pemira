@@ -2,16 +2,21 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getDevElectionSettings, updateDevElectionSettings } from '@/lib/election/dev-settings-store';
 import { getClientIp } from '@/lib/auth/client-ip';
 import type { Database } from '@/lib/supabase/types';
 
 const updateSettingsSchema = z.object({
   is_voting_open: z.boolean().optional(),
+  isVotingOpen: z.boolean().optional(),
   maintenance_mode: z.boolean().optional(),
-  start_time: z.string().datetime().optional(),
-  end_time: z.string().datetime().optional(),
-  reason: z.string().min(5, 'Alasan operasional wajib dicantumkan minimal 5 karakter.'),
+  maintenanceMode: z.boolean().optional(),
+  start_time: z.string().optional(),
+  startTime: z.string().optional(),
+  end_time: z.string().optional(),
+  endTime: z.string().optional(),
+  reason: z.string().min(3, 'Alasan operasional wajib dicantumkan.'),
 });
 
 export async function GET() {
@@ -25,21 +30,24 @@ export async function GET() {
     );
   }
 
-  const adminSupabase = createAdminClient();
-  const { data, error } = await adminSupabase
-    .from('election_settings')
-    .select('*')
-    .eq('id', 1)
-    .single();
+  if (isSupabaseConfigured()) {
+    try {
+      const adminSupabase = createAdminClient();
+      const { data, error } = await adminSupabase
+        .from('election_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
 
-  if (error || !data) {
-    return NextResponse.json(
-      { error: 'Gagal membaca data pengaturan pemilihan.' },
-      { status: 500 }
-    );
+      if (!error && data) {
+        return NextResponse.json({ success: true, settings: data });
+      }
+    } catch (err) {
+      console.warn('[ElectionSettings] Supabase error, using dev fallback:', err);
+    }
   }
 
-  return NextResponse.json({ success: true, settings: data });
+  return NextResponse.json({ success: true, settings: getDevElectionSettings() });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -72,7 +80,11 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { is_voting_open, maintenance_mode, start_time, end_time, reason } = parsed.data;
+    const is_voting_open = parsed.data.is_voting_open ?? parsed.data.isVotingOpen;
+    const maintenance_mode = parsed.data.maintenance_mode ?? parsed.data.maintenanceMode;
+    const start_time = parsed.data.start_time ?? parsed.data.startTime;
+    const end_time = parsed.data.end_time ?? parsed.data.endTime;
+    const reason = parsed.data.reason;
 
     // Batasan Wewenang Berdasarkan Aturan Operasional:
     // 1. Superadmin TIDAK BOLEH membuka/menutup pemilu secara sepihak (wewenang KPR)
@@ -103,6 +115,22 @@ export async function PATCH(request: NextRequest) {
         { error: 'Waktu mulai harus lebih awal daripada waktu penutupan.' },
         { status: 400 }
       );
+    }
+
+    // Jika Supabase tidak terkonfigurasi (dev mode), simpan di in-memory store
+    if (!isSupabaseConfigured()) {
+      const devUpdates: Record<string, boolean | string> = {};
+      if (is_voting_open !== undefined) devUpdates.is_voting_open = is_voting_open;
+      if (maintenance_mode !== undefined) devUpdates.maintenance_mode = maintenance_mode;
+      if (start_time !== undefined) devUpdates.start_time = start_time;
+      if (end_time !== undefined) devUpdates.end_time = end_time;
+
+      const updated = updateDevElectionSettings(devUpdates);
+      return NextResponse.json({
+        success: true,
+        message: 'Pengaturan pemilihan berhasil diperbarui (Dev Mode).',
+        settings: updated,
+      });
     }
 
     const adminSupabase = createAdminClient();
@@ -161,4 +189,8 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function POST(request: NextRequest) {
+  return PATCH(request);
 }

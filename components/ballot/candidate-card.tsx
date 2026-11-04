@@ -1,7 +1,6 @@
 'use client';
 
-import { Users, Check } from 'lucide-react';
-import { VisionMissionAccordion } from '@/components/candidates/vision-mission-accordion';
+import { Users, Check, FileText, ChevronRight } from 'lucide-react';
 
 export interface CandidateItem {
   id: string;
@@ -11,18 +10,22 @@ export interface CandidateItem {
   vision: string;
   mission: string[];
   photo_url: string | null;
+  chairman_cv_url?: string | null;
+  vice_chairman_cv_url?: string | null;
 }
 
 interface CandidateCardProps {
   candidate: CandidateItem;
   isSelected: boolean;
   onSelect: (candidate: CandidateItem) => void;
+  onOpenDetail?: (candidate: CandidateItem) => void;
 }
 
 export function CandidateCard({
   candidate,
   isSelected,
   onSelect,
+  onOpenDetail,
 }: CandidateCardProps) {
   const numberStr = candidate.candidate_number.toString().padStart(2, '0');
 
@@ -49,7 +52,7 @@ export function CandidateCard({
                 Pasangan Calon
               </span>
               <h3 className="text-base text-on-surface font-bold">
-                Nomor Urut {numberStr}
+                No. Urut {numberStr}
               </h3>
             </div>
           </div>
@@ -86,27 +89,50 @@ export function CandidateCard({
           )}
         </div>
 
-        {/* Nama Calon Ketua & Wakil Ketua */}
+        {/* Nama Pasangan Calon */}
         <div className="space-y-1">
           <h4 className="text-base sm:text-lg font-bold text-on-surface leading-snug">
             {candidate.leader_name} &amp; {candidate.vice_leader_name}
           </h4>
           <p className="text-xs text-on-surface-variant">
-            Calon Ketua &amp; Calon Wakil Ketua HMIF
+            Calon Chairman &amp; Vice Chairman HMIF
           </p>
         </div>
 
-        {/* Visi & Misi */}
-        <VisionMissionAccordion
-          vision={candidate.vision}
-          mission={candidate.mission}
-        />
+        {/* Fokus Visi Singkat */}
+        <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/30 text-xs text-on-surface-variant">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-primary block mb-1">
+            Fokus Visi:
+          </span>
+          <p className="line-clamp-2 text-xs leading-relaxed italic text-on-surface/90">
+            &ldquo;{candidate.vision}&rdquo;
+          </p>
+        </div>
+
+        {/* Tombol Masuk ke Halaman Detail & Unduh CV */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDetail?.(candidate);
+          }}
+          className="w-full h-10 px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-all group/btn shadow-sm cursor-pointer"
+        >
+          <span className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary group-hover/btn:scale-110 transition-transform" />
+            <span>Detail Visi Misi &amp; CV Paslon</span>
+          </span>
+          <span className="text-[11px] font-bold text-primary flex items-center gap-0.5">
+            <span>Buka</span>
+            <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
+          </span>
+        </button>
       </div>
 
       {/* Footer Aksi Card */}
       <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
         <span className="text-xs text-outline">
-          {isSelected ? '✓ Dipilih' : 'Klik untuk memilih'}
+          {isSelected ? '✓ Dipilih' : ''}
         </span>
         <button
           type="button"

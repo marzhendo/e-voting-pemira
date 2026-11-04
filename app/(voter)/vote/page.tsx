@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   Vote,
@@ -16,6 +17,8 @@ import {
 } from '@/components/ballot/candidate-card';
 import { KotakKosongCard } from '@/components/ballot/kotak-kosong-card';
 import { ConfirmationModal } from '@/components/ballot/confirmation-modal';
+import { SessionExpiredModal } from '@/components/ballot/session-expired-modal';
+import { CandidateDetailModal } from '@/components/candidates/candidate-detail-modal';
 import { castBallotAction } from '@/lib/actions/ballot';
 
 export default function VotePage() {
@@ -23,7 +26,9 @@ export default function VotePage() {
 
   const [candidates, setCandidates] = useState<CandidateItem[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateItem | null>(null);
+  const [detailCandidate, setDetailCandidate] = useState<CandidateItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingElection, setLoadingElection] = useState(true);
   const [electionError, setElectionError] = useState<string | null>(null);
@@ -34,15 +39,47 @@ export default function VotePage() {
   const [secondsLeft, setSecondsLeft] = useState(15 * 60);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDevOrTestHost =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.endsWith('.local');
+
+      if (isDevOrTestHost) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('expired') === 'true') {
+          setIsSessionExpired(true);
+        } else if (params.get('timeout')) {
+          const customSec = parseInt(params.get('timeout') || '15', 10);
+          if (!isNaN(customSec)) setSecondsLeft(customSec);
+        }
+      }
+    }
+
     // 1. Muat data kandidat dari endpoint master data pemilihan
     fetch('/api/election')
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setCandidates(data.candidates || []);
+          const candidateList: CandidateItem[] = data.candidates || [];
+          setCandidates(candidateList);
           if (data.electionStatus) {
             setVotingActive(data.electionStatus.isVotingActive);
             setMaintenanceMode(data.electionStatus.maintenanceMode);
+          }
+
+          if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const detailParam = params.get('detail') || params.get('candidate');
+            if (detailParam) {
+              const matched = candidateList.find(
+                (c) =>
+                  c.candidate_number.toString() === detailParam ||
+                  c.id === detailParam ||
+                  c.candidate_number.toString().padStart(2, '0') === detailParam
+              );
+              if (matched) setDetailCandidate(matched);
+            }
           }
         } else {
           setElectionError(data.error || 'Gagal memuat daftar kandidat.');
@@ -60,8 +97,7 @@ export default function VotePage() {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          alert('Sesi bilik suara Anda telah kedaluwarsa. Silakan login kembali.');
-          window.location.href = '/login';
+          setIsSessionExpired(true);
           return 0;
         }
         return prev - 1;
@@ -108,6 +144,8 @@ export default function VotePage() {
           setTimeout(() => {
             router.push('/receipt');
           }, 2000);
+        } else if (res.code === 'UNAUTHORIZED') {
+          setIsSessionExpired(true);
         }
       }
     } catch {
@@ -128,8 +166,15 @@ export default function VotePage() {
       <header className="fixed top-0 w-full z-40 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 shadow-sm">
         <div className="h-16 max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-              HMIF
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+              <Image
+                src="/assets/img/hmif-logo.png"
+                alt="Logo HMIF"
+                width={36}
+                height={36}
+                priority
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <span className="text-xs sm:text-sm font-bold tracking-tight text-on-surface uppercase block">
@@ -153,7 +198,7 @@ export default function VotePage() {
             </div>
 
             <a
-              href="https://t.me/hmif_tup"
+              href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
               className="text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1"
@@ -175,8 +220,8 @@ export default function VotePage() {
             </h1>
             <p className="text-on-surface-variant text-xs sm:text-sm mt-1">
               {isSingleCandidate
-                ? 'Tentukan pilihan Anda antara pasangan calon tunggal atau kotak kosong.'
-                : 'Pilih salah satu pasangan calon Ketua dan Wakil Ketua HMIF 2026/2027.'}
+                ? 'Pilih pasangan calon atau kotak kosong.'
+                : 'Pilih pasangan calon Chairman & Vice Chairman HMIF 2026/2027.'}
             </p>
           </div>
 
@@ -192,8 +237,8 @@ export default function VotePage() {
                 </h4>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   {maintenanceMode
-                    ? 'Sistem sedang dalam penyesuaian teknis. Pengiriman suara dinonaktifkan sementara.'
-                    : 'Jadwal pemungutan suara resmi belum dibuka atau telah berakhir.'}
+                    ? 'Sistem sedang dalam pemeliharaan. Coba lagi nanti atau hubungi Panitia KPR.'
+                    : 'Pemungutan suara belum dibuka atau telah berakhir sesuai jadwal resmi.'}
                 </p>
               </div>
             </div>
@@ -223,6 +268,7 @@ export default function VotePage() {
                     candidate={candidate}
                     isSelected={selectedCandidate?.id === candidate.id}
                     onSelect={handleSelectCandidate}
+                    onOpenDetail={setDetailCandidate}
                   />
                 ))}
 
@@ -252,6 +298,7 @@ export default function VotePage() {
                     candidate={candidate}
                     isSelected={selectedCandidate?.id === candidate.id}
                     onSelect={handleSelectCandidate}
+                    onOpenDetail={setDetailCandidate}
                   />
                 ))}
               </div>
@@ -262,7 +309,7 @@ export default function VotePage() {
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-px flex-1 bg-outline-variant/30" />
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-outline">
-                      Opsi Alternatif
+                      Kotak Kosong
                     </span>
                     <div className="h-px flex-1 bg-outline-variant/30" />
                   </div>
@@ -293,7 +340,7 @@ export default function VotePage() {
                   ? selectedCandidate.candidate_number === 0
                     ? 'Pilihan: Kotak Kosong'
                     : `Pilihan: Paslon ${selectedCandidate.candidate_number.toString().padStart(2, '0')}`
-                  : 'Silakan tentukan pilihan Anda'}
+                  : 'Pilih pasangan calon'}
               </span>
             </div>
 
@@ -310,7 +357,7 @@ export default function VotePage() {
 
               <button
                 type="button"
-                disabled={!selectedCandidate || !votingActive || maintenanceMode}
+                disabled={!selectedCandidate || !votingActive || maintenanceMode || isSessionExpired}
                 onClick={() => setIsModalOpen(true)}
                 className="w-full sm:w-auto px-5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm"
               >
@@ -323,11 +370,30 @@ export default function VotePage() {
 
         {/* Modal Konfirmasi */}
         <ConfirmationModal
-          isOpen={isModalOpen}
+          isOpen={isModalOpen && !isSessionExpired}
           selectedCandidate={selectedCandidate}
           isSubmitting={isSubmitting}
           onClose={() => setIsModalOpen(false)}
           onConfirm={handleConfirmVote}
+        />
+
+        {/* Modal Peringatan Sesi Kedaluwarsa */}
+        <SessionExpiredModal
+          isOpen={isSessionExpired}
+          onLoginRedirect={() => {
+            window.location.href = '/login';
+          }}
+        />
+
+        {/* Modal Detail Paslon & Unduh CV */}
+        <CandidateDetailModal
+          isOpen={!!detailCandidate}
+          candidate={detailCandidate}
+          isSelected={selectedCandidate?.id === detailCandidate?.id}
+          onClose={() => setDetailCandidate(null)}
+          onSelectCandidate={(c) => {
+            handleSelectCandidate(c);
+          }}
         />
       </main>
 

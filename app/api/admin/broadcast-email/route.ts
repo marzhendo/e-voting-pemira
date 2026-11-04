@@ -1,0 +1,223 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { z } from 'zod';
+import { getSession } from '@/lib/auth/session';
+import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { smtpMailService } from '@/lib/mail/smtp-service';
+
+export const dynamic = 'force-dynamic';
+
+const broadcastRequestSchema = z.object({
+  targetGroup: z.enum(['all', 'not_voted', 'voted']),
+  generation: z.string().default('all'),
+  subject: z.string().min(5, 'Subjek wajib minimal 5 karakter.'),
+  headline: z.string().min(5, 'Judul pengumuman wajib minimal 5 karakter.'),
+  bodyText: z.string().min(10, 'Isi pesan pengumuman wajib minimal 10 karakter.'),
+  ctaText: z.string().default('Masuk ke Bilik Suara Digital'),
+  ctaUrl: z.string().default('/login'),
+});
+
+// Mock DPT untuk pengujian di dev mode
+const MOCK_DEV_VOTERS = [
+  { nim: '103012300001', name: 'Ahmad Rizky Pratama', email: '103012300001@student.telkomuniversity.ac.id', generation: 2023, has_voted: false },
+  { nim: '103012300002', name: 'Budi Santoso', email: '103012300002@student.telkomuniversity.ac.id', generation: 2023, has_voted: true },
+  { nim: '103012400015', name: 'Siti Nurhaliza', email: '103012400015@student.telkomuniversity.ac.id', generation: 2024, has_voted: false },
+  { nim: '103012400022', name: 'Farhan Maulana', email: '103012400022@student.telkomuniversity.ac.id', generation: 2024, has_voted: true },
+  { nim: '103012500033', name: 'Nadia Putri', email: '103012500033@student.telkomuniversity.ac.id', generation: 2025, has_voted: false },
+  { nim: '103012600044', name: 'Kevin Ardiansyah', email: '103012600044@student.telkomuniversity.ac.id', generation: 2026, has_voted: false },
+];
+
+/**
+ * GET: Mengambil ringkasan jumlah calon penerima broadcast berdasarkan filter
+ */
+export async function GET(request: NextRequest) {
+  const session = await getSession();
+  const authCheck = verifyAdminAccess(session);
+
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const targetGroup = searchParams.get('targetGroup') || 'all';
+  const generation = searchParams.get('generation') || 'all';
+
+  if (isSupabaseConfigured()) {
+    try {
+      const adminSupabase = createAdminClient();
+      let query = adminSupabase.from('voters_whitelist').select('nim, name, email, generation, has_voted');
+
+      if (targetGroup === 'not_voted') query = query.eq('has_voted', false);
+      if (targetGroup === 'voted') query = query.eq('has_voted', true);
+      if (generation !== 'all') query = query.eq('generation', parseInt(generation, 10));
+
+      const { data: voters, error } = await query;
+      if (!error && voters) {
+        return NextResponse.json({
+          success: true,
+          count: voters.length,
+          previewRecipients: voters.slice(0, 5).map((v) => ({
+            nim: v.nim,
+            name: v.name,
+            email: v.email,
+            generation: v.generation,
+            has_voted: v.has_voted,
+          })),
+        });
+      }
+    } catch (err) {
+      console.warn('[BroadcastEmailRoute] Supabase query error, fallback to dev:', err);
+    }
+  }
+
+  // Dev mode mock filter
+  let filtered = MOCK_DEV_VOTERS;
+  if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
+  if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
+  if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);
+
+  return NextResponse.json({
+    success: true,
+    count: filtered.length,
+    previewRecipients: filtered.slice(0, 5),
+  });
+}
+
+/**
+ * POST: Menjalankan eksekusi pengiriman email massal / broadcast
+ */
+export async function POST(request: NextRequest) {
+  const session = await getSession();
+  const authCheck = verifyAdminAccess(session);
+
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+  }
+
+  // Auditor bersifat read-only mutlak
+  if (session?.role === 'auditor') {
+    return NextResponse.json(
+      { error: 'Akses Ditolak: Peran Auditor hanya memiliki hak baca (read-only).' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const parsed = broadcastRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Data formulir tidak valid.', details: parsed.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const { targetGroup, generation, subject, headline, bodyText, ctaText, ctaUrl } = parsed.data;
+
+    // Ambil daftar penerima
+    let recipients: Array<{ nim: string; name: string; email: string }> = [];
+
+    if (isSupabaseConfigured()) {
+      const adminSupabase = createAdminClient();
+      let query = adminSupabase.from('voters_whitelist').select('nim, name, email');
+
+      if (targetGroup === 'not_voted') query = query.eq('has_voted', false);
+      if (targetGroup === 'voted') query = query.eq('has_voted', true);
+      if (generation !== 'all') query = query.eq('generation', parseInt(generation, 10));
+
+      const { data, error } = await query;
+      if (error) {
+        return NextResponse.json({ error: 'Gagal mengambil data penerima DPT dari basis data.' }, { status: 500 });
+      }
+      recipients = data || [];
+    } else {
+      let filtered = MOCK_DEV_VOTERS;
+      if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
+      if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
+      if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);
+      recipients = filtered;
+    }
+
+    if (recipients.length === 0) {
+      return NextResponse.json(
+        { error: 'Tidak ditemukan pemilih yang sesuai dengan kriteria filter yang dipilih.' },
+        { status: 400 }
+      );
+    }
+
+    // Jalankan pengiriman dengan concurrent batching aman (anti-spam throttling)
+    // CHUNK_SIZE = 5 menjaga efisiensi throughput tanpa membebani connection pool SMTP
+    const CHUNK_SIZE = 5;
+    let sentCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
+      const chunk = recipients.slice(i, i + CHUNK_SIZE);
+      const results = await Promise.all(
+        chunk.map((voter) =>
+          smtpMailService
+            .sendBroadcastEmail({
+              to: voter.email,
+              voterName: voter.name,
+              nim: voter.nim,
+              subject,
+              headline,
+              bodyText,
+              ctaText,
+              ctaUrl,
+            })
+            .catch(() => ({ success: false }))
+        )
+      );
+
+      for (const res of results) {
+        if (res.success) {
+          sentCount++;
+        } else {
+          failedCount++;
+        }
+      }
+    }
+
+    // Catat ke Audit Log jika Supabase terhubung
+    if (isSupabaseConfigured()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const clientIp = getClientIp(request.headers);
+        await adminSupabase.from('audit_logs').insert({
+          actor_email: session?.email || 'unknown_admin',
+          action: 'BROADCAST_EMAIL',
+          details: {
+            targetGroup,
+            generation,
+            totalTarget: recipients.length,
+            sentCount,
+            failedCount,
+            subject,
+          },
+          ip_address: clientIp,
+        });
+      } catch (logErr) {
+        console.warn('[BroadcastEmailRoute] Audit log insert warning:', logErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Broadcast email selesai diproses. ${sentCount} berhasil, ${failedCount} gagal dari total ${recipients.length} target.`,
+      stats: {
+        totalTarget: recipients.length,
+        sentCount,
+        failedCount,
+      },
+    });
+  } catch (error) {
+    console.error('[BroadcastEmailRoute] Error sending broadcast:', error);
+    return NextResponse.json(
+      { error: 'Terjadi kegagalan server saat memproses pengiriman email massal.' },
+      { status: 500 }
+    );
+  }
+}

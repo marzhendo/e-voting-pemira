@@ -23,6 +23,10 @@ export interface Database {
           entra_tenant_id: string | null;
           entra_object_id: string | null;
           receipt_hash: string | null;
+          otp_hash: string | null;
+          otp_expires_at: string | null;
+          otp_attempts: number;
+          otp_last_sent_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -36,6 +40,10 @@ export interface Database {
           entra_tenant_id?: string | null;
           entra_object_id?: string | null;
           receipt_hash?: string | null;
+          otp_hash?: string | null;
+          otp_expires_at?: string | null;
+          otp_attempts?: number;
+          otp_last_sent_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -49,6 +57,10 @@ export interface Database {
           entra_tenant_id?: string | null;
           entra_object_id?: string | null;
           receipt_hash?: string | null;
+          otp_hash?: string | null;
+          otp_expires_at?: string | null;
+          otp_attempts?: number;
+          otp_last_sent_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -62,6 +74,8 @@ export interface Database {
           vision: string;
           mission: string[];
           photo_url: string;
+          chairman_cv_url?: string | null;
+          vice_chairman_cv_url?: string | null;
           is_active: boolean;
           created_at: string;
         };
@@ -73,6 +87,8 @@ export interface Database {
           vision: string;
           mission: string[];
           photo_url: string;
+          chairman_cv_url?: string | null;
+          vice_chairman_cv_url?: string | null;
           is_active?: boolean;
           created_at?: string;
         };
@@ -84,6 +100,8 @@ export interface Database {
           vision?: string;
           mission?: string[];
           photo_url?: string;
+          chairman_cv_url?: string | null;
+          vice_chairman_cv_url?: string | null;
           is_active?: boolean;
           created_at?: string;
         };

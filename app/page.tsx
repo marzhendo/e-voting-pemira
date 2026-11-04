@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Vote, Shield, ArrowRight, Lock, CheckCircle } from 'lucide-react';
 
 export default function HomePage() {
@@ -8,8 +9,15 @@ export default function HomePage() {
       <header className="w-full border-b border-neutral-800 bg-[#181818]/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white p-1 flex items-center justify-center font-bold text-hmif-dark text-xs">
-              HMIF
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+              <Image
+                src="/assets/img/hmif-logo.png"
+                alt="Logo HMIF Telkom University Purwokerto"
+                width={36}
+                height={36}
+                priority
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <span className="text-xs font-bold text-hmif-gold uppercase tracking-wider block">
@@ -48,7 +56,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-xs sm:text-sm text-neutral-300 max-w-lg leading-relaxed">
-            Sistem pemungutan suara digital Ketua dan Wakil Ketua Himpunan Mahasiswa Teknik Informatika Periode 2026/2027 dengan jaminan kerahasiaan suara (Ballot Secrecy) berasaskan LUBER JURDIL.
+            Platform resmi pemilihan Chairman &amp; Vice Chairman HMIF Periode 2026/2027.
           </p>
 
           {/* Action Buttons */}
@@ -57,7 +65,7 @@ export default function HomePage() {
               href="/login"
               className="w-full sm:w-auto px-6 py-3 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md"
             >
-              <span>Masuk dengan Akun Kampus</span>
+              <span>Masuk ke Bilik Suara</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
@@ -66,7 +74,7 @@ export default function HomePage() {
               className="w-full sm:w-auto px-6 py-3 rounded-xl bg-surface-container-high hover:bg-surface-bright text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 border border-neutral-700"
             >
               <Vote className="w-4 h-4 text-hmif-gold" />
-              <span>Bilik Suara</span>
+              <span>Buka Bilik Suara</span>
             </Link>
           </div>
 
@@ -77,7 +85,7 @@ export default function HomePage() {
               <div>
                 <h4 className="text-xs font-bold text-white">Kerahasiaan Suara</h4>
                 <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
-                  Pilihan Anda tidak dapat dilacak kembali ke identitas pemilih.
+                  Pilihan Anda bersifat rahasia dan tidak dapat dilacak kembali ke identitas pemilih.
                 </p>
               </div>
             </div>
@@ -85,9 +93,9 @@ export default function HomePage() {
             <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex items-start gap-3">
               <Lock className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-xs font-bold text-white">Transaksi Atomik</h4>
+                <h4 className="text-xs font-bold text-white">Satu Mahasiswa Satu Suara</h4>
                 <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
-                  Satu pemilih tepat satu suara dengan proteksi duplikasi data.
+                  Setiap pemilih hanya dapat memilih satu kali tanpa risiko duplikasi suara.
                 </p>
               </div>
             </div>
@@ -95,9 +103,9 @@ export default function HomePage() {
             <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex items-start gap-3">
               <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-xs font-bold text-white">Tanda Terima Sah</h4>
+                <h4 className="text-xs font-bold text-white">Tanda Terima Digital</h4>
                 <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
-                  Bukti resmi partisipasi yang dapat diverifikasi di sistem KPR.
+                  Bukti partisipasi yang bisa diverifikasi kapan saja.
                 </p>
               </div>
             </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   Vote,
@@ -31,6 +32,10 @@ import {
   Edit3,
   Trash2,
   LayoutGrid,
+  Mail,
+  Send,
+  Calendar,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface TallyItem {
@@ -69,11 +74,22 @@ interface CandidateItem {
   photo_url: string | null;
 }
 
+function formatDateTimeLocal(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '2026-11-04T08:00';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return '2026-11-04T08:00';
+  }
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'candidates' | 'dpt' | 'tally' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'candidates' | 'dpt' | 'tally' | 'settings' | 'emails'>('overview');
 
   // Admin user & roles
   const [userRole, setUserRole] = useState<string>('kpr_admin');
@@ -106,6 +122,8 @@ export default function AdminDashboardPage() {
   // Settings State
   const [isVotingOpen, setIsVotingOpen] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [startTime, setStartTime] = useState<string>('2026-11-04T08:00');
+  const [endTime, setEndTime] = useState<string>('2026-11-04T16:00');
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsReason, setSettingsReason] = useState('');
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
@@ -113,6 +131,24 @@ export default function AdminDashboardPage() {
   // Emergency Modal State
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [emergencyReason, setEmergencyReason] = useState('Jeda Teknis Terjadwal');
+
+  // Broadcast Email State
+  const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted'>('not_voted');
+  const [broadcastGeneration, setBroadcastGeneration] = useState('all');
+  const [broadcastTemplate, setBroadcastTemplate] = useState<'invitation' | 'reminder' | 'custom'>('reminder');
+  const [broadcastSubject, setBroadcastSubject] = useState('[PENTING] Sisa Waktu Pemira HMIF - Segera Gunakan Hak Suara Anda!');
+  const [broadcastHeadline, setBroadcastHeadline] = useState('Peringatan: Waktu Pemungutan Suara Segera Berakhir');
+  const [broadcastBody, setBroadcastBody] = useState(
+    'Berdasarkan data sistem, Anda tercatat belum menggunakan hak suara pada Pemira HMIF 2026/2027.\n\nBilik suara digital akan ditutup tepat sesuai jadwal resmi. Jangan lewatkan kesempatan Anda untuk menentukan Chairman & Vice Chairman HMIF berikutnya.\n\nProses voting hanya memerlukan waktu 2 menit menggunakan NIM dan kode PIN verifikasi Outlook.'
+  );
+  const [broadcastCtaText, setBroadcastCtaText] = useState('Beri Suara Sekarang');
+  const [broadcastCtaUrl, setBroadcastCtaUrl] = useState('/login');
+  const [broadcastTargetCount, setBroadcastTargetCount] = useState<number | null>(null);
+  const [loadingBroadcastCount, setLoadingBroadcastCount] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<{ totalTarget: number; sentCount: number; failedCount: number } | null>(null);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [isConfirmBroadcastOpen, setIsConfirmBroadcastOpen] = useState(false);
 
   // DPT Management State
   const [voters, setVoters] = useState<VoterRow[]>([]);
@@ -179,6 +215,12 @@ export default function AdminDashboardPage() {
         if (data.electionSettings) {
           setIsVotingOpen(data.electionSettings.isVotingOpen);
           setMaintenanceMode(data.electionSettings.maintenanceMode);
+          if (data.electionSettings.startTime) {
+            setStartTime(formatDateTimeLocal(data.electionSettings.startTime));
+          }
+          if (data.electionSettings.endTime) {
+            setEndTime(formatDateTimeLocal(data.electionSettings.endTime));
+          }
         }
       })
       .catch((err) => {
@@ -361,8 +403,14 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Handle Simpan Pengaturan Pemilihan
-  const handleSaveSettings = async (newVotingOpen: boolean, newMaintenance: boolean, reasonText: string) => {
+  // Handle Simpan Pengaturan Pemilihan & Jadwal
+  const handleSaveSettings = async (
+    newVotingOpen: boolean,
+    newMaintenance: boolean,
+    newStartTime: string,
+    newEndTime: string,
+    reasonText: string
+  ) => {
     setSettingsSaving(true);
     setSettingsMessage(null);
 
@@ -373,7 +421,9 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({
           isVotingOpen: newVotingOpen,
           maintenanceMode: newMaintenance,
-          reason: reasonText || 'Perubahan pengaturan via dashboard KPR',
+          startTime: new Date(newStartTime).toISOString(),
+          endTime: new Date(newEndTime).toISOString(),
+          reason: reasonText || 'Pembaruan jadwal dan status pemilihan via dashboard KPR',
         }),
       });
 
@@ -383,13 +433,98 @@ export default function AdminDashboardPage() {
       } else {
         setIsVotingOpen(data.settings.is_voting_open);
         setMaintenanceMode(data.settings.maintenance_mode);
-        setSettingsMessage('✓ Pengaturan pemilihan berhasil diperbarui.');
+        if (data.settings.start_time) setStartTime(formatDateTimeLocal(data.settings.start_time));
+        if (data.settings.end_time) setEndTime(formatDateTimeLocal(data.settings.end_time));
+        setSettingsMessage('✓ Pengaturan jadwal dan bilik suara berhasil diperbarui.');
         setIsEmergencyModalOpen(false);
       }
     } catch {
       setSettingsMessage('❌ Terjadi kesalahan jaringan saat memperbarui pengaturan.');
     } finally {
       setSettingsSaving(false);
+    }
+  };
+
+  // Broadcast Email Handlers
+  const handleSelectTemplate = (templateKey: 'invitation' | 'reminder' | 'custom') => {
+    setBroadcastTemplate(templateKey);
+    setBroadcastResult(null);
+    setBroadcastError(null);
+
+    if (templateKey === 'invitation') {
+      setBroadcastTargetGroup('all');
+      setBroadcastSubject('[PEMIRA HMIF 2026/2027] Bilik Suara Telah Dibuka - Gunakan Hak Suara Anda!');
+      setBroadcastHeadline('Bilik Suara Pemira HMIF Resmi Dibuka');
+      setBroadcastBody(
+        'Pemilihan Raya (PEMIRA) Chairman & Vice Chairman HMIF Periode 2026/2027 telah resmi dibuka.\n\nSebagai mahasiswa aktif Informatika Telkom University Purwokerto, hak suara Anda menentukan arah dan masa depan himpunan kita.\n\nSilakan akses bilik suara menggunakan NIM Anda untuk menerima kode PIN verifikasi di email Outlook kampus.'
+      );
+      setBroadcastCtaText('Masuk ke Bilik Suara Digital');
+    } else if (templateKey === 'reminder') {
+      setBroadcastTargetGroup('not_voted');
+      setBroadcastSubject('[PENTING] Sisa Waktu Pemira HMIF - Segera Gunakan Hak Suara Anda!');
+      setBroadcastHeadline('Peringatan: Waktu Pemungutan Suara Segera Berakhir');
+      setBroadcastBody(
+        'Berdasarkan data sistem, Anda tercatat belum menggunakan hak suara pada Pemira HMIF 2026/2027.\n\nBilik suara digital akan ditutup tepat sesuai jadwal resmi. Jangan lewatkan kesempatan Anda untuk menentukan Chairman & Vice Chairman HMIF berikutnya.\n\nProses voting hanya memerlukan waktu 2 menit menggunakan NIM dan kode PIN verifikasi Outlook.'
+      );
+      setBroadcastCtaText('Beri Suara Sekarang');
+    } else {
+      setBroadcastSubject('[PENGUMUMAN] Pemilihan Raya HMIF 2026/2027');
+      setBroadcastHeadline('Pengumuman Panitia KPR HMIF');
+      setBroadcastBody('Tuliskan isi pengumuman atau instruksi resmi Panitia KPR di sini...');
+      setBroadcastCtaText('Buka Platform Pemira');
+    }
+  };
+
+  const fetchBroadcastCount = useCallback(() => {
+    setLoadingBroadcastCount(true);
+    fetch(`/api/admin/broadcast-email?targetGroup=${broadcastTargetGroup}&generation=${broadcastGeneration}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success) {
+          setBroadcastTargetCount(data.count);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingBroadcastCount(false));
+  }, [broadcastTargetGroup, broadcastGeneration]);
+
+  useEffect(() => {
+    if (activeTab === 'emails') {
+      fetchBroadcastCount();
+    }
+  }, [activeTab, fetchBroadcastCount]);
+
+  const handleExecuteBroadcast = async () => {
+    setIsBroadcasting(true);
+    setBroadcastError(null);
+    setBroadcastResult(null);
+
+    try {
+      const res = await fetch('/api/admin/broadcast-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetGroup: broadcastTargetGroup,
+          generation: broadcastGeneration,
+          subject: broadcastSubject,
+          headline: broadcastHeadline,
+          bodyText: broadcastBody,
+          ctaText: broadcastCtaText,
+          ctaUrl: broadcastCtaUrl || '/login',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setBroadcastError(data.error || 'Gagal memproses pengiriman email broadcast.');
+      } else {
+        setBroadcastResult(data.stats);
+        setIsConfirmBroadcastOpen(false);
+      }
+    } catch {
+      setBroadcastError('Terjadi kesalahan koneksi saat memproses broadcast email.');
+    } finally {
+      setIsBroadcasting(false);
     }
   };
 
@@ -521,8 +656,15 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col gap-6">
           {/* Logo & Title */}
           <div className="px-6 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-              HMIF
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+              <Image
+                src="/assets/img/hmif-logo.png"
+                alt="Logo HMIF"
+                width={36}
+                height={36}
+                priority
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm text-on-surface tracking-tight leading-tight">
@@ -611,6 +753,19 @@ export default function AdminDashboardPage() {
             >
               <Settings className="w-4 h-4" />
               <span>Pengaturan Pemilihan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('emails')}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === 'emails'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              <span>Broadcast Email</span>
             </button>
           </nav>
         </div>
@@ -853,7 +1008,7 @@ export default function AdminDashboardPage() {
                       Kelola Pasangan Calon (Kandidat)
                     </h1>
                     <p className="text-xs text-outline mt-0.5">
-                      Atur daftar calon Ketua &amp; Wakil Ketua HMIF. Bilik suara akan otomatis menyesuaikan tata letak berdasarkan jumlah calon.
+                      Atur daftar calon Chairman &amp; Vice Chairman HMIF. Tata letak bilik suara menyesuaikan otomatis.
                     </p>
                   </div>
 
@@ -1302,15 +1457,15 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
-            {/* TAB 5: PENGATURAN PEMILIHAN */}
+            {/* TAB 5: PENGATURAN PEMILIHAN & JADWAL */}
             {activeTab === 'settings' && (
-              <div className="flex flex-col gap-6 max-w-2xl">
+              <div className="flex flex-col gap-6 max-w-3xl">
                 <div className="pb-4 border-b border-outline-variant/30">
                   <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
-                    Pengaturan Pemilihan
+                    Pengaturan Pemilihan & Jadwal Pemira
                   </h1>
                   <p className="text-xs text-outline mt-0.5">
-                    Kendali pembukaan bilik suara dan sakelar darurat.
+                    Atur jadwal resmi pelaksanaan, kendali pembukaan bilik suara, dan sakelar darurat teknis.
                   </p>
                 </div>
 
@@ -1320,14 +1475,97 @@ export default function AdminDashboardPage() {
                   </div>
                 )}
 
+                {/* KARTU 1: JADWAL RESMI PELAKSANAAN PEMIRA */}
                 <div className="rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col gap-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-outline-variant/20">
+                    <div className="flex items-center gap-2.5">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <div>
+                        <h3 className="text-sm font-bold text-on-surface">
+                          Jadwal Operasional Pemira
+                        </h3>
+                        <p className="text-xs text-outline">
+                          Rentang waktu resmi pembukaan bilik suara digital (WIB / UTC+7).
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Schedule Status Badge */}
+                    {(() => {
+                      const now = new Date();
+                      const start = new Date(startTime);
+                      const end = new Date(endTime);
+                      if (now >= start && now <= end) {
+                        return (
+                          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            Sedang Berlangsung
+                          </span>
+                        );
+                      } else if (now < start) {
+                        return (
+                          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
+                            <Clock className="w-3 h-3" />
+                            Belum Dimulai
+                          </span>
+                        );
+                      } else {
+                        return (
+                          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-hmif-red/10 text-hmif-red border border-hmif-red/30 flex items-center gap-1.5">
+                            <Lock className="w-3 h-3" />
+                            Telah Berakhir
+                          </span>
+                        );
+                      }
+                    })()}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase text-outline flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-primary" />
+                        <span>Waktu Mulai Pemilihan:</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase text-outline flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-primary" />
+                        <span>Waktu Penutupan Pemilihan:</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-outline leading-relaxed bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
+                    ℹ️ Sistem akan mengizinkan pengiriman suara hanya ketika waktu saat ini berada di antara waktu mulai dan penutupan. Di luar rentang waktu tersebut, bilik suara otomatis terkunci secara aman.
+                  </p>
+                </div>
+
+                {/* KARTU 2: KENDALI BILIK SUARA & SAKELAR DARURAT */}
+                <div className="rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col gap-5">
+                  <h3 className="text-sm font-bold text-on-surface pb-2 border-b border-outline-variant/20">
+                    Kendali Akses &amp; Sakelar Darurat
+                  </h3>
+
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <h4 className="text-sm font-bold text-on-surface">
                         Buka Pemungutan Suara
                       </h4>
                       <p className="text-xs text-outline mt-0.5">
-                        Izinkan pemilih terdaftar untuk mengirimkan suara di bilik suara.
+                        Sakelar utama izin pengiriman suara pemilih di bilik suara digital.
                       </p>
                     </div>
                     <button
@@ -1352,7 +1590,7 @@ export default function AdminDashboardPage() {
                         Mode Pemeliharaan Darurat
                       </h4>
                       <p className="text-xs text-outline mt-0.5">
-                        Tutup sementara bilik suara untuk pemeliharaan teknis server.
+                        Nonaktifkan sementara pengiriman suara — bisa diaktifkan kembali kapan saja.
                       </p>
                     </div>
                     <button
@@ -1377,7 +1615,7 @@ export default function AdminDashboardPage() {
                     <textarea
                       value={settingsReason}
                       onChange={(e) => setSettingsReason(e.target.value)}
-                      placeholder="Tuliskan justifikasi teknis atau administratif..."
+                      placeholder="Contoh: Jeda teknis sebelum penghitungan suara"
                       rows={2}
                       className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
                     />
@@ -1386,18 +1624,318 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     disabled={settingsSaving || !settingsReason.trim()}
-                    onClick={() => handleSaveSettings(isVotingOpen, maintenanceMode, settingsReason)}
-                    className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                    onClick={() => handleSaveSettings(isVotingOpen, maintenanceMode, startTime, endTime, settingsReason)}
+                    className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     {settingsSaving ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Menyimpan...</span>
+                        <span>Menyimpan Pengaturan...</span>
                       </>
                     ) : (
-                      <span>Simpan Perubahan</span>
+                      <span>Simpan Pengaturan &amp; Jadwal</span>
                     )}
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 6: BROADCAST EMAIL */}
+            {activeTab === 'emails' && (
+              <div className="flex flex-col gap-6">
+                <div className="pb-4 border-b border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-on-surface flex items-center gap-2.5">
+                      <Mail className="w-6 h-6 text-primary" />
+                      <span>Broadcast Email Pemira HMIF</span>
+                    </h1>
+                    <p className="text-xs text-outline mt-0.5">
+                      Kirim email pengumuman resmi dan pengingat hak suara ke mahasiswa Telkom University.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fetchBroadcastCount}
+                    className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-container border border-outline-variant/30 text-outline hover:text-on-surface transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Segarkan Kuota</span>
+                  </button>
+                </div>
+
+                {/* Metrics Summary Strip */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
+                    <span className="text-[11px] font-semibold uppercase text-outline block">Total DPT Resmi</span>
+                    <span className="text-xl font-bold text-on-surface font-mono">{totalDpt || 1240} Mahasiswa</span>
+                  </div>
+                  <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
+                    <span className="text-[11px] font-semibold uppercase text-emerald-400 block">Sudah Menggunakan Hak Suara</span>
+                    <span className="text-xl font-bold text-emerald-400 font-mono">{totalVotes || 892} Mahasiswa</span>
+                  </div>
+                  <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
+                    <span className="text-[11px] font-semibold uppercase text-amber-400 block">Belum Menggunakan Hak Suara</span>
+                    <span className="text-xl font-bold text-amber-400 font-mono">{(totalDpt - totalVotes) > 0 ? (totalDpt - totalVotes) : 348} Mahasiswa</span>
+                  </div>
+                </div>
+
+                {/* Results / Error Banner */}
+                {broadcastResult && (
+                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-400 flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Broadcast terkirim.</span>
+                      <span className="text-emerald-300 block mt-0.5">
+                        Total {broadcastResult.sentCount} email berhasil terkirim ke mahasiswa ({broadcastResult.failedCount} gagal) dari total target {broadcastResult.totalTarget} penerima.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {broadcastError && (
+                  <div className="rounded-2xl border border-hmif-red/30 bg-hmif-red/10 p-4 text-xs text-hmif-red flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Gagal Mengirim Broadcast</span>
+                      <span className="block mt-0.5">{broadcastError}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Main 2-Column Interface: Composer & Live Preview */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  {/* Left Column: Configuration & Message Composer */}
+                  <div className="lg:col-span-7 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-5">
+                    {/* Template Picker */}
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline block mb-2">
+                        Pilih Template Pesan:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTemplate('reminder')}
+                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
+                            broadcastTemplate === 'reminder'
+                              ? 'bg-primary text-on-primary border-primary shadow-sm'
+                              : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
+                          }`}
+                        >
+                          <span className="block">⏳ Pengingat (Nudge)</span>
+                          <span className="text-[10px] opacity-80 block mt-0.5">Khusus belum memilih</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTemplate('invitation')}
+                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
+                            broadcastTemplate === 'invitation'
+                              ? 'bg-primary text-on-primary border-primary shadow-sm'
+                              : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
+                          }`}
+                        >
+                          <span className="block">📢 Undangan Buka</span>
+                          <span className="text-[10px] opacity-80 block mt-0.5">Untuk semua DPT</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTemplate('custom')}
+                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
+                            broadcastTemplate === 'custom'
+                              ? 'bg-primary text-on-primary border-primary shadow-sm'
+                              : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
+                          }`}
+                        >
+                          <span className="block">✍️ Pesan Kustom</span>
+                          <span className="text-[10px] opacity-80 block mt-0.5">Tulis bebas</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter Target Penerima */}
+                    <div className="pt-4 border-t border-outline-variant/20 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-outline">
+                          Target Kelompok Pemilih:
+                        </label>
+                        <select
+                          value={broadcastTargetGroup}
+                          onChange={(e) => setBroadcastTargetGroup(e.target.value as any)}
+                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                        >
+                          <option value="not_voted">🔴 Khusus yang Belum Memilih (Rekomendasi)</option>
+                          <option value="all">👥 Seluruh Mahasiswa di DPT</option>
+                          <option value="voted">🟢 Khusus yang Sudah Memilih</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-outline">
+                          Filter Angkatan:
+                        </label>
+                        <select
+                          value={broadcastGeneration}
+                          onChange={(e) => setBroadcastGeneration(e.target.value)}
+                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                        >
+                          <option value="all">Semua Angkatan (2023 - 2026)</option>
+                          <option value="2023">Angkatan 2023</option>
+                          <option value="2024">Angkatan 2024</option>
+                          <option value="2025">Angkatan 2025</option>
+                          <option value="2026">Angkatan 2026</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Target Counter Badge */}
+                    <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/20 flex items-center justify-between text-xs">
+                      <span className="text-outline">Jumlah Penerima Sasaran:</span>
+                      <span className="font-bold text-primary font-mono text-sm">
+                        {loadingBroadcastCount ? (
+                          <Loader2 className="w-4 h-4 animate-spin inline" />
+                        ) : (
+                          `${broadcastTargetCount ?? '...'} Mahasiswa`
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Form Fields */}
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-outline">
+                          Subjek Email:
+                        </label>
+                        <input
+                          type="text"
+                          value={broadcastSubject}
+                          onChange={(e) => setBroadcastSubject(e.target.value)}
+                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-outline">
+                          Judul Pengumuman:
+                        </label>
+                        <input
+                          type="text"
+                          value={broadcastHeadline}
+                          onChange={(e) => setBroadcastHeadline(e.target.value)}
+                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-bold"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-outline">
+                          Isi Pesan Pengumuman:
+                        </label>
+                        <textarea
+                          rows={6}
+                          value={broadcastBody}
+                          onChange={(e) => setBroadcastBody(e.target.value)}
+                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold uppercase text-outline">
+                            Teks Tombol Aksi (CTA):
+                          </label>
+                          <input
+                            type="text"
+                            value={broadcastCtaText}
+                            onChange={(e) => setBroadcastCtaText(e.target.value)}
+                            className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold uppercase text-outline">
+                            Tautan Tombol Aksi:
+                          </label>
+                          <input
+                            type="text"
+                            value={broadcastCtaUrl}
+                            placeholder="/login atau https://pemirahmif.org/login"
+                            onChange={(e) => setBroadcastCtaUrl(e.target.value)}
+                            className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                          />
+                          <span className="text-[10px] text-outline block">
+                            Tautan relatif (contoh: /login) akan otomatis dikonversi sistem ke alamat domain resmi Pemira.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Submit Action */}
+                    <button
+                      type="button"
+                      disabled={isBroadcasting || (broadcastTargetCount !== null && broadcastTargetCount === 0)}
+                      onClick={() => setIsConfirmBroadcastOpen(true)}
+                      className="w-full h-12 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer mt-4"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>Kirim Broadcast Email ({broadcastTargetCount ?? '...'} Penerima)</span>
+                    </button>
+                  </div>
+
+                  {/* Right Column: Live Email Preview */}
+                  <div className="lg:col-span-5 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
+                      <span className="text-xs font-bold uppercase tracking-wider text-outline">
+                        Pratinjau Email Mahasiswa
+                      </span>
+                      <span className="text-[10px] text-outline font-mono">
+                        Outlook Preview
+                      </span>
+                    </div>
+
+                    {/* Email Container Frame */}
+                    <div className="bg-[#181818] rounded-2xl border border-neutral-800 p-5 space-y-4 text-xs font-sans">
+                      {/* Email Meta Headers */}
+                      <div className="pb-3 border-b border-neutral-800 space-y-1 text-[11px]">
+                        <div><strong className="text-neutral-400">Dari:</strong> <span className="text-neutral-200">Panitia Pemira HMIF &lt;noreply@pemirahmif.org&gt;</span></div>
+                        <div><strong className="text-neutral-400">Kepada:</strong> <span className="text-neutral-200 font-mono">103012300001@student.telkomuniversity.ac.id</span></div>
+                        <div><strong className="text-neutral-400">Subjek:</strong> <span className="text-primary font-medium">{broadcastSubject}</span></div>
+                      </div>
+
+                      {/* Rendered Email Card */}
+                      <div className="bg-[#1E1E1E] rounded-xl p-5 border border-neutral-800 space-y-4">
+                        <div className="text-center pb-3 border-b border-neutral-800">
+                          <span className="text-[10px] font-bold text-hmif-gold uppercase tracking-widest block">
+                            PEMIRA HMIF 2026/2027
+                          </span>
+                          <h4 className="text-sm font-bold text-white mt-1">
+                            {broadcastHeadline}
+                          </h4>
+                          <span className="text-[10px] text-neutral-400 block mt-0.5">
+                            Telkom University Purwokerto
+                          </span>
+                        </div>
+
+                        <p className="text-neutral-300 leading-relaxed text-[11px]">
+                          Halo <strong>Ahmad Rizky Pratama</strong> (<span className="text-hmif-gold font-mono">103012300001</span>),
+                        </p>
+
+                        <div className="text-neutral-300 leading-relaxed text-[11px] whitespace-pre-line space-y-2">
+                          {broadcastBody}
+                        </div>
+
+                        <div className="pt-2 text-center">
+                          <span className="inline-block px-5 py-2.5 rounded-lg bg-hmif-blue text-white text-[11px] font-bold shadow-md">
+                            {broadcastCtaText} &rarr;
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded bg-neutral-900 border-l-2 border-hmif-gold text-[10px] text-neutral-400 leading-normal">
+                          🛡️ Kerahasiaan suara dijamin penuh berasaskan LUBER JURDIL (*Ballot Secrecy*).
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1415,7 +1953,7 @@ export default function AdminDashboardPage() {
                   {editingCandidate ? 'Edit Pasangan Calon' : 'Tambah Pasangan Calon Baru'}
                 </h3>
                 <p className="text-xs text-outline">
-                  Konfigurasikan rincian data pasangan calon peserta Pemira.
+                  Isi detail data pasangan calon peserta Pemira.
                 </p>
               </div>
 
@@ -1445,7 +1983,7 @@ export default function AdminDashboardPage() {
 
               <div>
                 <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
-                  Nama Calon Ketua
+                  Nama Calon Chairman
                 </label>
                 <input
                   type="text"
@@ -1459,7 +1997,7 @@ export default function AdminDashboardPage() {
 
               <div>
                 <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
-                  Nama Calon Wakil Ketua
+                  Nama Calon Vice Chairman
                 </label>
                 <input
                   type="text"
@@ -1554,7 +2092,7 @@ export default function AdminDashboardPage() {
                     Kunci Darurat Bilik Suara
                   </h3>
                   <span className="text-[10px] text-outline uppercase tracking-wider">
-                    Tindakan Administratif
+                    Tindakan Darurat
                   </span>
                 </div>
               </div>
@@ -1592,7 +2130,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsEmergencyModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -1600,11 +2138,85 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 disabled={settingsSaving}
-                onClick={() => handleSaveSettings(isVotingOpen, true, emergencyReason)}
-                className="px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                onClick={() => handleSaveSettings(isVotingOpen, true, startTime, endTime, emergencyReason)}
+                className="px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>Kunci Bilik Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI BROADCAST EMAIL */}
+      {isConfirmBroadcastOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                <Send className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-on-surface">
+                  Konfirmasi Broadcast Email
+                </h3>
+                <p className="text-xs text-outline mt-0.5">
+                  Tinjau sebelum pesan dikirimkan ke server email kampus.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-surface-container-high rounded-xl p-3.5 border border-outline-variant/20 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-outline">Jumlah Penerima:</span>
+                <span className="font-bold text-primary font-mono">{broadcastTargetCount ?? '...'} Mahasiswa</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-outline">Kelompok Sasaran:</span>
+                <span className="font-semibold text-on-surface">
+                  {broadcastTargetGroup === 'not_voted' ? 'Khusus yang Belum Memilih' : broadcastTargetGroup === 'all' ? 'Seluruh DPT' : 'Khusus yang Sudah Memilih'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-outline">Filter Angkatan:</span>
+                <span className="font-semibold text-on-surface">
+                  {broadcastGeneration === 'all' ? 'Semua (2023 - 2026)' : `Angkatan ${broadcastGeneration}`}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-outline-variant/20">
+                <span className="text-outline block mb-1">Subjek:</span>
+                <span className="font-medium text-on-surface truncate block">{broadcastSubject}</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+              ⚠️ Sistem akan menggunakan mekanisme batching aman untuk menjaga deliverability SMTP dan reputasi domain di Microsoft Outlook Telkom University.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isBroadcasting}
+                onClick={() => setIsConfirmBroadcastOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isBroadcasting}
+                onClick={handleExecuteBroadcast}
+                className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                {isBroadcasting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Mengirim...</span>
+                  </>
+                ) : (
+                  <span>Ya, Kirim Sekarang</span>
+                )}
               </button>
             </div>
           </div>

@@ -65,17 +65,17 @@ export function KotakKosongCard({
               Kolom Kosong
             </span>
             <p className="text-xs text-on-surface-variant max-w-xs mt-1.5 leading-relaxed">
-              Opsi sah konstitusional bagi pemilih yang tidak menyetujui pasangan calon tunggal.
+              Pilihan resmi bagi pemilih yang tidak menentukan suara pada calon tunggal.
             </p>
           </div>
 
           {/* Deskripsi */}
           <div className="space-y-1">
             <h4 className="text-base sm:text-lg font-bold text-on-surface leading-snug">
-              Tidak Memilih Calon Tunggal
+              Opsi Kotak Kosong
             </h4>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Suara Anda tetap dihitung sah dalam rekapitulasi pemilihan umum HMIF.
+              Suara Anda tetap sah dan dihitung dalam rekapitulasi Pemira HMIF.
             </p>
           </div>
         </div>

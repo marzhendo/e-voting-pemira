@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Bebas_Neue, Montserrat } from 'next/font/google';
+import { NavigationProgress } from '@/components/ui/navigation-progress';
 import './globals.css';
 
 const bebas = Bebas_Neue({
@@ -18,7 +19,10 @@ const montserrat = Montserrat({
 
 export const metadata: Metadata = {
   title: 'E-Voting Pemira HMIF | Telkom University Purwokerto',
-  description: 'Sistem Pemungutan Suara Elektronik Pemilihan Ketua dan Wakil Ketua HMIF Telkom University Purwokerto',
+  description: 'Sistem Pemungutan Suara Elektronik Pemilihan Chairman dan Vice Chairman HMIF Telkom University Purwokerto',
+  icons: {
+    icon: '/assets/img/hmif-logo.png',
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="id" className={`dark ${bebas.variable} ${montserrat.variable}`}>
       <body className="min-h-screen bg-surface text-on-surface font-montserrat antialiased selection:bg-primary-container selection:text-on-primary">
+        <NavigationProgress />
         {children}
       </body>
     </html>

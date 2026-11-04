@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
-import { getDevCandidates } from '@/app/api/admin/candidates/route';
+import { getDevCandidates } from '@/lib/candidates/dev-store';
+import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,15 +54,22 @@ export async function GET() {
 
   // Jika di lingkungan non-produksi dan DB belum terhubung, kembalikan mock data untuk pengujian lokal
   if (process.env.APP_ENV !== 'production') {
+    const devSettings = getDevElectionSettings();
+    const now = new Date();
+    const startTime = new Date(devSettings.start_time);
+    const endTime = new Date(devSettings.end_time);
+    const isWithinWindow = now >= startTime && now <= endTime;
+    const isVotingActive = devSettings.is_voting_open && !devSettings.maintenance_mode && isWithinWindow;
+
     return NextResponse.json({
       success: true,
       electionStatus: {
-        isVotingActive: true,
-        isVotingOpen: true,
-        maintenanceMode: false,
-        isWithinWindow: true,
-        startTime: new Date(Date.now() - 3600000).toISOString(),
-        endTime: new Date(Date.now() + 28800000).toISOString(),
+        isVotingActive,
+        isVotingOpen: devSettings.is_voting_open,
+        maintenanceMode: devSettings.maintenance_mode,
+        isWithinWindow,
+        startTime: devSettings.start_time,
+        endTime: devSettings.end_time,
       },
       candidates: getDevCandidates().filter((c) => c.is_active),
     });

@@ -36,7 +36,7 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
     await expect(page.locator('body')).toContainText('Fajar Ramadhan');
   });
 
-  test('Election settings tab allows toggling voting state', async ({ page }) => {
+  test('Election settings tab allows toggling voting state and schedule settings', async ({ page }) => {
     // Login as Admin
     await page.goto('/login');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
@@ -47,5 +47,40 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
     await page.locator('button', { hasText: 'Pengaturan Pemilihan' }).click();
     await expect(page.locator('h1')).toContainText('Pengaturan Pemilihan');
     await expect(page.locator('body')).toContainText('Buka Pemungutan Suara');
+    await expect(page.locator('body')).toContainText('Jadwal Operasional Pemira');
+    await expect(page.locator('body')).toContainText('Waktu Mulai Pemilihan');
+    await expect(page.locator('body')).toContainText('Waktu Penutupan Pemilihan');
+  });
+
+  test('Broadcast email tab allows filtering recipients and previewing message', async ({ page }) => {
+    // Login as Admin
+    await page.goto('/login');
+    await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
+    await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
+    await expect(page).toHaveURL(/\/admin\/dashboard/);
+
+    // Switch to "Broadcast Email" tab
+    const emailTab = page.locator('button', { hasText: 'Broadcast Email' });
+    await expect(emailTab).toBeVisible();
+    await emailTab.click();
+
+    // Verify header and template buttons
+    await expect(page.locator('h1')).toContainText('Broadcast Email Pemira HMIF');
+    await expect(page.locator('body')).toContainText('Pilih Template Pesan');
+    await expect(page.locator('body')).toContainText('Pratinjau Email Mahasiswa');
+
+    // Switch to Invitation Template
+    await page.locator('button', { hasText: 'Undangan Buka' }).click();
+    await expect(page.locator('input[value*="Bilik Suara Telah Dibuka"]')).toBeVisible();
+
+    // Open Confirmation Modal
+    const blastBtn = page.locator('button', { hasText: 'Kirim Broadcast Email' });
+    await expect(blastBtn).toBeVisible();
+    await blastBtn.click();
+    await expect(page.locator('h3', { hasText: 'Konfirmasi Broadcast Email' })).toBeVisible();
+
+    // Cancel modal
+    await page.locator('button', { hasText: 'Batal' }).click();
+    await expect(page.locator('h3', { hasText: 'Konfirmasi Broadcast Email' })).not.toBeVisible();
   });
 });

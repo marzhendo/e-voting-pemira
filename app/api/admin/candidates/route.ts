@@ -3,76 +3,23 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import {
+  type CandidateRecord,
+  getDevCandidates,
+  setDevCandidates,
+} from '@/lib/candidates/dev-store';
 
 export const dynamic = 'force-dynamic';
 
 const candidateSchema = z.object({
   candidate_number: z.number().int().min(0, 'Nomor urut minimal 0'),
-  leader_name: z.string().min(2, 'Nama Calon Ketua minimal 2 karakter'),
-  vice_leader_name: z.string().min(2, 'Nama Calon Wakil Ketua minimal 2 karakter'),
+  leader_name: z.string().min(2, 'Nama Calon Chairman minimal 2 karakter'),
+  vice_leader_name: z.string().min(2, 'Nama Calon Vice Chairman minimal 2 karakter'),
   vision: z.string().min(5, 'Visi minimal 5 karakter'),
   mission: z.array(z.string()).min(1, 'Minimal sertakan 1 butir misi'),
   photo_url: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
 });
-
-export interface CandidateRecord {
-  id: string;
-  candidate_number: number;
-  leader_name: string;
-  vice_leader_name: string;
-  vision: string;
-  mission: string[];
-  photo_url: string | null;
-  is_active: boolean;
-  created_at?: string;
-}
-
-// In-memory dev storage jika DB belum online
-let DEV_CANDIDATES: CandidateRecord[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000000',
-    candidate_number: 0,
-    leader_name: 'Kotak Kosong',
-    vice_leader_name: 'Tidak Memilih Calon',
-    vision: 'Opsi konstitusional sah berasaskan LUBER JURDIL.',
-    mission: ['Menampung suara pemilih yang menyatakan tidak memilih pasangan calon yang terdaftar.'],
-    photo_url: null,
-    is_active: true,
-  },
-  {
-    id: '11111111-1111-1111-1111-111111111111',
-    candidate_number: 1,
-    leader_name: 'Arya Narendra Putra',
-    vice_leader_name: 'Rayhan Al-Fayeed',
-    vision: 'Terwujudnya HMIF yang adaptif, kolaboratif, dan inklusif berlandaskan inovasi teknologi.',
-    mission: [
-      'Membangun ekosistem riset mahasiswa terpadu.',
-      'Memperluas relasi industri strategis nasional dan inkubasi technopreneur.',
-      'Advokasi akademik cepat tanggap berkeadilan.',
-    ],
-    photo_url: null,
-    is_active: true,
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222222',
-    candidate_number: 2,
-    leader_name: 'Dimas Satria Wicaksana',
-    vice_leader_name: 'Cynthia Maharani',
-    vision: 'Sinergi Informatika berdaya saing global yang berintegritas dan berjiwa technopreneur.',
-    mission: [
-      'Mengoptimalkan inkubasi bakat informatika.',
-      'Digitalisasi layanan kemahasiswaan satu pintu.',
-      'Pengabdian masyarakat berbasis teknologi tepat guna.',
-    ],
-    photo_url: null,
-    is_active: true,
-  },
-];
-
-export function getDevCandidates(): CandidateRecord[] {
-  return DEV_CANDIDATES;
-}
 
 export async function GET() {
   const session = await getSession();
@@ -102,7 +49,7 @@ export async function GET() {
   }
 
   if (process.env.APP_ENV !== 'production') {
-    return NextResponse.json({ success: true, candidates: DEV_CANDIDATES });
+    return NextResponse.json({ success: true, candidates: getDevCandidates() });
   }
 
   return NextResponse.json({ error: 'Gagal memuat daftar kandidat.' }, { status: 500 });
@@ -171,9 +118,11 @@ export async function POST(req: NextRequest) {
         is_active: newCandidate.is_active,
         created_at: new Date().toISOString(),
       };
-      DEV_CANDIDATES = [...DEV_CANDIDATES.filter((c) => c.candidate_number !== created.candidate_number), created].sort(
+      const currentList = getDevCandidates();
+      const updatedList = [...currentList.filter((c) => c.candidate_number !== created.candidate_number), created].sort(
         (a, b) => a.candidate_number - b.candidate_number
       );
+      setDevCandidates(updatedList);
       return NextResponse.json({ success: true, candidate: created });
     }
 
@@ -222,8 +171,10 @@ export async function PUT(req: NextRequest) {
     }
 
     if (process.env.APP_ENV !== 'production') {
-      DEV_CANDIDATES = DEV_CANDIDATES.map((c) => (c.id === id ? { ...c, ...updates } : c));
-      const updated = DEV_CANDIDATES.find((c) => c.id === id);
+      const currentList = getDevCandidates();
+      const updatedList = currentList.map((c) => (c.id === id ? { ...c, ...updates } : c));
+      setDevCandidates(updatedList);
+      const updated = updatedList.find((c) => c.id === id);
       return NextResponse.json({ success: true, candidate: updated });
     }
 
@@ -253,7 +204,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ID kandidat wajib disertakan.' }, { status: 400 });
     }
 
-    const target = DEV_CANDIDATES.find((c) => c.id === id);
+    const currentList = getDevCandidates();
+    const target = currentList.find((c) => c.id === id);
     if (target && target.candidate_number === 0) {
       return NextResponse.json({ error: 'Opsi Kotak Kosong adalah opsi konstitusional dasar dan tidak dapat dihapus.' }, { status: 400 });
     }
@@ -275,7 +227,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (process.env.APP_ENV !== 'production') {
-      DEV_CANDIDATES = DEV_CANDIDATES.filter((c) => c.id !== id);
+      const filtered = getDevCandidates().filter((c) => c.id !== id);
+      setDevCandidates(filtered);
       return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus (Dev Mode).' });
     }
 

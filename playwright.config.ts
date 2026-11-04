@@ -15,12 +15,14 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3002',
     trace: 'on-first-retry',
   },
-  webServer: {
-    command: 'npx next start -p 3002',
-    url: 'http://localhost:3002',
-    reuseExistingServer: false,
-    timeout: 60 * 1000,
-  },
+  webServer: process.env.PLAYWRIGHT_BASE_URL
+    ? undefined
+    : {
+        command: 'npx next start -p 3002',
+        url: 'http://localhost:3002',
+        reuseExistingServer: true,
+        timeout: 60 * 1000,
+      },
   projects: [
     {
       name: 'chromium',
