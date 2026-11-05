@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Clock, ArrowRight, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Portal } from '@/components/ui/portal';
 
 interface SessionExpiredModalProps {
   isOpen: boolean;
@@ -18,20 +19,31 @@ export function SessionExpiredModal({
     if (isOpen) {
       // Fokuskan tombol login otomatis saat modal terbuka untuk aksesibilitas
       buttonRef.current?.focus();
+
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="session-expired-title"
-      aria-describedby="session-expired-description"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-    >
-      <div className="relative w-full max-w-md bg-surface-container-high rounded-3xl p-6 sm:p-8 shadow-2xl border border-outline-variant/30 flex flex-col items-center text-center animate-in zoom-in-95 duration-200 overflow-hidden">
+    <Portal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="session-expired-title"
+        aria-describedby="session-expired-description"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-hidden animate-in fade-in duration-200"
+      >
+        <div className="relative w-full max-w-md bg-surface-container-high rounded-3xl p-6 sm:p-8 shadow-2xl border border-outline-variant/30 flex flex-col items-center text-center animate-in zoom-in-95 duration-200 overflow-hidden">
         {/* Subtle decorative glow */}
         <div className="absolute -top-16 inset-x-0 h-28 bg-gradient-to-b from-hmif-red/20 to-transparent pointer-events-none" />
 
@@ -89,7 +101,7 @@ export function SessionExpiredModal({
             href="https://wa.me/6281809300406"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-outline hover:text-on-surface transition-colors inline-flex items-center gap-1 font-medium"
+            className="text-xs text-outline hover:text-on-surface transition-colors inline-flex items-center gap-1 font-medium p-2 -m-2 rounded-lg"
           >
             <span>Kendala teknis? Hubungi Panitia KPR</span>
             <ExternalLink className="w-3 h-3" />
@@ -97,5 +109,6 @@ export function SessionExpiredModal({
         </div>
       </div>
     </div>
+  </Portal>
   );
 }

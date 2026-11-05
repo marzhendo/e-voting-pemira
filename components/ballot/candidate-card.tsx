@@ -48,7 +48,7 @@ export function CandidateCard({
               </span>
             </div>
             <div>
-              <span className="text-[11px] text-outline uppercase tracking-wider block font-medium">
+              <span className="text-xs text-outline uppercase tracking-wider block font-medium">
                 Pasangan Calon
               </span>
               <h3 className="text-base text-on-surface font-bold">
@@ -69,7 +69,7 @@ export function CandidateCard({
         </div>
 
         {/* Foto Pasangan Calon */}
-        <div className="relative w-full h-72 sm:h-80 rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/20 flex flex-col items-center justify-center text-center p-4 select-none">
+        <div className="relative w-full h-48 sm:h-64 md:h-72 rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/20 flex flex-col items-center justify-center text-center p-4 select-none">
           {candidate.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -101,7 +101,7 @@ export function CandidateCard({
 
         {/* Fokus Visi Singkat */}
         <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/30 text-xs text-on-surface-variant">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-primary block mb-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-primary block mb-1">
             Fokus Visi:
           </span>
           <p className="line-clamp-2 text-xs leading-relaxed italic text-on-surface/90">
@@ -122,7 +122,7 @@ export function CandidateCard({
             <FileText className="w-4 h-4 text-primary group-hover/btn:scale-110 transition-transform" />
             <span>Detail Visi Misi &amp; CV Paslon</span>
           </span>
-          <span className="text-[11px] font-bold text-primary flex items-center gap-0.5">
+          <span className="text-xs font-bold text-primary flex items-center gap-0.5">
             <span>Buka</span>
             <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
           </span>
@@ -140,7 +140,7 @@ export function CandidateCard({
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+          className={`h-10 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center ${
             isSelected
               ? 'bg-primary text-on-primary shadow-sm'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'

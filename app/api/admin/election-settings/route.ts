@@ -16,6 +16,8 @@ const updateSettingsSchema = z.object({
   startTime: z.string().optional(),
   end_time: z.string().optional(),
   endTime: z.string().optional(),
+  allow_kotak_kosong_multi: z.boolean().optional(),
+  allowKotakKosongMulti: z.boolean().optional(),
   reason: z.string().min(3, 'Alasan operasional wajib dicantumkan.'),
 });
 
@@ -84,6 +86,7 @@ export async function PATCH(request: NextRequest) {
     const maintenance_mode = parsed.data.maintenance_mode ?? parsed.data.maintenanceMode;
     const start_time = parsed.data.start_time ?? parsed.data.startTime;
     const end_time = parsed.data.end_time ?? parsed.data.endTime;
+    const allow_kotak_kosong_multi = parsed.data.allow_kotak_kosong_multi ?? parsed.data.allowKotakKosongMulti;
     const reason = parsed.data.reason;
 
     // Batasan Wewenang Berdasarkan Aturan Operasional:
@@ -124,6 +127,7 @@ export async function PATCH(request: NextRequest) {
       if (maintenance_mode !== undefined) devUpdates.maintenance_mode = maintenance_mode;
       if (start_time !== undefined) devUpdates.start_time = start_time;
       if (end_time !== undefined) devUpdates.end_time = end_time;
+      if (allow_kotak_kosong_multi !== undefined) devUpdates.allow_kotak_kosong_multi = allow_kotak_kosong_multi;
 
       const updated = updateDevElectionSettings(devUpdates);
       return NextResponse.json({

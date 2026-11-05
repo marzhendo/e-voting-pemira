@@ -4,6 +4,7 @@ export interface ElectionSettingsRecord {
   maintenance_mode: boolean;
   start_time: string;
   end_time: string;
+  allow_kotak_kosong_multi: boolean;
   updated_at?: string;
 }
 
@@ -14,6 +15,7 @@ let DEV_SETTINGS: ElectionSettingsRecord = {
   maintenance_mode: false,
   start_time: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
   end_time: new Date(Date.now() + 28800000).toISOString(),   // 8 hours from now
+  allow_kotak_kosong_multi: true,
   updated_at: new Date().toISOString(),
 };
 

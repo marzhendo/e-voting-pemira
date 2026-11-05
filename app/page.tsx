@@ -23,7 +23,7 @@ export default function HomePage() {
               <span className="text-xs font-bold text-hmif-gold uppercase tracking-wider block">
                 PEMIRA HMIF 2026/2027
               </span>
-              <span className="text-[10px] text-neutral-400">
+              <span className="text-[11px] text-neutral-400">
                 Telkom University Purwokerto
               </span>
             </div>

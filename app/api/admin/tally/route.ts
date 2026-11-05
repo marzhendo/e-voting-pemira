@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
 
 export async function GET() {
   // 1. Verifikasi Otorisasi Sesi Pengguna
@@ -160,15 +161,17 @@ export async function GET() {
   }
 
   if (process.env.APP_ENV !== 'production') {
+    const devSettings = getDevElectionSettings();
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       electionSettings: {
-        isVotingOpen: true,
-        isClosed: false,
-        maintenanceMode: false,
-        startTime: '2026-11-01T08:00:00+07:00',
-        endTime: '2026-11-01T16:00:00+07:00',
+        isVotingOpen: devSettings.is_voting_open,
+        isClosed: !devSettings.is_voting_open,
+        maintenanceMode: devSettings.maintenance_mode,
+        startTime: devSettings.start_time,
+        endTime: devSettings.end_time,
+        allowKotakKosongMulti: devSettings.allow_kotak_kosong_multi,
       },
       turnout: {
         totalDpt: 1240,

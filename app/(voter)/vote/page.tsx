@@ -34,6 +34,7 @@ export default function VotePage() {
   const [electionError, setElectionError] = useState<string | null>(null);
   const [votingActive, setVotingActive] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [electionSchedule, setElectionSchedule] = useState<{ start: string; end: string } | null>(null);
 
   // Sisa waktu sesi (15 menit countdown)
   const [secondsLeft, setSecondsLeft] = useState(15 * 60);
@@ -66,6 +67,12 @@ export default function VotePage() {
           if (data.electionStatus) {
             setVotingActive(data.electionStatus.isVotingActive);
             setMaintenanceMode(data.electionStatus.maintenanceMode);
+            if (data.electionStatus.startTime && data.electionStatus.endTime) {
+              setElectionSchedule({
+                start: data.electionStatus.startTime,
+                end: data.electionStatus.endTime,
+              });
+            }
           }
 
           if (typeof window !== 'undefined') {
@@ -180,7 +187,7 @@ export default function VotePage() {
               <span className="text-xs sm:text-sm font-bold tracking-tight text-on-surface uppercase block">
                 Pemira HMIF 2026/2027
               </span>
-              <span className="text-[11px] text-outline hidden sm:block">
+              <span className="text-xs text-outline hidden sm:block">
                 Bilik Suara Mahasiswa
               </span>
             </div>
@@ -201,7 +208,7 @@ export default function VotePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1"
+              className="text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1 p-2 -m-2 rounded-lg"
             >
               <HelpCircle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Bantuan</span>
@@ -212,7 +219,7 @@ export default function VotePage() {
 
       {/* Main Content */}
       <main className="w-full pt-20 flex-1 flex flex-col">
-        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-36">
+        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-28 sm:pb-32">
           {/* Header Title Section */}
           <div className="mb-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
@@ -238,6 +245,12 @@ export default function VotePage() {
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   {maintenanceMode
                     ? 'Sistem sedang dalam pemeliharaan. Coba lagi nanti atau hubungi Panitia KPR.'
+                    : electionSchedule
+                    ? `Pemungutan suara hanya dapat dilakukan pada jadwal resmi: ${new Date(
+                        electionSchedule.start
+                      ).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} s/d ${new Date(
+                        electionSchedule.end
+                      ).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB.`
                     : 'Pemungutan suara belum dibuka atau telah berakhir sesuai jadwal resmi.'}
                 </p>
               </div>
@@ -327,7 +340,7 @@ export default function VotePage() {
         </div>
 
         {/* Bottom Sticky Action Bar */}
-        <div className="fixed bottom-0 inset-x-0 bg-surface/95 backdrop-blur-md z-40 py-3.5 border-t border-outline-variant/30 shadow-lg">
+        <div className="fixed bottom-0 inset-x-0 bg-surface/95 backdrop-blur-md z-40 py-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))] border-t border-outline-variant/30 shadow-lg">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
               <div
@@ -367,34 +380,6 @@ export default function VotePage() {
             </div>
           </div>
         </div>
-
-        {/* Modal Konfirmasi */}
-        <ConfirmationModal
-          isOpen={isModalOpen && !isSessionExpired}
-          selectedCandidate={selectedCandidate}
-          isSubmitting={isSubmitting}
-          onClose={() => setIsModalOpen(false)}
-          onConfirm={handleConfirmVote}
-        />
-
-        {/* Modal Peringatan Sesi Kedaluwarsa */}
-        <SessionExpiredModal
-          isOpen={isSessionExpired}
-          onLoginRedirect={() => {
-            window.location.href = '/login';
-          }}
-        />
-
-        {/* Modal Detail Paslon & Unduh CV */}
-        <CandidateDetailModal
-          isOpen={!!detailCandidate}
-          candidate={detailCandidate}
-          isSelected={selectedCandidate?.id === detailCandidate?.id}
-          onClose={() => setDetailCandidate(null)}
-          onSelectCandidate={(c) => {
-            handleSelectCandidate(c);
-          }}
-        />
       </main>
 
       {/* Footer */}
@@ -407,6 +392,34 @@ export default function VotePage() {
           <span>Kerahasiaan Suara Dijamin Asas Luber Jurdil</span>
         </div>
       </footer>
+
+      {/* Modal Konfirmasi */}
+      <ConfirmationModal
+        isOpen={isModalOpen && !isSessionExpired}
+        selectedCandidate={selectedCandidate}
+        isSubmitting={isSubmitting}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmVote}
+      />
+
+      {/* Modal Peringatan Sesi Kedaluwarsa */}
+      <SessionExpiredModal
+        isOpen={isSessionExpired}
+        onLoginRedirect={() => {
+          window.location.href = '/login';
+        }}
+      />
+
+      {/* Modal Detail Paslon & Unduh CV */}
+      <CandidateDetailModal
+        isOpen={!!detailCandidate}
+        candidate={detailCandidate}
+        isSelected={selectedCandidate?.id === detailCandidate?.id}
+        onClose={() => setDetailCandidate(null)}
+        onSelectCandidate={(c) => {
+          handleSelectCandidate(c);
+        }}
+      />
     </div>
   );
 }

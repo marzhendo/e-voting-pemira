@@ -18,6 +18,8 @@ const candidateSchema = z.object({
   vision: z.string().min(5, 'Visi minimal 5 karakter'),
   mission: z.array(z.string()).min(1, 'Minimal sertakan 1 butir misi'),
   photo_url: z.string().nullable().optional(),
+  chairman_cv_url: z.string().nullable().optional(),
+  vice_chairman_cv_url: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
 });
 
@@ -92,6 +94,8 @@ export async function POST(req: NextRequest) {
               vision: newCandidate.vision,
               mission: newCandidate.mission,
               photo_url: newCandidate.photo_url || '',
+              chairman_cv_url: newCandidate.chairman_cv_url || null,
+              vice_chairman_cv_url: newCandidate.vice_chairman_cv_url || null,
               is_active: newCandidate.is_active,
             },
           ])
@@ -115,6 +119,8 @@ export async function POST(req: NextRequest) {
         vision: newCandidate.vision,
         mission: newCandidate.mission,
         photo_url: newCandidate.photo_url || null,
+        chairman_cv_url: newCandidate.chairman_cv_url || null,
+        vice_chairman_cv_url: newCandidate.vice_chairman_cv_url || null,
         is_active: newCandidate.is_active,
         created_at: new Date().toISOString(),
       };

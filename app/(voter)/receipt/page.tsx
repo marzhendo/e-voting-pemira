@@ -110,7 +110,7 @@ export default function ReceiptPage() {
               <span className="text-xs sm:text-sm font-bold text-on-surface uppercase block">
                 Pemira HMIF 2026/2027
               </span>
-              <span className="text-[10px] text-outline">
+              <span className="text-xs text-outline">
                 Bukti Pemungutan Suara
               </span>
             </div>
@@ -150,7 +150,7 @@ export default function ReceiptPage() {
             {/* Token Section */}
             <div className="p-6 flex flex-col gap-4">
               <div>
-                <span className="text-[11px] text-outline uppercase tracking-wider block font-medium">
+                <span className="text-xs text-outline uppercase tracking-wider block font-medium">
                   Token Bukti Pemilihan
                 </span>
                 <div className="mt-1.5 flex items-center justify-between gap-3 p-3 rounded-xl bg-surface-container-highest border border-outline-variant/30">
@@ -160,7 +160,7 @@ export default function ReceiptPage() {
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="p-2 rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors shrink-0"
+                    className="p-2.5 rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors shrink-0"
                     title="Salin Token"
                   >
                     {copied ? (
@@ -175,14 +175,14 @@ export default function ReceiptPage() {
               {/* Session Details */}
               <div className="grid grid-cols-2 gap-3 text-xs pt-1">
                 <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20">
-                  <span className="text-outline text-[11px] block">Waktu Pencatatan:</span>
+                  <span className="text-outline text-xs block">Waktu Pencatatan:</span>
                   <span className="font-medium text-on-surface mt-0.5 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-primary" />
                     {sessionDate || 'Hari Pemilihan'}
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20">
-                  <span className="text-outline text-[11px] block">Status Pilihan:</span>
+                  <span className="text-outline text-xs block">Status Pilihan:</span>
                   <span className="font-medium text-on-surface mt-0.5 flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-primary" />
                     Rahasia (Asas Luber)
@@ -196,7 +196,7 @@ export default function ReceiptPage() {
                   type="button"
                   disabled={isVerifying}
                   onClick={handleVerifyReceipt}
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-medium"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-[2.75rem] px-3 rounded-lg hover:bg-primary/10 transition-colors -mx-3"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>{isVerifying ? 'Memeriksa...' : 'Cek Keabsahan Bukti Pemilihan'}</span>
@@ -212,7 +212,7 @@ export default function ReceiptPage() {
 
             {/* Note & Actions Footer */}
             <div className="p-6 pt-0 flex flex-col gap-3">
-              <p className="text-[11px] text-outline text-center leading-relaxed">
+              <p className="text-xs text-outline text-center leading-relaxed">
                 Simpan token ini sebagai bukti partisipasi. Pilihan Anda bersifat rahasia.
               </p>
 

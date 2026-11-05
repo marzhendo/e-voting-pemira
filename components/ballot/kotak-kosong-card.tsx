@@ -137,14 +137,14 @@ export function KotakKosongCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-outline-variant/20">
+      <div className="flex items-center justify-end gap-3 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+          className={`h-10 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center ${
             isSelected
               ? 'bg-primary text-on-primary shadow-sm'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'

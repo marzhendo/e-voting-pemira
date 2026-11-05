@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { ShieldCheck, X, Loader2 } from 'lucide-react';
+import { Portal } from '@/components/ui/portal';
 import type { CandidateItem } from '@/components/ballot/candidate-card';
 
 interface ConfirmationModalProps {
@@ -18,6 +20,28 @@ export function ConfirmationModal({
   onClose,
   onConfirm,
 }: ConfirmationModalProps) {
+  useEffect(() => {
+    if (isOpen) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && !isSubmitting) {
+          onClose();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen || !selectedCandidate) return null;
 
   const isKotakKosong = selectedCandidate.candidate_number === 0;
@@ -34,16 +58,27 @@ export function ConfirmationModal({
     : `${selectedCandidate.leader_name} & ${selectedCandidate.vice_leader_name}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 shadow-2xl flex flex-col gap-5 border border-outline-variant/30">
-        {/* Modal Header */}
+    <Portal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-modal-title"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isSubmitting) {
+            onClose();
+          }
+        }}
+      >
+        <div className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 shadow-2xl flex flex-col gap-5 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+          {/* Modal Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-on-surface">
+              <h2 id="confirmation-modal-title" className="text-lg font-bold text-on-surface">
                 Konfirmasi Pilihan
               </h2>
               <p className="text-xs text-outline">
@@ -56,7 +91,8 @@ export function ConfirmationModal({
             type="button"
             disabled={isSubmitting}
             onClick={onClose}
-            className="text-outline hover:text-on-surface p-1.5 rounded-lg transition-colors disabled:opacity-50"
+            aria-label="Tutup Konfirmasi"
+            className="w-11 h-11 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -117,5 +153,6 @@ export function ConfirmationModal({
         </div>
       </div>
     </div>
+  </Portal>
   );
 }

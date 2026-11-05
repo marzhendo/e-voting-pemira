@@ -10,7 +10,7 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12">
         <div className="w-full max-w-4xl bg-hmif-dark border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
           {/* LEFT COLUMN: Identity & Branding */}
-          <section className="lg:col-span-7 p-8 sm:p-10 flex flex-col justify-center bg-hmif-dark border-b lg:border-b-0 lg:border-r border-neutral-800">
+          <section className="hidden lg:flex lg:col-span-7 p-8 sm:p-10 flex flex-col justify-center bg-hmif-dark lg:border-r border-neutral-800">
             <div>
               {/* Logo */}
               <div className="flex items-center gap-3.5 mb-8">
@@ -48,9 +48,31 @@ export default function LoginPage() {
           </section>
 
           {/* RIGHT COLUMN: Authentication Panel */}
-          <section className="lg:col-span-5 text-neutral-900 p-8 sm:p-10 flex flex-col justify-between bg-white">
+          <section className="col-span-1 lg:col-span-5 text-neutral-900 p-6 sm:p-8 lg:p-10 flex flex-col justify-between bg-white">
             <div>
-              <div className="flex items-center justify-between mb-6">
+              {/* Mobile Compact Branding Header */}
+              <div className="lg:hidden flex items-center gap-3 pb-5 mb-5 border-b border-neutral-200">
+                <div className="relative w-10 h-10 shrink-0 flex items-center justify-center">
+                  <Image
+                    src="/assets/img/hmif-logo.png"
+                    alt="Logo HMIF"
+                    width={40}
+                    height={40}
+                    priority
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-bold tracking-wider uppercase text-hmif-dark">
+                    PEMIRA HMIF 2026/2027
+                  </p>
+                  <p className="text-xs font-medium text-neutral-500">
+                    Telkom University Purwokerto
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
                   Autentikasi Pemilih
                 </span>

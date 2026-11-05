@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { Portal } from '@/components/ui/portal';
 import {
   Vote,
   Users,
@@ -36,6 +37,10 @@ import {
   Send,
   Calendar,
   CheckCircle2,
+  Upload,
+  Eye,
+  Image as ImageIcon,
+  Menu,
 } from 'lucide-react';
 
 interface TallyItem {
@@ -72,6 +77,8 @@ interface CandidateItem {
   vision: string;
   mission: string[];
   photo_url: string | null;
+  chairman_cv_url?: string | null;
+  vice_chairman_cv_url?: string | null;
 }
 
 function formatDateTimeLocal(isoString: string): string {
@@ -90,6 +97,7 @@ export default function AdminDashboardPage() {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<'overview' | 'candidates' | 'dpt' | 'tally' | 'settings' | 'emails'>('overview');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Admin user & roles
   const [userRole, setUserRole] = useState<string>('kpr_admin');
@@ -116,8 +124,20 @@ export default function AdminDashboardPage() {
   const [candidateFormPhotoUrl, setCandidateFormPhotoUrl] = useState('');
   const [candidateFormVision, setCandidateFormVision] = useState('');
   const [candidateFormMission, setCandidateFormMission] = useState('');
+  const [candidateFormChairmanCvUrl, setCandidateFormChairmanCvUrl] = useState<string | null>(null);
+  const [candidateFormViceChairmanCvUrl, setCandidateFormViceChairmanCvUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingChairmanCv, setUploadingChairmanCv] = useState(false);
+  const [uploadingViceChairmanCv, setUploadingViceChairmanCv] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [allowKotakKosongMulti, setAllowKotakKosongMulti] = useState(true);
+  const [togglingKotakKosong, setTogglingKotakKosong] = useState(false);
   const [savingCandidate, setSavingCandidate] = useState(false);
   const [candidateActionMessage, setCandidateActionMessage] = useState<string | null>(null);
+
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
+  const chairmanCvFileInputRef = useRef<HTMLInputElement>(null);
+  const viceChairmanCvFileInputRef = useRef<HTMLInputElement>(null);
 
   // Settings State
   const [isVotingOpen, setIsVotingOpen] = useState(true);
@@ -172,6 +192,44 @@ export default function AdminDashboardPage() {
   const [isCommittingImport, setIsCommittingImport] = useState(false);
   const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
 
+  // Kunci scroll halaman (body & html) saat modal atau menu drawer terbuka
+  useEffect(() => {
+    const shouldLock = candidateModalOpen || isEmergencyModalOpen || isConfirmBroadcastOpen || isSidebarOpen;
+    if (shouldLock) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          if (isConfirmBroadcastOpen && !isBroadcasting) setIsConfirmBroadcastOpen(false);
+          else if (isEmergencyModalOpen && !settingsSaving) setIsEmergencyModalOpen(false);
+          else if (candidateModalOpen && !savingCandidate && !uploadingPhoto && !uploadingChairmanCv && !uploadingViceChairmanCv) setCandidateModalOpen(false);
+          else if (isSidebarOpen) setIsSidebarOpen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [
+    candidateModalOpen,
+    isEmergencyModalOpen,
+    isConfirmBroadcastOpen,
+    isSidebarOpen,
+    isBroadcasting,
+    settingsSaving,
+    savingCandidate,
+    uploadingPhoto,
+    uploadingChairmanCv,
+    uploadingViceChairmanCv,
+  ]);
+
   // 1. Muat profil sesi admin
   useEffect(() => {
     fetch('/api/auth/me')
@@ -220,6 +278,9 @@ export default function AdminDashboardPage() {
           }
           if (data.electionSettings.endTime) {
             setEndTime(formatDateTimeLocal(data.electionSettings.endTime));
+          }
+          if (data.electionSettings.allowKotakKosongMulti !== undefined) {
+            setAllowKotakKosongMulti(data.electionSettings.allowKotakKosongMulti);
           }
         }
       })
@@ -305,6 +366,9 @@ export default function AdminDashboardPage() {
     setCandidateFormLeader('');
     setCandidateFormViceLeader('');
     setCandidateFormPhotoUrl('');
+    setCandidateFormChairmanCvUrl(null);
+    setCandidateFormViceChairmanCvUrl(null);
+    setUploadError(null);
     setCandidateFormVision('');
     setCandidateFormMission('');
     setCandidateModalOpen(true);
@@ -317,9 +381,75 @@ export default function AdminDashboardPage() {
     setCandidateFormLeader(candidate.leader_name);
     setCandidateFormViceLeader(candidate.vice_leader_name);
     setCandidateFormPhotoUrl(candidate.photo_url || '');
+    setCandidateFormChairmanCvUrl(candidate.chairman_cv_url || null);
+    setCandidateFormViceChairmanCvUrl(candidate.vice_chairman_cv_url || null);
+    setUploadError(null);
     setCandidateFormVision(candidate.vision || '');
     setCandidateFormMission(Array.isArray(candidate.mission) ? candidate.mission.join('\n') : '');
     setCandidateModalOpen(true);
+  };
+
+  // Upload file helper for candidate photo or CVs
+  const handleUploadFile = async (
+    file: File,
+    category: 'candidates' | 'cv',
+    onSuccess: (url: string) => void,
+    setLoadingState: (loading: boolean) => void
+  ) => {
+    setLoadingState(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', category);
+      formData.append('candidateNumber', candidateFormNumber.toString());
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setUploadError(data.error || 'Gagal mengunggah berkas.');
+      } else {
+        onSuccess(data.url);
+      }
+    } catch {
+      setUploadError('Terjadi kesalahan jaringan saat mengunggah berkas.');
+    } finally {
+      setLoadingState(false);
+    }
+  };
+
+  // Toggle Kotak Kosong for Multi-Candidate Elections
+  const handleToggleKotakKosong = async () => {
+    const nextVal = !allowKotakKosongMulti;
+    setTogglingKotakKosong(true);
+    try {
+      const res = await fetch('/api/admin/election-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          allow_kotak_kosong_multi: nextVal,
+          reason: `Admin mengubah opsi kotak kosong multi-kandidat menjadi ${nextVal ? 'Aktif' : 'Nonaktif'}`,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAllowKotakKosongMulti(nextVal);
+        setCandidateActionMessage(
+          nextVal
+            ? '✓ Opsi Kotak Kosong diaktifkan untuk pemilihan multi-paslon.'
+            : '✓ Opsi Kotak Kosong dinonaktifkan untuk pemilihan multi-paslon.'
+        );
+      } else {
+        alert(data.error || 'Gagal memperbarui status sakelar Kotak Kosong.');
+      }
+    } catch {
+      alert('Gagal memperbarui status sakelar Kotak Kosong.');
+    } finally {
+      setTogglingKotakKosong(false);
+    }
   };
 
   // Save Candidate (Create or Update)
@@ -340,6 +470,8 @@ export default function AdminDashboardPage() {
       vision: candidateFormVision.trim(),
       mission: missionArray,
       photo_url: candidateFormPhotoUrl.trim() || null,
+      chairman_cv_url: candidateFormChairmanCvUrl || null,
+      vice_chairman_cv_url: candidateFormViceChairmanCvUrl || null,
     };
 
     try {
@@ -651,35 +783,59 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="bg-surface font-montserrat text-on-surface antialiased min-h-screen flex selection:bg-primary selection:text-on-primary">
+      {/* Mobile Sidebar Backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* SIDEBAR NAVIGATION */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between py-6 border-r border-outline-variant/30 shadow-sm">
+      <aside
+        className={`fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between py-6 border-r border-outline-variant/30 shadow-lg lg:shadow-sm transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
+      >
         <div className="flex flex-col gap-6">
           {/* Logo & Title */}
-          <div className="px-6 flex items-center gap-3">
-            <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
-              <Image
-                src="/assets/img/hmif-logo.png"
-                alt="Logo HMIF"
-                width={36}
-                height={36}
-                priority
-                className="w-full h-full object-contain"
-              />
+          <div className="px-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+                <Image
+                  src="/assets/img/hmif-logo.png"
+                  alt="Logo HMIF"
+                  width={36}
+                  height={36}
+                  priority
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-sm text-on-surface tracking-tight leading-tight">
+                  PEMIRA HMIF
+                </span>
+                <span className="text-[11px] text-outline font-medium">
+                  Panel Panitia KPR
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-sm text-on-surface tracking-tight leading-tight">
-                PEMIRA HMIF
-              </span>
-              <span className="text-[10px] text-outline font-medium">
-                Panel Panitia KPR
-              </span>
-            </div>
+
+            <button
+              type="button"
+              className="lg:hidden p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Tutup navigasi"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* User Role Badge */}
           <div className="px-6">
             <div className="px-3 py-1.5 rounded-lg bg-surface-container flex items-center justify-between border border-outline-variant/20">
-              <span className="text-[10px] text-outline uppercase font-medium">
+              <span className="text-[11px] text-outline uppercase font-medium">
                 Role
               </span>
               <span className="text-xs text-primary font-bold uppercase">
@@ -692,7 +848,10 @@ export default function AdminDashboardPage() {
           <nav className="flex flex-col gap-1 px-3">
             <button
               type="button"
-              onClick={() => setActiveTab('overview')}
+              onClick={() => {
+                setActiveTab('overview');
+                setIsSidebarOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'overview'
                   ? 'bg-primary text-on-primary shadow-sm'
@@ -705,7 +864,10 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('candidates')}
+              onClick={() => {
+                setActiveTab('candidates');
+                setIsSidebarOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'candidates'
                   ? 'bg-primary text-on-primary shadow-sm'
@@ -718,7 +880,10 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('dpt')}
+              onClick={() => {
+                setActiveTab('dpt');
+                setIsSidebarOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'dpt'
                   ? 'bg-primary text-on-primary shadow-sm'
@@ -731,7 +896,10 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('tally')}
+              onClick={() => {
+                setActiveTab('tally');
+                setIsSidebarOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'tally'
                   ? 'bg-primary text-on-primary shadow-sm'
@@ -744,7 +912,10 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('settings')}
+              onClick={() => {
+                setActiveTab('settings');
+                setIsSidebarOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'settings'
                   ? 'bg-primary text-on-primary shadow-sm'
@@ -757,7 +928,10 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('emails')}
+              onClick={() => {
+                setActiveTab('emails');
+                setIsSidebarOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'emails'
                   ? 'bg-primary text-on-primary shadow-sm'
@@ -793,10 +967,18 @@ export default function AdminDashboardPage() {
       </aside>
 
       {/* MAIN VIEWPORT CONTAINER */}
-      <div className="pl-64 flex-1 flex flex-col min-h-screen">
+      <div className="lg:pl-64 flex-1 flex flex-col min-h-screen">
         {/* TOP HEADER BAR */}
-        <header className="fixed top-0 left-64 right-0 h-16 bg-surface/90 backdrop-blur-md z-40 px-6 sm:px-8 flex items-center justify-between border-b border-outline-variant/20 shadow-sm">
+        <header className="fixed top-0 lg:left-64 left-0 right-0 h-16 bg-surface/90 backdrop-blur-md z-40 px-4 sm:px-8 flex items-center justify-between border-b border-outline-variant/20 shadow-sm">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="lg:hidden p-2 rounded-lg text-on-surface hover:bg-surface-container transition-colors -ml-1 cursor-pointer"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              aria-label="Buka menu navigasi"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-container border border-outline-variant/30 text-xs">
               <span
                 className={`w-2 h-2 rounded-full ${
@@ -816,7 +998,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex flex-col text-right">
               <span className="text-xs font-bold text-on-surface">{userName}</span>
-              <span className="text-[10px] text-outline uppercase">
+              <span className="text-[11px] text-outline uppercase">
                 {userRole.replace('_', ' ')}
               </span>
             </div>
@@ -977,7 +1159,7 @@ export default function AdminDashboardPage() {
                                       ? 'Kotak Kosong'
                                       : `${cand.leaderName} & ${cand.viceLeaderName}`}
                                   </span>
-                                  <span className="text-[10px] text-outline">
+                                  <span className="text-[11px] text-outline">
                                     {cand.voteCount} Suara
                                   </span>
                                 </div>
@@ -1056,13 +1238,47 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="px-3 py-1 rounded-full bg-surface-container-high text-xs text-on-surface font-semibold border border-outline-variant/30">
                       Total: {regularCount} Paslon
                     </span>
-                    <span className="px-3 py-1 rounded-full bg-surface-container-high text-xs text-primary font-semibold border border-outline-variant/30">
-                      Kotak Kosong: Aktif Otomatis
-                    </span>
+                    {regularCount === 1 ? (
+                      <span className="px-3 py-1 rounded-full bg-primary/10 text-xs text-primary font-semibold border border-primary/30">
+                        Kotak Kosong: Wajib Aktif (Calon Tunggal)
+                      </span>
+                    ) : regularCount >= 2 ? (
+                      <div className="flex items-center gap-3 bg-surface-container-high px-3 py-1.5 rounded-xl border border-outline-variant/30">
+                        <div className="text-right">
+                          <span className="text-[11px] font-bold text-on-surface block leading-tight">
+                            Opsi Kotak Kosong
+                          </span>
+                          <span className="text-[11px] text-outline">
+                            {allowKotakKosongMulti ? 'Diikutsertakan' : 'Dinonaktifkan'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          title={
+                            allowKotakKosongMulti
+                              ? 'Klik untuk mematikan opsi Kotak Kosong'
+                              : 'Klik untuk mengaktifkan opsi Kotak Kosong'
+                          }
+                          disabled={togglingKotakKosong}
+                          onClick={handleToggleKotakKosong}
+                          className={`w-11 h-6 rounded-full transition-colors relative p-1 cursor-pointer ${
+                            allowKotakKosongMulti
+                              ? 'bg-primary'
+                              : 'bg-surface-container-highest border border-outline/30'
+                          }`}
+                        >
+                          <span
+                            className={`w-4 h-4 rounded-full bg-white block transition-transform ${
+                              allowKotakKosongMulti ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1117,19 +1333,57 @@ export default function AdminDashboardPage() {
                             </div>
                           </div>
 
-                          {/* Leader & Vice Leader */}
-                          <div>
-                            <h4 className="text-sm font-bold text-on-surface leading-snug">
-                              {cand.leader_name}
-                            </h4>
-                            <p className="text-xs text-on-surface-variant">
-                              &amp; {cand.vice_leader_name}
-                            </p>
+                          {/* Leader & Vice Leader with Photo / Avatar */}
+                          <div className="flex items-center gap-3">
+                            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center shrink-0">
+                              {cand.photo_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={cand.photo_url}
+                                  alt={`Paslon ${cand.candidate_number}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Users className="w-5 h-5 text-primary/70" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-bold text-on-surface leading-snug truncate">
+                                {cand.leader_name}
+                              </h4>
+                              <p className="text-xs text-on-surface-variant truncate">
+                                &amp; {cand.vice_leader_name}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* CV status badges */}
+                          <div className="flex flex-wrap gap-1.5 text-[11px]">
+                            <span
+                              className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                cand.chairman_cv_url
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
+                                  : 'bg-surface-container-high text-outline border-outline-variant/30'
+                              }`}
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span>{cand.chairman_cv_url ? 'CV Chairman ✓' : 'CV Chairman -'}</span>
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                cand.vice_chairman_cv_url
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
+                                  : 'bg-surface-container-high text-outline border-outline-variant/30'
+                              }`}
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span>{cand.vice_chairman_cv_url ? 'CV Vice ✓' : 'CV Vice -'}</span>
+                            </span>
                           </div>
 
                           {/* Vision preview */}
                           <div className="p-3 rounded-xl bg-surface-container-low text-xs text-on-surface-variant border border-outline-variant/20">
-                            <span className="text-[10px] text-outline uppercase font-semibold block mb-0.5">
+                            <span className="text-[11px] text-outline uppercase font-semibold block mb-0.5">
                               Visi:
                             </span>
                             <p className="line-clamp-2 leading-relaxed">
@@ -1723,7 +1977,7 @@ export default function AdminDashboardPage() {
                           }`}
                         >
                           <span className="block">⏳ Pengingat (Nudge)</span>
-                          <span className="text-[10px] opacity-80 block mt-0.5">Khusus belum memilih</span>
+                          <span className="text-[11px] opacity-80 block mt-0.5">Khusus belum memilih</span>
                         </button>
 
                         <button
@@ -1736,7 +1990,7 @@ export default function AdminDashboardPage() {
                           }`}
                         >
                           <span className="block">📢 Undangan Buka</span>
-                          <span className="text-[10px] opacity-80 block mt-0.5">Untuk semua DPT</span>
+                          <span className="text-[11px] opacity-80 block mt-0.5">Untuk semua DPT</span>
                         </button>
 
                         <button
@@ -1749,7 +2003,7 @@ export default function AdminDashboardPage() {
                           }`}
                         >
                           <span className="block">✍️ Pesan Kustom</span>
-                          <span className="text-[10px] opacity-80 block mt-0.5">Tulis bebas</span>
+                          <span className="text-[11px] opacity-80 block mt-0.5">Tulis bebas</span>
                         </button>
                       </div>
                     </div>
@@ -1863,7 +2117,7 @@ export default function AdminDashboardPage() {
                             onChange={(e) => setBroadcastCtaUrl(e.target.value)}
                             className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
                           />
-                          <span className="text-[10px] text-outline block">
+                          <span className="text-[11px] text-outline block">
                             Tautan relatif (contoh: /login) akan otomatis dikonversi sistem ke alamat domain resmi Pemira.
                           </span>
                         </div>
@@ -1883,12 +2137,12 @@ export default function AdminDashboardPage() {
                   </div>
 
                   {/* Right Column: Live Email Preview */}
-                  <div className="lg:col-span-5 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-4">
+                  <div className="hidden lg:block lg:col-span-5 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
                       <span className="text-xs font-bold uppercase tracking-wider text-outline">
                         Pratinjau Email Mahasiswa
                       </span>
-                      <span className="text-[10px] text-outline font-mono">
+                      <span className="text-[11px] text-outline font-mono">
                         Outlook Preview
                       </span>
                     </div>
@@ -1905,13 +2159,13 @@ export default function AdminDashboardPage() {
                       {/* Rendered Email Card */}
                       <div className="bg-[#1E1E1E] rounded-xl p-5 border border-neutral-800 space-y-4">
                         <div className="text-center pb-3 border-b border-neutral-800">
-                          <span className="text-[10px] font-bold text-hmif-gold uppercase tracking-widest block">
+                          <span className="text-[11px] font-bold text-hmif-gold uppercase tracking-widest block">
                             PEMIRA HMIF 2026/2027
                           </span>
                           <h4 className="text-sm font-bold text-white mt-1">
                             {broadcastHeadline}
                           </h4>
-                          <span className="text-[10px] text-neutral-400 block mt-0.5">
+                          <span className="text-[11px] text-neutral-400 block mt-0.5">
                             Telkom University Purwokerto
                           </span>
                         </div>
@@ -1930,7 +2184,7 @@ export default function AdminDashboardPage() {
                           </span>
                         </div>
 
-                        <div className="p-2.5 rounded bg-neutral-900 border-l-2 border-hmif-gold text-[10px] text-neutral-400 leading-normal">
+                        <div className="p-2.5 rounded bg-neutral-900 border-l-2 border-hmif-gold text-[11px] text-neutral-400 leading-normal">
                           🛡️ Kerahasiaan suara dijamin penuh berasaskan LUBER JURDIL (*Ballot Secrecy*).
                         </div>
                       </div>
@@ -1945,8 +2199,18 @@ export default function AdminDashboardPage() {
 
       {/* MODAL TAMBAH / EDIT PASANGAN CALON */}
       {candidateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 max-h-[90vh] overflow-y-auto">
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !savingCandidate) {
+                setCandidateModalOpen(false);
+              }
+            }}
+          >
+            <div className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
               <div>
                 <h3 className="text-base font-bold text-on-surface">
@@ -1960,7 +2224,8 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setCandidateModalOpen(false)}
-                className="text-outline hover:text-on-surface p-1 rounded-lg"
+                aria-label="Tutup formulir paslon"
+                className="w-11 h-11 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2009,17 +2274,273 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
-                  URL Foto Paslon (Opsional)
-                </label>
+              {/* Banner Kesalahan Unggah Berkas */}
+              {uploadError && (
+                <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error text-xs flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{uploadError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUploadError(null)}
+                    aria-label="Tutup pesan error"
+                    className="text-error hover:opacity-80 p-1.5 -m-1 rounded-lg hover:bg-error/10 transition-colors cursor-pointer shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* FOTO PASLON DENGAN FITUR UNGGAH & HAPUS FOTO */}
+              <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-outline uppercase flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                    <span>Foto Pasangan Calon</span>
+                  </label>
+                  <span className="text-[11px] text-outline">Maks. 5 MB (.png, .jpg, .webp)</span>
+                </div>
+
                 <input
-                  type="text"
-                  placeholder="https://... atau /images/paslon.png"
-                  value={candidateFormPhotoUrl}
-                  onChange={(e) => setCandidateFormPhotoUrl(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                  ref={photoFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadFile(f, 'candidates', (url) => setCandidateFormPhotoUrl(url), setUploadingPhoto);
+                  }}
                 />
+
+                {candidateFormPhotoUrl ? (
+                  <div className="flex items-center gap-3 bg-surface-container p-2.5 rounded-xl border border-outline-variant/20">
+                    <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-surface-container-highest shrink-0 border border-outline-variant/30">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={candidateFormPhotoUrl}
+                        alt="Preview Foto Paslon"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-semibold text-on-surface block truncate">
+                        Foto Paslon Terpasang
+                      </span>
+                      <span className="text-[11px] text-outline block truncate font-mono mt-0.5">
+                        {candidateFormPhotoUrl}
+                      </span>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          disabled={uploadingPhoto}
+                          onClick={() => photoFileInputRef.current?.click()}
+                          className="text-[11px] font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {uploadingPhoto ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Mengunggah...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-3 h-3" />
+                              <span>Ganti Foto</span>
+                            </>
+                          )}
+                        </button>
+                        <span className="text-outline text-[11px]">•</span>
+                        <button
+                          type="button"
+                          onClick={() => setCandidateFormPhotoUrl('')}
+                          className="text-[11px] font-semibold text-error hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus Foto</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={uploadingPhoto}
+                      onClick={() => photoFileInputRef.current?.click()}
+                      className="flex-1 py-3 px-4 rounded-xl border border-dashed border-outline-variant hover:border-primary/60 bg-surface-container hover:bg-surface-bright transition-all text-center flex flex-col items-center justify-center gap-1 cursor-pointer group"
+                    >
+                      {uploadingPhoto ? (
+                        <div className="flex items-center gap-2 text-primary font-semibold text-xs">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Mengunggah foto...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface group-hover:text-primary">
+                            <UploadCloud className="w-4 h-4 text-primary" />
+                            <span>Pilih / Unggah Berkas Foto Paslon</span>
+                          </div>
+                          <span className="text-[11px] text-outline">
+                            Foto akan otomatis ditampilkan di bilik suara pemilih
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* BERKAS CV TERPISAH: CHAIRMAN & VICE CHAIRMAN (PDF) */}
+              <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-3">
+                <div className="flex items-center justify-between pb-1 border-b border-outline-variant/20">
+                  <label className="text-[11px] font-bold text-outline uppercase flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-primary" />
+                    <span>Berkas CV Pasangan Calon (PDF)</span>
+                  </label>
+                  <span className="text-[11px] text-outline">Maks. 10 MB per berkas</span>
+                </div>
+
+                {/* CV Chairman */}
+                <input
+                  ref={chairmanCvFileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadFile(f, 'cv', (url) => setCandidateFormChairmanCvUrl(url), setUploadingChairmanCv);
+                  }}
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container border border-outline-variant/20">
+                  <div>
+                    <span className="text-xs font-bold text-on-surface block">
+                      CV Calon Chairman
+                    </span>
+                    {candidateFormChairmanCvUrl ? (
+                      <span className="text-[11px] text-emerald-400 font-medium block truncate max-w-[220px]">
+                        ✓ Terunggah: {candidateFormChairmanCvUrl.split('/').pop()}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-outline block">
+                        Belum ada berkas PDF CV Chairman
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                    {candidateFormChairmanCvUrl && (
+                      <>
+                        <a
+                          href={candidateFormChairmanCvUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
+                        >
+                          <Eye className="w-3 h-3 text-primary" />
+                          <span>Lihat</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setCandidateFormChairmanCvUrl(null)}
+                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-error/20 text-error text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
+                          title="Hapus CV Chairman"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus</span>
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      disabled={uploadingChairmanCv}
+                      onClick={() => chairmanCvFileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      {uploadingChairmanCv ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Mengunggah...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3" />
+                          <span>{candidateFormChairmanCvUrl ? 'Ganti CV' : 'Unggah CV Chairman'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* CV Vice Chairman */}
+                <input
+                  ref={viceChairmanCvFileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadFile(f, 'cv', (url) => setCandidateFormViceChairmanCvUrl(url), setUploadingViceChairmanCv);
+                  }}
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container border border-outline-variant/20">
+                  <div>
+                    <span className="text-xs font-bold text-on-surface block">
+                      CV Calon Vice Chairman
+                    </span>
+                    {candidateFormViceChairmanCvUrl ? (
+                      <span className="text-[11px] text-emerald-400 font-medium block truncate max-w-[220px]">
+                        ✓ Terunggah: {candidateFormViceChairmanCvUrl.split('/').pop()}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-outline block">
+                        Belum ada berkas PDF CV Vice Chairman
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                    {candidateFormViceChairmanCvUrl && (
+                      <>
+                        <a
+                          href={candidateFormViceChairmanCvUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
+                        >
+                          <Eye className="w-3 h-3 text-primary" />
+                          <span>Lihat</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setCandidateFormViceChairmanCvUrl(null)}
+                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-error/20 text-error text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
+                          title="Hapus CV Vice Chairman"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus</span>
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      disabled={uploadingViceChairmanCv}
+                      onClick={() => viceChairmanCvFileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      {uploadingViceChairmanCv ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Mengunggah...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3" />
+                          <span>{candidateFormViceChairmanCvUrl ? 'Ganti CV' : 'Unggah CV Vice Chairman'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -2076,12 +2597,23 @@ export default function AdminDashboardPage() {
             </form>
           </div>
         </div>
+      </Portal>
       )}
 
       {/* MODAL KUNCI DARURAT */}
       {isEmergencyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30">
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !settingsSaving) {
+                setIsEmergencyModalOpen(false);
+              }
+            }}
+          >
+            <div className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 text-error">
                 <div className="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center">
@@ -2091,7 +2623,7 @@ export default function AdminDashboardPage() {
                   <h3 className="text-sm font-bold text-on-surface">
                     Kunci Darurat Bilik Suara
                   </h3>
-                  <span className="text-[10px] text-outline uppercase tracking-wider">
+                  <span className="text-[11px] text-outline uppercase tracking-wider">
                     Tindakan Darurat
                   </span>
                 </div>
@@ -2100,7 +2632,8 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsEmergencyModalOpen(false)}
-                className="text-outline hover:text-on-surface p-1 rounded-lg"
+                aria-label="Tutup kunci darurat"
+                className="w-11 h-11 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2147,12 +2680,23 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
+      </Portal>
       )}
 
       {/* MODAL KONFIRMASI BROADCAST EMAIL */}
       {isConfirmBroadcastOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isBroadcasting) {
+                setIsConfirmBroadcastOpen(false);
+              }
+            }}
+          >
+            <div className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                 <Send className="w-5 h-5" />
@@ -2194,12 +2738,12 @@ export default function AdminDashboardPage() {
               ⚠️ Sistem akan menggunakan mekanisme batching aman untuk menjaga deliverability SMTP dan reputasi domain di Microsoft Outlook Telkom University.
             </p>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3 pt-2">
               <button
                 type="button"
                 disabled={isBroadcasting}
                 onClick={() => setIsConfirmBroadcastOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer"
+                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center justify-center"
               >
                 Batal
               </button>
@@ -2207,7 +2751,7 @@ export default function AdminDashboardPage() {
                 type="button"
                 disabled={isBroadcasting}
                 onClick={handleExecuteBroadcast}
-                className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
               >
                 {isBroadcasting ? (
                   <>
@@ -2221,6 +2765,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
+      </Portal>
       )}
     </div>
   );
