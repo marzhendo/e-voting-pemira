@@ -1,6 +1,9 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/admin';
 import { smtpMailService } from '@/lib/mail/smtp-service';
+import { findVoterByIdentifier } from '@/lib/dpt/store';
 import type { SessionUser } from './session';
 
 export interface OtpRequestResult {
@@ -31,51 +34,66 @@ interface InMemoOtpState {
   otpLastSentAt: number | null;
 }
 
-// Dev mock in-memory store saat Supabase belum dikonfigurasi
-const devMockStore = new Map<string, InMemoOtpState>([
-  [
-    '103012300001',
-    {
-      nim: '103012300001',
-      name: 'Ahmad Rizky Pratama',
-      email: 'voter1@student.telkomuniversity.ac.id',
-      generation: 2023,
-      hasVoted: false,
-      otpHash: null,
-      otpExpiresAt: null,
-      otpAttempts: 0,
-      otpLastSentAt: null,
-    },
-  ],
-  [
-    '103012300002',
-    {
-      nim: '103012300002',
-      name: 'Budi Santoso',
-      email: 'voter2@student.telkomuniversity.ac.id',
-      generation: 2023,
-      hasVoted: true,
-      otpHash: null,
-      otpExpiresAt: null,
-      otpAttempts: 0,
-      otpLastSentAt: null,
-    },
-  ],
-  [
-    '103012400003',
-    {
-      nim: '103012400003',
-      name: 'Citra Dewi Lestari',
-      email: 'voter3@student.telkomuniversity.ac.id',
-      generation: 2024,
-      hasVoted: false,
-      otpHash: null,
-      otpExpiresAt: null,
-      otpAttempts: 0,
-      otpLastSentAt: null,
-    },
-  ],
-]);
+declare global {
+  // eslint-disable-next-line no-var
+  var __devMockOtpStore: Map<string, InMemoOtpState> | undefined;
+}
+
+const DATA_DIR = path.join(process.cwd(), 'data');
+const OTP_STORE_PATH = path.join(DATA_DIR, 'dev-otps.json');
+
+function ensureDataDir(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('[OtpService] Failed to create data dir:', err);
+  }
+}
+
+function getDevMockStore(): Map<string, InMemoOtpState> {
+  if (!globalThis.__devMockOtpStore) {
+    globalThis.__devMockOtpStore = new Map<string, InMemoOtpState>();
+  }
+
+  // Sinkronisasi data dari disk agar konsisten lintas route handler (/api/auth/otp/request dan /api/auth/otp/verify)
+  try {
+    if (fs.existsSync(OTP_STORE_PATH)) {
+      const raw = fs.readFileSync(OTP_STORE_PATH, 'utf-8');
+      const list: InMemoOtpState[] = JSON.parse(raw);
+      for (const item of list) {
+        globalThis.__devMockOtpStore.set(item.nim, item);
+      }
+    }
+  } catch (err) {
+    console.warn('[OtpService] Failed to sync OTP store from disk:', err);
+  }
+
+  return globalThis.__devMockOtpStore;
+}
+
+function saveDevMockStore(): void {
+  if (!globalThis.__devMockOtpStore) return;
+  ensureDataDir();
+  try {
+    const list = Array.from(globalThis.__devMockOtpStore.values());
+    fs.writeFileSync(OTP_STORE_PATH, JSON.stringify(list, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[OtpService] Failed to persist OTP store to disk:', err);
+  }
+}
+
+export function resetDevOtpStore(): void {
+  if (globalThis.__devMockOtpStore) {
+    globalThis.__devMockOtpStore.clear();
+  }
+  try {
+    if (fs.existsSync(OTP_STORE_PATH)) {
+      fs.unlinkSync(OTP_STORE_PATH);
+    }
+  } catch {}
+}
 
 const OTP_SECRET_SALT = process.env.OTP_SECRET_SALT || 'hmif-pemira-otp-salt-secure-2026';
 if (process.env.APP_ENV === 'production' && !process.env.OTP_SECRET_SALT) {
@@ -239,12 +257,37 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
     }
   }
 
-  // Fallback Dev Mode (In-Memory)
+  // Fallback Dev Mode (In-Memory + Disk Sync)
+  const devMockStore = getDevMockStore();
   let voterState: InMemoOtpState | undefined;
-  for (const v of devMockStore.values()) {
-    if (isEmail ? v.email.toLowerCase() === cleanId : v.nim === cleanId) {
-      voterState = v;
-      break;
+  const dptVoter = findVoterByIdentifier(cleanId);
+  if (dptVoter) {
+    if (!devMockStore.has(dptVoter.nim)) {
+      devMockStore.set(dptVoter.nim, {
+        nim: dptVoter.nim,
+        name: dptVoter.name,
+        email: dptVoter.email,
+        generation: dptVoter.generation,
+        hasVoted: dptVoter.has_voted,
+        otpHash: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+        otpLastSentAt: null,
+      });
+    }
+    voterState = devMockStore.get(dptVoter.nim);
+    if (voterState) {
+      voterState.hasVoted = dptVoter.has_voted;
+      voterState.name = dptVoter.name;
+      voterState.email = dptVoter.email;
+      voterState.generation = dptVoter.generation;
+    }
+  } else {
+    for (const v of devMockStore.values()) {
+      if (isEmail ? v.email.toLowerCase() === cleanId : v.nim === cleanId) {
+        voterState = v;
+        break;
+      }
     }
   }
 
@@ -284,6 +327,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
   voterState.otpExpiresAt = now + OTP_EXPIRATION_MS;
   voterState.otpAttempts = 0;
   voterState.otpLastSentAt = now;
+  saveDevMockStore();
 
   // Kirim via SMTP Service (akan mencetak di console jika SMTP offline)
   await smtpMailService.sendLoginPin({
@@ -431,12 +475,37 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
     }
   }
 
-  // Fallback Dev Mode (In-Memory)
+  // Fallback Dev Mode (In-Memory + Disk Sync)
+  const devMockStore = getDevMockStore();
   let voterState: InMemoOtpState | undefined;
-  for (const v of devMockStore.values()) {
-    if (isEmail ? v.email.toLowerCase() === cleanId : v.nim === cleanId) {
-      voterState = v;
-      break;
+  const dptVoter = findVoterByIdentifier(cleanId);
+  if (dptVoter) {
+    if (!devMockStore.has(dptVoter.nim)) {
+      devMockStore.set(dptVoter.nim, {
+        nim: dptVoter.nim,
+        name: dptVoter.name,
+        email: dptVoter.email,
+        generation: dptVoter.generation,
+        hasVoted: dptVoter.has_voted,
+        otpHash: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+        otpLastSentAt: null,
+      });
+    }
+    voterState = devMockStore.get(dptVoter.nim);
+    if (voterState) {
+      voterState.hasVoted = dptVoter.has_voted;
+      voterState.name = dptVoter.name;
+      voterState.email = dptVoter.email;
+      voterState.generation = dptVoter.generation;
+    }
+  } else {
+    for (const v of devMockStore.values()) {
+      if (isEmail ? v.email.toLowerCase() === cleanId : v.nim === cleanId) {
+        voterState = v;
+        break;
+      }
     }
   }
 
@@ -484,6 +553,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
 
   if (!isValid) {
     voterState.otpAttempts += 1;
+    saveDevMockStore();
     const remaining = MAX_FAILED_ATTEMPTS - voterState.otpAttempts;
     return {
       success: false,
@@ -499,6 +569,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
   voterState.otpHash = null;
   voterState.otpExpiresAt = null;
   voterState.otpAttempts = 0;
+  saveDevMockStore();
 
   return {
     success: true,

@@ -29,7 +29,8 @@ export class SmtpMailService implements MailService {
     const host = process.env.SMTP_HOST!;
     const port = Number(process.env.SMTP_PORT || 587);
     const user = process.env.SMTP_USER!;
-    const pass = process.env.SMTP_PASS!;
+    // Bersihkan spasi jika password disalin langsung dari Google App Password (misal: "xxxx yyyy zzzz aaaa")
+    const pass = process.env.SMTP_PASS!.replace(/\s+/g, '');
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
     // Opsional: In-App DKIM Signing untuk memvalidasi tanda tangan kriptografi di Microsoft EOP

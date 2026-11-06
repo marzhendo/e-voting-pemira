@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { queryVoters } from '@/lib/dpt/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,23 +64,29 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Dev mock data jika DB belum online
+  // Dev store jika Supabase belum online
   if (process.env.APP_ENV !== 'production') {
-    const mockVoters = [
-      { id: '1', nim: '103012300001', name: 'Ahmad Rizky Pratama', email: 'voter1@student.telkomuniversity.ac.id', generation: 2023, has_voted: false, updated_at: new Date().toISOString() },
-      { id: '2', nim: '103012300002', name: 'Budi Santoso', email: 'voter2@student.telkomuniversity.ac.id', generation: 2023, has_voted: true, updated_at: new Date().toISOString() },
-      { id: '3', nim: '103012400003', name: 'Citra Dewi Lestari', email: 'voter3@student.telkomuniversity.ac.id', generation: 2024, has_voted: false, updated_at: new Date().toISOString() },
-      { id: '4', nim: '103012400004', name: 'Dimas Wicaksono', email: 'dimasw@student.telkomuniversity.ac.id', generation: 2024, has_voted: true, updated_at: new Date().toISOString() },
-      { id: '5', nim: '103012500005', name: 'Fadhil Muhammad', email: 'fadhilm@student.telkomuniversity.ac.id', generation: 2025, has_voted: false, updated_at: new Date().toISOString() },
-      { id: '6', nim: '103012600006', name: 'Siti Nurhaliza', email: 'sitinur@student.telkomuniversity.ac.id', generation: 2026, has_voted: true, updated_at: new Date().toISOString() },
-    ];
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get('q') || '';
+    const generation = searchParams.get('generation');
+    const status = searchParams.get('status') as 'voted' | 'not_voted' | 'all' | null;
+    const limit = Math.min(Number(searchParams.get('limit') || '50'), 100);
+    const offset = Number(searchParams.get('offset') || '0');
+
+    const result = queryVoters({
+      search,
+      generation: generation || undefined,
+      status: status || undefined,
+      limit,
+      offset,
+    });
 
     return NextResponse.json({
       success: true,
-      voters: mockVoters,
-      total: mockVoters.length,
-      limit: 50,
-      offset: 0,
+      voters: result.voters,
+      total: result.total,
+      limit,
+      offset,
     });
   }
 

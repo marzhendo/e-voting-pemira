@@ -81,28 +81,29 @@ export function generatePinEmailHtml({ voterName, nim, pin }: Omit<SendPinPayloa
               <!-- PIN Display Box -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
                 <tr>
-                  <td align="center" style="background-color: #292929; border: 1px dashed #EBBD1C; border-radius: 12px; padding: 20px 16px;">
-                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #EBBD1C; display: block;">
+                  <td align="center" style="background-color: #262626; border: 1px solid #383838; border-radius: 12px; padding: 22px 16px;">
+                    <span style="font-family: ui-monospace, 'SF Mono', Consolas, 'Segoe UI Mono', 'Courier New', monospace; font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #EBBD1C; display: block;">
                       ${safePin}
                     </span>
-                    <span style="font-size: 11px; color: #8B8A8B; display: block; margin-top: 8px;">
-                      Masa aktif: <strong>10 Menit</strong> (Batas 3x percobaan)
+                    <span style="font-size: 11px; color: #B8B8B8; display: block; margin-top: 8px;">
+                      Masa aktif: <strong style="color: #FFFFFF;">10 Menit</strong> (Batas 3x percobaan)
                     </span>
                   </td>
                 </tr>
               </table>
 
               <!-- Warning Notice -->
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #222222; border-left: 3px solid #EBBD1C; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #222222; border: 1px solid #333333; padding: 14px 16px; border-radius: 10px; margin-bottom: 20px;">
                 <tr>
-                  <td style="font-size: 12px; color: #CCCCCC; line-height: 1.5;">
-                    ⚠️ <strong>PENTING:</strong> Jangan berikan kode PIN ini kepada siapapun demi menjaga kerahasiaan dan integritas hak suara Anda (Ballot Secrecy).
+                  <td style="font-size: 12px; color: #D5D5D5; line-height: 1.5;">
+                    <span style="display: inline-block; background-color: rgba(235, 189, 28, 0.15); color: #EBBD1C; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; margin-right: 6px;">PENTING</span>
+                    Jangan berikan kode PIN ini kepada siapa pun demi menjaga kerahasiaan hak suara Anda.
                   </td>
                 </tr>
               </table>
 
-              <p style="margin: 0; font-size: 11px; color: #777777; line-height: 1.5;">
-                Jika Anda tidak merasa meminta kode ini, abaikan email ini atau hubungi Panitia KPR HMIF melalui kanal resmi.
+              <p style="margin: 0; font-size: 11px; color: #A5A5A5; line-height: 1.5;">
+                Jika Anda tidak merasa meminta kode ini, abaikan email ini atau hubungi Panitia KPR HMIF.
               </p>
             </td>
           </tr>
@@ -110,9 +111,9 @@ export function generatePinEmailHtml({ voterName, nim, pin }: Omit<SendPinPayloa
           <!-- Footer -->
           <tr>
             <td style="padding: 20px 28px; background-color: #181818; border-top: 1px solid #282828; text-align: center;">
-              <p style="margin: 0; font-size: 11px; color: #666666; line-height: 1.5;">
-                Panitia Komisi Pemilihan Raya (KPR) HMIF 2026/2027<br>
-                Sistem E-Voting Berasaskan LUBER JURDIL
+              <p style="margin: 0; font-size: 11px; color: #8E8E8E; line-height: 1.5;">
+                Komisi Pemilihan Raya (KPR) HMIF Periode 2026/2027<br>
+                Telkom University Purwokerto &bull; Kendala? <a href="https://wa.me/6281809300406" style="color: #EBBD1C; text-decoration: underline;">WhatsApp Panitia KPR</a>
               </p>
             </td>
           </tr>
@@ -136,7 +137,7 @@ KODE PIN: ${pin}
 Masa aktif: 10 Menit (Batas maksimal 3x percobaan)
 
 PENTING:
-Jangan berikan kode PIN ini kepada siapapun demi menjaga kerahasiaan dan integritas hak suara Anda (Ballot Secrecy).
+Jangan berikan kode PIN ini kepada siapa pun demi menjaga kerahasiaan hak suara Anda.
 
 Jika Anda tidak merasa meminta kode ini, silakan abaikan email ini.
 

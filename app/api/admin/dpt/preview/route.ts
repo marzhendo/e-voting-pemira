@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getAllVoters } from '@/lib/dpt/store';
 
 const dptRowSchema = z.object({
   nim: z.string().min(5).max(15).regex(/^[a-zA-Z0-9]+$/, 'NIM hanya boleh berisi karakter alfanumerik'),
@@ -78,14 +79,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Validasi Konflik dengan Data Eksisting di Database
-    const adminSupabase = createAdminClient();
-    const { data: existingVoters } = await adminSupabase
-      .from('voters_whitelist')
-      .select('nim, email');
+    // 2. Validasi Konflik dengan Data Eksisting di Database / Store
+    let existingNims = new Set<string>();
+    let existingEmails = new Set<string>();
 
-    const existingNims = new Set(existingVoters?.map((v) => v.nim) || []);
-    const existingEmails = new Set(existingVoters?.map((v) => v.email.toLowerCase()) || []);
+    if (isSupabaseConfigured()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const { data: existingVoters } = await adminSupabase
+          .from('voters_whitelist')
+          .select('nim, email');
+
+        if (existingVoters) {
+          existingNims = new Set(existingVoters.map((v) => v.nim));
+          existingEmails = new Set(existingVoters.map((v) => v.email.toLowerCase()));
+        }
+      } catch (err) {
+        console.warn('[DptPreviewRoute] Supabase offline, using dev store:', err);
+        const devVoters = getAllVoters();
+        existingNims = new Set(devVoters.map((v) => v.nim));
+        existingEmails = new Set(devVoters.map((v) => v.email.toLowerCase()));
+      }
+    } else {
+      const devVoters = getAllVoters();
+      existingNims = new Set(devVoters.map((v) => v.nim));
+      existingEmails = new Set(devVoters.map((v) => v.email.toLowerCase()));
+    }
 
     const dbConflicts: Array<{ nim: string; email: string; conflictType: 'NIM' | 'EMAIL' | 'BOTH' }> = [];
     for (const row of validRows) {

@@ -25,7 +25,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
     await expect(modal).toBeVisible();
 
     // Check bounding box: must be centered in viewport (top space approx equal to bottom space)
-    const modalBox = await modal.locator('> div').boundingBox();
+    const modalBox = await modal.locator('> div > div').boundingBox();
     expect(modalBox).not.toBeNull();
     if (modalBox) {
       expect(modalBox.y).toBeGreaterThan(0);
@@ -40,7 +40,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
 
     // Scroll wheel on page while modal is open
     await page.mouse.wheel(0, 500);
-    const boxAfterScroll = await modal.locator('> div').boundingBox();
+    const boxAfterScroll = await modal.locator('> div > div').boundingBox();
     if (modalBox && boxAfterScroll) {
       expect(boxAfterScroll.y).toBe(modalBox.y);
     }
@@ -81,7 +81,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
     await expect(modal).toBeVisible();
 
     // Verify modal is centered in viewport
-    const modalBox = await modal.locator('> div').boundingBox();
+    const modalBox = await modal.locator('> div > div').boundingBox();
     expect(modalBox).not.toBeNull();
     if (modalBox) {
       expect(modalBox.y).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
 
     // Scroll wheel should not displace the modal
     await page.mouse.wheel(0, 500);
-    const boxAfterScroll = await modal.locator('> div').boundingBox();
+    const boxAfterScroll = await modal.locator('> div > div').boundingBox();
     if (modalBox && boxAfterScroll) {
       expect(boxAfterScroll.y).toBe(modalBox.y);
     }
@@ -138,7 +138,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
     await expect(backBtn).toBeVisible();
 
     // Get bounding box of dialog inner container
-    const dialogInner = dialog.locator('> div').first();
+    const dialogInner = dialog.locator('> div > div').first();
     const box = await dialogInner.boundingBox();
 
     // Verify top is >= 0 (not cut off at the top!) and vertically balanced
@@ -161,8 +161,6 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
     if (box && boxAfterScroll) {
       expect(boxAfterScroll.y).toBe(box.y);
     }
-
-    await page.screenshot({ path: 'docs/screenshots/debug-candidate-modal.png' });
   });
 });
 

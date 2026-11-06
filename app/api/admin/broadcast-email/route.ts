@@ -5,6 +5,7 @@ import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { smtpMailService } from '@/lib/mail/smtp-service';
+import { getAllVoters } from '@/lib/dpt/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,8 +72,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Dev mode mock filter
-  let filtered = MOCK_DEV_VOTERS;
+  // Dev store filter
+  let filtered = getAllVoters();
   if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
   if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
   if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);
@@ -80,7 +81,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     count: filtered.length,
-    previewRecipients: filtered.slice(0, 5),
+    previewRecipients: filtered.slice(0, 5).map((v) => ({
+      nim: v.nim,
+      name: v.name,
+      email: v.email,
+      generation: v.generation,
+      has_voted: v.has_voted,
+    })),
   });
 }
 
@@ -133,7 +140,7 @@ export async function POST(request: NextRequest) {
       }
       recipients = data || [];
     } else {
-      let filtered = MOCK_DEV_VOTERS;
+      let filtered = getAllVoters();
       if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
       if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
       if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);

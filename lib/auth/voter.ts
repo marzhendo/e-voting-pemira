@@ -1,4 +1,5 @@
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { findVoterByIdentifier } from '@/lib/dpt/store';
 import type { AdminRole } from '@/lib/supabase/types';
 import type { SessionUser } from './session';
 
@@ -25,6 +26,36 @@ export async function resolveUserIdentity(params: {
 }): Promise<IdentityResolutionResult> {
   try {
     const normalizedEmail = params.email.trim().toLowerCase();
+
+    // Dev store fallback saat Supabase belum dikonfigurasi
+    if (!isSupabaseConfigured() && process.env.APP_ENV !== 'production') {
+      const devVoter = findVoterByIdentifier(normalizedEmail);
+      if (devVoter) {
+        if (devVoter.has_voted) {
+          return {
+            success: false,
+            code: 'ALREADY_VOTED',
+            message: 'Hak suara Anda telah digunakan pada pemilihan ini.',
+          };
+        }
+        return {
+          success: true,
+          code: 'ELIGIBLE',
+          message: 'Identitas pemilih terverifikasi dalam DPT.',
+          user: {
+            id: devVoter.id,
+            email: devVoter.email,
+            name: devVoter.name,
+            nim: devVoter.nim,
+            role: 'voter',
+            isDptVerified: true,
+            hasVoted: false,
+            generation: devVoter.generation,
+          },
+        };
+      }
+    }
+
     const adminSupabase = createAdminClient();
 
     // 1. Cek apakah pengguna terdaftar sebagai Administrator Pemira

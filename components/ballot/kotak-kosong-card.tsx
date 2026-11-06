@@ -36,7 +36,7 @@ export function KotakKosongCard({
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-outline uppercase tracking-wider block font-medium">
+                <span className="text-[11px] text-outline uppercase tracking-wider block font-semibold">
                   Opsi Resmi Sah
                 </span>
                 <h3 className="text-base text-on-surface font-bold">
@@ -74,16 +74,16 @@ export function KotakKosongCard({
             <h4 className="text-base sm:text-lg font-bold text-on-surface leading-snug">
               Opsi Kotak Kosong
             </h4>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Suara Anda tetap sah dan dihitung dalam rekapitulasi Pemira HMIF.
+            <p className="text-xs text-outline leading-relaxed">
+              Suara Anda tetap sah dan dihitung dalam rekapitulasi resmi Pemira HMIF.
             </p>
           </div>
         </div>
 
         {/* Footer */}
         <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
-          <span className="text-xs text-outline">
-            {isSelected ? '✓ Dipilih' : 'Klik untuk memilih'}
+          <span className="text-xs text-outline font-medium">
+            {isSelected ? '✓ Terpilih' : 'Ketuk untuk memilih'}
           </span>
           <button
             type="button"
@@ -91,7 +91,7 @@ export function KotakKosongCard({
               e.stopPropagation();
               onSelect(candidate);
             }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+            className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
               isSelected
                 ? 'bg-primary text-on-primary shadow-sm'
                 : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'
@@ -144,7 +144,7 @@ export function KotakKosongCard({
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`h-10 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center ${
+          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer ${
             isSelected
               ? 'bg-primary text-on-primary shadow-sm'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'

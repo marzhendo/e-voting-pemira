@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
+import { importVotersBatch } from '@/lib/dpt/store';
 
 const dptImportRowSchema = z.object({
   nim: z.string().min(5).max(15).regex(/^[a-zA-Z0-9]+$/),
@@ -89,43 +90,59 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const adminSupabase = createAdminClient();
-    const clientIp = getClientIp(request.headers);
+    if (isSupabaseConfigured()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const clientIp = getClientIp(request.headers);
 
-    // 2. Insert batch ke tabel voters_whitelist
-    const { data: insertedData, error: insertError } = await adminSupabase
-      .from('voters_whitelist')
-      .insert(validatedRecords)
-      .select('id');
+        // 2. Insert batch ke tabel voters_whitelist
+        const { data: insertedData, error: insertError } = await adminSupabase
+          .from('voters_whitelist')
+          .insert(validatedRecords)
+          .select('id');
 
-    if (insertError) {
-      console.error('[DptImportRoute] Database insert error:', insertError);
-      return NextResponse.json(
-        {
-          error: 'Gagal memasukkan data DPT ke database. Pastikan tidak ada NIM atau Email yang bertabrakan dengan data yang sudah terdaftar.',
-          details: insertError.message,
-        },
-        { status: 409 }
-      );
+        if (insertError) {
+          console.error('[DptImportRoute] Database insert error:', insertError);
+          return NextResponse.json(
+            {
+              error: 'Gagal memasukkan data DPT ke database. Pastikan tidak ada NIM atau Email yang bertabrakan dengan data yang sudah terdaftar.',
+              details: insertError.message,
+            },
+            { status: 409 }
+          );
+        }
+
+        const insertedCount = insertedData ? insertedData.length : validatedRecords.length;
+
+        // 3. Catat ke Audit Log
+        await adminSupabase.from('audit_logs').insert({
+          actor_email: session?.email || 'unknown_admin',
+          action: 'IMPORT_DPT',
+          details: {
+            total_imported: insertedCount,
+            cohorts_included: Array.from(new Set(validatedRecords.map((r) => r.generation))),
+          },
+          ip_address: clientIp,
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `Berhasil mengimpor ${insertedCount} pemilih baru ke dalam Daftar Pemilih Tetap (DPT).`,
+          totalImported: insertedCount,
+          importedCount: insertedCount,
+        });
+      } catch (dbErr) {
+        console.warn('[DptImportRoute] Supabase offline, using dev store fallback:', dbErr);
+      }
     }
 
-    const insertedCount = insertedData ? insertedData.length : validatedRecords.length;
-
-    // 3. Catat ke Audit Log
-    await adminSupabase.from('audit_logs').insert({
-      actor_email: session?.email || 'unknown_admin',
-      action: 'IMPORT_DPT',
-      details: {
-        total_imported: insertedCount,
-        cohorts_included: Array.from(new Set(validatedRecords.map((r) => r.generation))),
-      },
-      ip_address: clientIp,
-    });
-
+    // Dev store fallback
+    const result = importVotersBatch(validatedRecords);
     return NextResponse.json({
       success: true,
-      message: `Berhasil mengimpor ${insertedCount} pemilih baru ke dalam Daftar Pemilih Tetap (DPT).`,
-      totalImported: insertedCount,
+      message: `Berhasil mengimpor ${result.insertedCount} pemilih baru ke dalam Daftar Pemilih Tetap (DPT) (Mode Dev).`,
+      totalImported: result.insertedCount,
+      importedCount: result.insertedCount,
     });
   } catch (error) {
     console.error('[DptImportRoute] Unexpected error during DPT import:', error);

@@ -192,9 +192,27 @@ export default function AdminDashboardPage() {
   const [isCommittingImport, setIsCommittingImport] = useState(false);
   const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
 
+  // State Modal Tambah Pemilih Uji Coba (Tes SMTP)
+  const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  const [quickAddNim, setQuickAddNim] = useState('103012399001');
+  const [quickAddName, setQuickAddName] = useState('Penguji Sistem KPR');
+  const [quickAddEmail, setQuickAddEmail] = useState('');
+  const [quickAddGeneration, setQuickAddGeneration] = useState(2023);
+  const [quickAddLoading, setQuickAddLoading] = useState(false);
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
+
+  // State Reset Ballots Simulasi
+  const [isResettingBallots, setIsResettingBallots] = useState(false);
+  const [ballotActionMessage, setBallotActionMessage] = useState<string | null>(null);
+
   // Kunci scroll halaman (body & html) saat modal atau menu drawer terbuka
   useEffect(() => {
-    const shouldLock = candidateModalOpen || isEmergencyModalOpen || isConfirmBroadcastOpen || isSidebarOpen;
+    const shouldLock =
+      candidateModalOpen ||
+      isEmergencyModalOpen ||
+      isConfirmBroadcastOpen ||
+      isSidebarOpen ||
+      isQuickAddModalOpen;
     if (shouldLock) {
       const originalBodyOverflow = document.body.style.overflow;
       const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -206,6 +224,7 @@ export default function AdminDashboardPage() {
           if (isConfirmBroadcastOpen && !isBroadcasting) setIsConfirmBroadcastOpen(false);
           else if (isEmergencyModalOpen && !settingsSaving) setIsEmergencyModalOpen(false);
           else if (candidateModalOpen && !savingCandidate && !uploadingPhoto && !uploadingChairmanCv && !uploadingViceChairmanCv) setCandidateModalOpen(false);
+          else if (isQuickAddModalOpen && !quickAddLoading) setIsQuickAddModalOpen(false);
           else if (isSidebarOpen) setIsSidebarOpen(false);
         }
       };
@@ -222,12 +241,14 @@ export default function AdminDashboardPage() {
     isEmergencyModalOpen,
     isConfirmBroadcastOpen,
     isSidebarOpen,
+    isQuickAddModalOpen,
     isBroadcasting,
     settingsSaving,
     savingCandidate,
     uploadingPhoto,
     uploadingChairmanCv,
     uploadingViceChairmanCv,
+    quickAddLoading,
   ]);
 
   // 1. Muat profil sesi admin
@@ -244,11 +265,11 @@ export default function AdminDashboardPage() {
   }, []);
 
   // 2. Muat data Tally & Turnout
-  const fetchTally = useCallback(() => {
-    setLoadingTally(true);
+  const fetchTally = useCallback((silent = false) => {
+    if (!silent) setLoadingTally(true);
     setTallyError(null);
 
-    fetch('/api/admin/tally')
+    fetch('/api/admin/tally', { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
         if (res.status === 403 && data.code === 'AUDITOR_TALLY_LOCKED') {
@@ -285,21 +306,29 @@ export default function AdminDashboardPage() {
         }
       })
       .catch((err) => {
-        setTallyError(err.message);
+        if (!silent) setTallyError(err.message);
       })
       .finally(() => {
-        setLoadingTally(false);
+        if (!silent) setLoadingTally(false);
       });
   }, []);
 
   useEffect(() => {
     fetchTally();
-  }, [fetchTally]);
+
+    // Auto-polling real-time setiap 3 detik saat tab Overview atau Tally aktif
+    if (activeTab === 'overview' || activeTab === 'tally') {
+      const pollTimer = setInterval(() => {
+        fetchTally(true);
+      }, 3000);
+      return () => clearInterval(pollTimer);
+    }
+  }, [fetchTally, activeTab]);
 
   // 3. Muat data Kandidat
-  const fetchCandidates = useCallback(() => {
-    setLoadingCandidates(true);
-    fetch('/api/admin/candidates')
+  const fetchCandidates = useCallback((silent = false) => {
+    if (!silent) setLoadingCandidates(true);
+    fetch('/api/admin/candidates', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.candidates) {
@@ -307,12 +336,18 @@ export default function AdminDashboardPage() {
         }
       })
       .catch(() => {})
-      .finally(() => setLoadingCandidates(false));
+      .finally(() => {
+        if (!silent) setLoadingCandidates(false);
+      });
   }, []);
 
   useEffect(() => {
     if (activeTab === 'candidates' || activeTab === 'overview') {
       fetchCandidates();
+      const candTimer = setInterval(() => {
+        fetchCandidates(true);
+      }, 5000);
+      return () => clearInterval(candTimer);
     }
   }, [activeTab, fetchCandidates]);
 
@@ -778,6 +813,66 @@ export default function AdminDashboardPage() {
     document.body.removeChild(link);
   };
 
+  const handleQuickAddVoter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setQuickAddLoading(true);
+    setQuickAddError(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nim: quickAddNim.trim(),
+          name: quickAddName.trim(),
+          email: quickAddEmail.trim(),
+          generation: Number(quickAddGeneration),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setQuickAddError(data.error || 'Gagal menambahkan pemilih.');
+      } else {
+        setImportSuccessMessage(
+          `✓ Pemilih uji coba (${data.voter?.name} - ${data.voter?.email}) berhasil didaftarkan ke DPT.`
+        );
+        setIsQuickAddModalOpen(false);
+        fetchVoters();
+        fetchTally();
+      }
+    } catch {
+      setQuickAddError('Terjadi kesalahan jaringan saat menambahkan pemilih.');
+    } finally {
+      setQuickAddLoading(false);
+    }
+  };
+
+  const handleResetDevBallots = async () => {
+    if (!confirm('Apakah Anda yakin ingin mereset seluruh surat suara simulasi pengujian? Tindakan ini akan mengosongkan perolehan suara.')) {
+      return;
+    }
+    setIsResettingBallots(true);
+    setBallotActionMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/tally', {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBallotActionMessage('✓ Seluruh surat suara simulasi berhasil direset ke 0.');
+        fetchTally();
+      } else {
+        alert(data.error || 'Gagal mereset surat suara.');
+      }
+    } catch {
+      alert('Terjadi kesalahan jaringan saat mereset surat suara.');
+    } finally {
+      setIsResettingBallots(false);
+    }
+  };
+
   const regularCandidates = candidates.filter((c) => c.candidate_number > 0);
   const regularCount = regularCandidates.length;
 
@@ -948,7 +1043,7 @@ export default function AdminDashboardPage() {
         <div className="px-4 pt-4 border-t border-outline-variant/20 flex flex-col gap-2">
           <button
             type="button"
-            onClick={fetchTally}
+            onClick={() => fetchTally()}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-outline hover:text-on-surface transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -1019,9 +1114,15 @@ export default function AdminDashboardPage() {
                       <Vote className="w-6 h-6" />
                     </div>
                     <div>
-                      <h1 className="text-lg font-bold text-on-surface">
-                        Bilik Suara Digital Pemira HMIF
-                      </h1>
+                      <div className="flex items-center gap-3">
+                        <h1 className="text-lg font-bold text-on-surface">
+                          Bilik Suara Digital Pemira HMIF
+                        </h1>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>Live Real-time</span>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2 text-xs text-outline mt-0.5">
                         <Clock className="w-3.5 h-3.5 text-primary" />
                         <span>Jadwal Resmi: 08.00 – 16.00 WIB</span>
@@ -1033,14 +1134,26 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsEmergencyModalOpen(true)}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-semibold text-xs border border-outline-variant/30 transition-colors self-start sm:self-auto"
-                  >
-                    <ShieldAlert className="w-4 h-4 text-primary" />
-                    <span>Kunci Darurat Bilik</span>
-                  </button>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => fetchTally()}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-semibold text-xs border border-outline-variant/30 transition-colors"
+                      title="Segarkan data perolehan suara sekarang"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingTally ? 'animate-spin' : ''}`} />
+                      <span className="hidden sm:inline">Segarkan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsEmergencyModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-semibold text-xs border border-outline-variant/30 transition-colors"
+                    >
+                      <ShieldAlert className="w-4 h-4 text-primary" />
+                      <span>Kunci Darurat Bilik</span>
+                    </button>
+                  </div>
                 </section>
 
                 {/* KPI Cards */}
@@ -1422,7 +1535,16 @@ export default function AdminDashboardPage() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickAddModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/30 transition-colors shadow-sm"
+                    >
+                      <UserPlus className="w-3.5 h-3.5 text-primary" />
+                      <span>+ Pemilih Uji Coba</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleDownloadTemplate}
@@ -1634,22 +1756,52 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
                   <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
-                      Rekapitulasi Suara
-                    </h1>
+                    <div className="flex items-center gap-2.5">
+                      <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
+                        Rekapitulasi Suara
+                      </h1>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Live Real-time</span>
+                      </span>
+                    </div>
                     <p className="text-xs text-outline mt-0.5">
                       Hasil agregasi surat suara yang sah tanpa keterkaitan identitas pemilih.
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-xs font-semibold hover:bg-surface-bright transition-colors border border-outline-variant/30"
-                  >
-                    <Download className="w-4 h-4 text-primary" />
-                    <span>Cetak Berita Acara</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => fetchTally()}
+                      disabled={loadingTally}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-outline hover:text-on-surface border border-outline-variant/30 transition-colors"
+                      title="Segarkan Perolehan Suara"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingTally ? 'animate-spin text-primary' : ''}`} />
+                      <span className="hidden sm:inline">Segarkan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleResetDevBallots}
+                      disabled={isResettingBallots}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-xs font-semibold text-error border border-error/30 transition-colors"
+                      title="Kosongkan Suara Pengujian Simulasi"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Reset Suara</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-xs font-semibold hover:bg-surface-bright transition-colors border border-outline-variant/30"
+                    >
+                      <Download className="w-4 h-4 text-primary" />
+                      <span>Cetak Berita Acara</span>
+                    </button>
+                  </div>
                 </div>
 
                 {isTallyLocked ? (
@@ -2203,14 +2355,18 @@ export default function AdminDashboardPage() {
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
             onClick={(e) => {
               if (e.target === e.currentTarget && !savingCandidate) {
                 setCandidateModalOpen(false);
               }
             }}
           >
-            <div className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 max-h-[calc(100dvh-2rem)] min-h-0 overflow-y-auto my-auto animate-in zoom-in-95 duration-150"
+              >
             <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
               <div>
                 <h3 className="text-base font-bold text-on-surface">
@@ -2597,8 +2753,9 @@ export default function AdminDashboardPage() {
             </form>
           </div>
         </div>
-      </Portal>
-      )}
+      </div>
+    </Portal>
+    )}
 
       {/* MODAL KUNCI DARURAT */}
       {isEmergencyModalOpen && (
@@ -2606,14 +2763,18 @@ export default function AdminDashboardPage() {
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
             onClick={(e) => {
               if (e.target === e.currentTarget && !settingsSaving) {
                 setIsEmergencyModalOpen(false);
               }
             }}
           >
-            <div className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 text-error">
                 <div className="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center">
@@ -2680,8 +2841,9 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </div>
+    </Portal>
+    )}
 
       {/* MODAL KONFIRMASI BROADCAST EMAIL */}
       {isConfirmBroadcastOpen && (
@@ -2689,14 +2851,18 @@ export default function AdminDashboardPage() {
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
             onClick={(e) => {
               if (e.target === e.currentTarget && !isBroadcasting) {
                 setIsConfirmBroadcastOpen(false);
               }
             }}
           >
-            <div className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                 <Send className="w-5 h-5" />
@@ -2765,7 +2931,148 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
-      </Portal>
+      </div>
+    </Portal>
+    )}
+
+      {/* MODAL TAMBAH PEMILIH UJI COBA (EMAIL PENGUJIAN) */}
+      {isQuickAddModalOpen && (
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !quickAddLoading) {
+                setIsQuickAddModalOpen(false);
+              }
+            }}
+          >
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
+                <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                      <UserPlus className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-on-surface">
+                        Tambah Pemilih Uji Coba
+                      </h3>
+                      <p className="text-[11px] text-outline">
+                        Gunakan email aktif sendiri untuk menguji pengiriman OTP &amp; Broadcast.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickAddModalOpen(false)}
+                    className="w-8 h-8 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {quickAddError && (
+                  <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs">
+                    {quickAddError}
+                  </div>
+                )}
+
+                <form onSubmit={handleQuickAddVoter} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      NIM Mahasiswa <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 103012399001"
+                      value={quickAddNim}
+                      onChange={(e) => setQuickAddNim(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      Nama Mahasiswa <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Penguji E-Voting"
+                      value={quickAddName}
+                      onChange={(e) => setQuickAddName(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      Email Tujuan (Email Pengujian Anda) <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="Contoh: namaanda@gmail.com / kampus"
+                      value={quickAddEmail}
+                      onChange={(e) => setQuickAddEmail(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                    />
+                    <span className="text-[10px] text-outline mt-1 block">
+                      Masukkan email riil yang bisa Anda buka di inbox untuk memverifikasi penerimaan surat.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      Angkatan
+                    </label>
+                    <select
+                      value={quickAddGeneration}
+                      onChange={(e) => setQuickAddGeneration(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                    >
+                      <option value="2023">2023</option>
+                      <option value="2024">2024</option>
+                      <option value="2025">2025</option>
+                      <option value="2026">2026</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+                    <button
+                      type="button"
+                      disabled={quickAddLoading}
+                      onClick={() => setIsQuickAddModalOpen(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={quickAddLoading}
+                      className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                    >
+                      {quickAddLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Menambahkan...</span>
+                        </>
+                      ) : (
+                        <span>Simpan &amp; Uji Coba</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </Portal>
       )}
     </div>
   );

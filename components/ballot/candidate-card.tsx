@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, Check, FileText, ChevronRight } from 'lucide-react';
+import { Users, Check, FileText } from 'lucide-react';
 
 export interface CandidateItem {
   id: string;
@@ -48,11 +48,11 @@ export function CandidateCard({
               </span>
             </div>
             <div>
-              <span className="text-xs text-outline uppercase tracking-wider block font-medium">
+              <span className="text-[11px] text-outline uppercase tracking-wider block font-semibold">
                 Pasangan Calon
               </span>
               <h3 className="text-base text-on-surface font-bold">
-                No. Urut {numberStr}
+                Nomor Urut {numberStr}
               </h3>
             </div>
           </div>
@@ -94,7 +94,7 @@ export function CandidateCard({
           <h4 className="text-base sm:text-lg font-bold text-on-surface leading-snug">
             {candidate.leader_name} &amp; {candidate.vice_leader_name}
           </h4>
-          <p className="text-xs text-on-surface-variant">
+          <p className="text-xs text-outline">
             Calon Chairman &amp; Vice Chairman HMIF
           </p>
         </div>
@@ -104,7 +104,7 @@ export function CandidateCard({
           <span className="text-[11px] font-bold uppercase tracking-wider text-primary block mb-1">
             Fokus Visi:
           </span>
-          <p className="line-clamp-2 text-xs leading-relaxed italic text-on-surface/90">
+          <p className="line-clamp-2 text-xs leading-relaxed text-on-surface/90">
             &ldquo;{candidate.vision}&rdquo;
           </p>
         </div>
@@ -116,23 +116,22 @@ export function CandidateCard({
             e.stopPropagation();
             onOpenDetail?.(candidate);
           }}
-          className="w-full h-10 px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-all group/btn shadow-sm cursor-pointer"
+          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-all shadow-sm cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-primary group-hover/btn:scale-110 transition-transform" />
+            <FileText className="w-4 h-4 text-primary" />
             <span>Detail Visi Misi &amp; CV Paslon</span>
           </span>
-          <span className="text-xs font-bold text-primary flex items-center gap-0.5">
-            <span>Buka</span>
-            <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
+          <span className="text-xs font-semibold text-primary">
+            Lihat Profil →
           </span>
         </button>
       </div>
 
       {/* Footer Aksi Card */}
       <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
-        <span className="text-xs text-outline">
-          {isSelected ? '✓ Dipilih' : ''}
+        <span className="text-xs text-outline font-medium">
+          {isSelected ? '✓ Terpilih' : 'Ketuk untuk memilih'}
         </span>
         <button
           type="button"
@@ -140,7 +139,7 @@ export function CandidateCard({
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`h-10 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center ${
+          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer ${
             isSelected
               ? 'bg-primary text-on-primary shadow-sm'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'

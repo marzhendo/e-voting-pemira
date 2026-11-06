@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
+import { calculateLiveTally, resetBallotsStore } from '@/lib/ballots/store';
 
 export async function GET() {
   // 1. Verifikasi Otorisasi Sesi Pengguna
@@ -162,55 +163,40 @@ export async function GET() {
 
   if (process.env.APP_ENV !== 'production') {
     const devSettings = getDevElectionSettings();
+    const isClosed = !devSettings.is_voting_open || new Date() > new Date(devSettings.end_time);
+
+    // Auditor hanya berhak melihat perolehan suara jika pemilihan sudah ditutup
+    if (session?.role === 'auditor' && !isClosed) {
+      return NextResponse.json(
+        {
+          error: 'Akses Ditolak: Peran Auditor hanya diperbolehkan melihat tally suara setelah pemungutan suara resmi ditutup oleh KPR.',
+          code: 'AUDITOR_TALLY_LOCKED',
+        },
+        { status: 403 }
+      );
+    }
+
+    const liveData = calculateLiveTally();
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       electionSettings: {
         isVotingOpen: devSettings.is_voting_open,
-        isClosed: !devSettings.is_voting_open,
+        isClosed,
         maintenanceMode: devSettings.maintenance_mode,
         startTime: devSettings.start_time,
         endTime: devSettings.end_time,
         allowKotakKosongMulti: devSettings.allow_kotak_kosong_multi,
       },
       turnout: {
-        totalDpt: 1240,
-        totalVotesRecorded: 892,
-        totalVotersParticipated: 892,
-        turnoutPercentage: 71.94,
-        byGeneration: [
-          { generation: 2023, totalVoters: 360, votedCount: 308, turnoutPercentage: 85.56 },
-          { generation: 2024, totalVoters: 350, votedCount: 269, turnoutPercentage: 76.86 },
-          { generation: 2025, totalVoters: 330, votedCount: 230, turnoutPercentage: 69.7 },
-          { generation: 2026, totalVoters: 200, votedCount: 85, turnoutPercentage: 42.5 },
-        ],
+        totalDpt: liveData.totalDpt,
+        totalVotesRecorded: liveData.totalVotesRecorded,
+        totalVotersParticipated: liveData.totalVotersParticipated,
+        turnoutPercentage: liveData.turnoutPercentage,
+        byGeneration: liveData.byGeneration,
       },
-      tally: [
-        {
-          candidateId: '00000000-0000-0000-0000-000000000000',
-          candidateNumber: 0,
-          leaderName: 'Kotak Kosong',
-          viceLeaderName: 'Tidak Memilih Calon',
-          voteCount: 32,
-          percentage: 3.59,
-        },
-        {
-          candidateId: '11111111-1111-1111-1111-111111111111',
-          candidateNumber: 1,
-          leaderName: 'Arya Narendra Putra',
-          viceLeaderName: 'Rayhan Al-Fayeed',
-          voteCount: 492,
-          percentage: 55.16,
-        },
-        {
-          candidateId: '22222222-2222-2222-2222-222222222222',
-          candidateNumber: 2,
-          leaderName: 'Dimas Satria Wicaksana',
-          viceLeaderName: 'Cynthia Maharani',
-          voteCount: 368,
-          percentage: 41.26,
-        },
-      ],
+      tally: liveData.tally,
     });
   }
 
@@ -218,4 +204,23 @@ export async function GET() {
     { error: 'Terjadi kegagalan server saat memproses rekapitulasi suara.' },
     { status: 500 }
   );
+}
+
+/**
+ * DELETE: Mereset surat suara pengujian lokal (Khusus mode pengembangan / Non-Production)
+ */
+export async function DELETE() {
+  const session = await getSession();
+  const authCheck = verifyAdminAccess(session);
+
+  if (!authCheck.authorized) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+  }
+
+  if (process.env.APP_ENV === 'production') {
+    return NextResponse.json({ error: 'Reset surat suara dinonaktifkan di lingkungan produksi.' }, { status: 403 });
+  }
+
+  resetBallotsStore();
+  return NextResponse.json({ success: true, message: 'Surat suara simulasi berhasil direset.' });
 }

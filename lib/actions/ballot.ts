@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getSession, createSessionToken, setSessionCookie, type SessionUser } from '@/lib/auth/session';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { generateReceipt } from '@/lib/receipt/generator';
+import { castBallotAtomicDev } from '@/lib/ballots/store';
 
 const candidateIdSchema = z.string().uuid('ID kandidat harus berformat UUID yang valid.');
 
@@ -99,7 +100,24 @@ export async function castBallotAction(candidateId: string): Promise<CastBallotA
       }
     }
 
-    // Dev mock fallback jika database Supabase belum terhubung saat pengujian lokal
+    // Dev fallback jika database Supabase belum terhubung saat pengujian lokal
+    if (!isSupabaseConfigured()) {
+      const devResult = castBallotAtomicDev(session.nim, candidateId);
+
+      if (!devResult.success) {
+        if (devResult.code === 'ALREADY_VOTED') {
+          const updatedUser: SessionUser = { ...session, hasVoted: true };
+          const updatedToken = await createSessionToken(updatedUser);
+          setSessionCookie(updatedToken);
+        }
+        return {
+          success: false,
+          code: devResult.code,
+          message: devResult.message,
+        };
+      }
+    }
+
     const updatedUser: SessionUser = { ...session, hasVoted: true };
     const updatedToken = await createSessionToken(updatedUser);
     setSessionCookie(updatedToken);

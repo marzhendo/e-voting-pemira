@@ -160,7 +160,7 @@ export default function ReceiptPage() {
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="p-2.5 rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors shrink-0"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors flex items-center justify-center shrink-0 cursor-pointer"
                     title="Salin Token"
                   >
                     {copied ? (
@@ -196,9 +196,9 @@ export default function ReceiptPage() {
                   type="button"
                   disabled={isVerifying}
                   onClick={handleVerifyReceipt}
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-[2.75rem] px-3 rounded-lg hover:bg-primary/10 transition-colors -mx-3"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-semibold min-h-[44px] px-3 rounded-lg hover:bg-surface-container-highest transition-colors cursor-pointer -mx-3"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span>{isVerifying ? 'Memeriksa...' : 'Cek Keabsahan Bukti Pemilihan'}</span>
                 </button>
 
@@ -216,11 +216,11 @@ export default function ReceiptPage() {
                 Simpan token ini sebagai bukti partisipasi. Pilihan Anda bersifat rahasia.
               </p>
 
-              <div className="flex flex-col gap-2 pt-2">
+              <div className="flex flex-col gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full py-3 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm"
+                  className="w-full h-11 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Keluar dari Sesi</span>
@@ -228,7 +228,7 @@ export default function ReceiptPage() {
 
                 <Link
                   href="/"
-                  className="w-full py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold text-center transition-colors"
+                  className="w-full h-11 min-h-[44px] rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer"
                 >
                   Kembali ke Beranda
                 </Link>
@@ -239,10 +239,10 @@ export default function ReceiptPage() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-outline-variant/20 py-3 text-center text-xs text-outline">
+      <footer className="w-full border-t border-outline-variant/20 py-4 text-center text-xs text-outline">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1">
-          <span>KPR HMIF Telkom University Purwokerto 2026/2027</span>
-          <span>© 2026 HMIF Telkom University Purwokerto</span>
+          <span>Komisi Pemilihan Raya • HMIF Telkom University Purwokerto</span>
+          <span>Periode 2026/2027</span>
         </div>
       </footer>
     </div>

@@ -63,96 +63,96 @@ export function ConfirmationModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirmation-modal-title"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-in fade-in duration-150"
+        className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
         onClick={(e) => {
           if (e.target === e.currentTarget && !isSubmitting) {
             onClose();
           }
         }}
       >
-        <div className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 shadow-2xl flex flex-col gap-5 border border-outline-variant/30 animate-in zoom-in-95 duration-150">
-          {/* Modal Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-              <ShieldCheck className="w-5 h-5" />
+        <div className="flex min-h-full items-center justify-center p-4 text-left">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 shadow-2xl flex flex-col gap-5 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 id="confirmation-modal-title" className="text-lg font-bold text-on-surface">
+                    Konfirmasi Pilihan
+                  </h2>
+                  <p className="text-xs text-outline mt-0.5">
+                    Pilihanmu bersifat final dan langsung tercatat secara rahasia.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={onClose}
+                aria-label="Tutup Konfirmasi"
+                className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div>
-              <h2 id="confirmation-modal-title" className="text-lg font-bold text-on-surface">
-                Konfirmasi Pilihan
-              </h2>
-              <p className="text-xs text-outline">
-                Pilihan ini bersifat final dan tidak dapat diubah.
-              </p>
+
+            {/* Selected Candidate Summary */}
+            <div className="bg-surface-container rounded-xl p-4 flex items-center gap-4 border border-outline-variant/20">
+              <div className="w-14 h-14 rounded-xl bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/30">
+                <span className="font-bebas text-3xl text-primary leading-none">
+                  {numberStr}
+                </span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <span className="text-[11px] text-outline uppercase tracking-wider block font-semibold">
+                  Pilihan Anda:
+                </span>
+                <h3 className="text-base text-on-surface font-bold truncate">
+                  {title}
+                </h3>
+                <p className="text-xs text-on-surface-variant truncate mt-0.5">
+                  {subtitle}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={onClose}
+                className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Ubah Pilihan
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={onConfirm}
+                className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                    <span>Mengunci Suara...</span>
+                  </>
+                ) : (
+                  <span>Kunci Suara</span>
+                )}
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onClose}
-            aria-label="Tutup Konfirmasi"
-            className="w-11 h-11 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Selected Candidate Summary */}
-        <div className="bg-surface-container rounded-xl p-4 flex items-center gap-4 border border-outline-variant/20">
-          <div className="w-14 h-14 rounded-xl bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/30">
-            <span className="font-bebas text-3xl text-primary leading-none">
-              {numberStr}
-            </span>
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <span className="text-[11px] text-outline uppercase tracking-wider block font-semibold">
-              Pilihan Anda:
-            </span>
-            <h3 className="text-base text-on-surface font-bold truncate">
-              {title}
-            </h3>
-            <p className="text-xs text-on-surface-variant truncate mt-0.5">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-
-        {/* Note */}
-        <p className="text-xs text-on-surface-variant leading-relaxed">
-          Suara yang sudah dikunci tidak dapat diubah kembali.
-        </p>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-1">
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
-          >
-            Ubah Pilihan
-          </button>
-
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onConfirm}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-75 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
-                <span>Mengunci Suara...</span>
-              </>
-            ) : (
-              <span>Kunci Suara</span>
-            )}
-          </button>
         </div>
       </div>
-    </div>
-  </Portal>
+    </Portal>
   );
 }

@@ -1,4 +1,5 @@
-# dependencies
+# local dev data store
+/data/
 /node_modules
 /.pnpm-store
 
@@ -82,3 +83,7 @@ coverage/
 Thumbs.db
 ehthumbs.db
 desktop.ini
+
+# user uploaded files in dev
+/public/uploads/*
+!/public/uploads/.gitkeep

@@ -21,7 +21,7 @@ test.describe('Documentation Screenshot Captures', () => {
     // 1. Landing Page
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('h1')).toContainText('Masa Depan HMIF');
+    await expect(page.locator('h1')).toContainText('Bawa Perubahan untuk Informatika');
     await saveScreenshot(page, '01-landing-page.png', true);
 
     // 2. Login Page (Official Clean View with HMIF Logo)

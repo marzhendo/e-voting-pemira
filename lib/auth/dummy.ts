@@ -39,6 +39,15 @@ export const DUMMY_ACCOUNTS: DummyAccount[] = [
     description: 'Pemilih sah angkatan 2024 untuk pengujian konkurensi (Race Condition).',
   },
   {
+    id: 'voter-tester-marzhendo',
+    name: 'Marzhendo (Tester Real Email)',
+    email: 'marzhendo03@gmail.com',
+    nim: '103012400099',
+    role: 'voter',
+    generation: 2024,
+    description: 'Akun pemilih terdaftar DPT dengan email riil marzhendo03@gmail.com untuk uji coba OTP & SMTP.',
+  },
+  {
     id: 'unregistered',
     name: 'Mahasiswa Luar DPT',
     email: 'unregistered@student.telkomuniversity.ac.id',

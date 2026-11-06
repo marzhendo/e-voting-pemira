@@ -64,10 +64,10 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
   test('Voter can request 6-digit PIN via NIM input and receives Step 2 verification form', async ({ page }) => {
     await page.goto('/login');
 
-    // Input NIM
+    // Input NIM of active unvoted student (Budi Santoso)
     const nimInput = page.locator('input#identifier');
     await expect(nimInput).toBeVisible();
-    await nimInput.fill('103012300001');
+    await nimInput.fill('103012300002');
 
     // Submit PIN request
     const requestBtn = page.locator('button', { hasText: 'Kirim Kode PIN' });

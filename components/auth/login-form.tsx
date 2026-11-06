@@ -10,8 +10,6 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
-  KeyRound,
-  ArrowRight,
   ArrowLeft,
   CheckCircle2,
   RefreshCw,
@@ -68,7 +66,7 @@ export function LoginForm() {
     const cleanId = identifier.trim();
 
     if (!cleanId || cleanId.length < 4) {
-      setErrorMessage('Silakan masukkan NIM atau email kampus yang valid.');
+      setErrorMessage('Masukkan NIM atau email kampus yang valid.');
       return;
     }
 
@@ -93,13 +91,13 @@ export function LoginForm() {
         return;
       }
 
-      setMaskedEmail(data.maskedEmail || 'email kampus Anda');
+      setMaskedEmail(data.maskedEmail || 'email SSO kampus');
       setCooldown(data.cooldownSeconds || 60);
-      setSuccessNotice(`Kode PIN 6-digit dikirim ke ${data.maskedEmail || 'Outlook kampus Anda'}.`);
+      setSuccessNotice(`Kode PIN 6-digit dikirim ke ${data.maskedEmail || 'email SSO kampus'}.`);
       setStep('pin');
       setPin('');
     } catch {
-      setErrorMessage('Terjadi kesalahan jaringan saat mengirim permintaan kode PIN.');
+      setErrorMessage('Terjadi gangguan jaringan saat meminta kode PIN.');
     } finally {
       setIsLoading(false);
     }
@@ -132,7 +130,7 @@ export function LoginForm() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setErrorMessage(data.error || 'Kode PIN tidak valid atau telah kedaluwarsa.');
+        setErrorMessage(data.error || 'Kode PIN salah atau telah kedaluwarsa.');
         if (typeof data.remainingAttempts === 'number') {
           setRemainingAttempts(data.remainingAttempts);
         }
@@ -177,7 +175,7 @@ export function LoginForm() {
         window.location.href = '/vote';
       }
     } catch {
-      setErrorMessage('Terjadi kesalahan koneksi saat login.');
+      setErrorMessage('Terjadi kesalahan koneksi saat login simulasi.');
     } finally {
       setLoadingAccountId(null);
     }
@@ -187,15 +185,15 @@ export function LoginForm() {
     <div className="w-full space-y-4">
       {/* Banner Error / Notifikasi */}
       {(errorMessage || urlMessage) && (
-        <div className="rounded-xl border border-hmif-red/30 bg-red-50 p-3.5 text-xs text-hmif-red flex items-start gap-2.5 animate-in fade-in duration-200">
+        <div className="rounded-xl border border-error/40 bg-error-container/20 p-3.5 text-xs text-error flex items-start gap-2.5 animate-in fade-in duration-200">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <div className="flex-1">
             <div className="font-bold">
-              {urlError ? `Akses Ditolak (${urlError})` : 'Gagal masuk'}
+              {urlError ? `Akses Ditolak (${urlError})` : 'Gagal Masuk'}
             </div>
-            <div className="mt-0.5 text-neutral-700">{errorMessage || urlMessage}</div>
+            <div className="mt-0.5 text-on-surface-variant">{errorMessage || urlMessage}</div>
             {remainingAttempts !== null && (
-              <div className="mt-1 font-semibold text-neutral-800">
+              <div className="mt-1 font-semibold text-on-surface">
                 Sisa kesempatan percobaan: {remainingAttempts} kali.
               </div>
             )}
@@ -205,8 +203,8 @@ export function LoginForm() {
 
       {/* Banner Sukses Pengiriman */}
       {successNotice && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-start gap-2.5 animate-in fade-in duration-200">
-          <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600 shrink-0" />
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-300 flex items-start gap-2.5 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" />
           <span className="flex-1 leading-relaxed">{successNotice}</span>
         </div>
       )}
@@ -217,7 +215,7 @@ export function LoginForm() {
           <div>
             <label
               htmlFor="identifier"
-              className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5"
+              className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
             >
               NIM
             </label>
@@ -230,30 +228,24 @@ export function LoginForm() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="Contoh: 103012300001"
                 disabled={isLoading}
-                className="w-full h-12 pl-11 pr-4 rounded-xl border border-neutral-300 bg-neutral-50 text-neutral-900 placeholder:text-neutral-400 text-sm font-medium focus:bg-white focus:border-hmif-blue focus:ring-2 focus:ring-hmif-blue/20 transition-all outline-none"
+                className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-outline/60 text-sm font-medium focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
               />
-              <Mail className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Mail className="w-4 h-4 text-outline absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
-            <p className="text-[11px] text-neutral-500 mt-1.5 leading-normal">
-              Kode PIN 6-digit dikirim ke email Outlook kampus Anda.
-            </p>
           </div>
 
           <button
             type="submit"
             disabled={isLoading || !identifier.trim()}
-            className="w-full h-12 px-5 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-hmif-blue disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
                 <span>Mengirim Kode PIN...</span>
               </>
             ) : (
-              <>
-                <span>Kirim Kode PIN</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
+              <span>Kirim Kode PIN</span>
             )}
           </button>
         </form>
@@ -266,9 +258,9 @@ export function LoginForm() {
             <div className="flex items-center justify-between mb-1.5">
               <label
                 htmlFor="pin"
-                className="block text-xs font-bold uppercase tracking-wider text-neutral-700"
+                className="block text-xs font-bold uppercase tracking-wider text-on-surface"
               >
-                Masukkan Kode PIN 6-Digit
+                Kode PIN 6 Digit
               </label>
               <button
                 type="button"
@@ -277,14 +269,14 @@ export function LoginForm() {
                   setErrorMessage(null);
                   setSuccessNotice(null);
                 }}
-                className="text-xs text-hmif-blue hover:underline flex items-center gap-1 font-medium min-h-[2.75rem] px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors -my-2"
+                className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold min-h-[44px] px-3 py-2 rounded-lg hover:bg-surface-container transition-colors -my-2"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Ganti NIM</span>
               </button>
             </div>
 
-            <div className="relative">
+            <div>
               <input
                 id="pin"
                 type="text"
@@ -297,32 +289,28 @@ export function LoginForm() {
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="• • • • • •"
                 disabled={isLoading}
-                className="w-full h-14 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-neutral-300 bg-neutral-50 text-neutral-900 placeholder:text-neutral-300 focus:bg-white focus:border-hmif-blue focus:ring-2 focus:ring-hmif-blue/20 transition-all outline-none"
+                className="w-full h-14 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-outline-variant/40 bg-surface-container text-primary placeholder:text-outline/40 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
               />
-              <KeyRound className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
-            <div className="flex items-center justify-between mt-2 text-xs text-neutral-500">
-              <span>Dikirim ke: <strong className="text-neutral-700">{maskedEmail}</strong></span>
-              <span>Masa aktif: <strong>10 Menit</strong></span>
+            <div className="flex items-center justify-between mt-2 text-xs text-outline">
+              <span>Terkirim ke: <strong className="text-on-surface">{maskedEmail}</strong></span>
+              <span>Aktif: <strong className="text-on-surface">10 Menit</strong></span>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={isLoading || pin.length !== 6}
-            className="w-full h-12 px-5 rounded-xl bg-hmif-blue hover:bg-brand-blue-hover text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-hmif-blue disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Memverifikasi Kode PIN...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                <span>Memverifikasi PIN...</span>
               </>
             ) : (
-              <>
-                <span>Masuk ke Bilik Suara</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
+              <span>Masuk ke Bilik Suara</span>
             )}
           </button>
 
@@ -332,7 +320,7 @@ export function LoginForm() {
               type="button"
               disabled={cooldown > 0 || isLoading}
               onClick={() => handleRequestOtp()}
-              className="min-h-[2.75rem] px-3.5 py-2 rounded-xl text-xs text-neutral-600 hover:text-hmif-blue hover:bg-neutral-100 transition-colors font-medium inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-on-surface-variant hover:text-primary hover:bg-surface-container disabled:text-outline disabled:opacity-80 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               <span>
@@ -345,36 +333,36 @@ export function LoginForm() {
         </form>
       )}
 
-      {/* DPT Verification Badge */}
-      <div className="flex items-center gap-2 text-xs text-neutral-500 justify-center text-center pt-2">
-        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-        <span>Hak pilih divalidasi dengan Daftar Pemilih Tetap resmi.</span>
+      {/* DPT Verification Note */}
+      <div className="flex items-center gap-2 text-xs text-outline justify-center text-center pt-2">
+        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+        <span>Hanya untuk mahasiswa aktif Informatika terdaftar di DPT.</span>
       </div>
 
       {/* Panel Pengujian Mode Dummy (Collapsible Drawer for Dev Testing) */}
       {dummyEnabled && (
-        <div className="mt-4 rounded-xl border border-neutral-700 bg-neutral-900 overflow-hidden text-white">
+        <div className="mt-4 rounded-xl border border-outline-variant/30 bg-surface-container-low overflow-hidden text-on-surface">
           <button
             type="button"
             onClick={() => setShowDummyAccounts(!showDummyAccounts)}
-            className="w-full p-3 flex items-center justify-between text-left hover:bg-neutral-800/80 transition-colors"
+            className="w-full p-3 min-h-[44px] flex items-center justify-between text-left hover:bg-surface-container transition-colors"
           >
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-hmif-gold animate-pulse" />
-              <span className="text-xs font-bold text-hmif-gold">
+              <span className="w-2 h-2 rounded-full bg-primary" />
+              <span className="text-xs font-bold text-primary">
                 Mode Uji Coba Cepat (Dev)
               </span>
             </div>
             {showDummyAccounts ? (
-              <ChevronUp className="w-4 h-4 text-neutral-400" />
+              <ChevronUp className="w-4 h-4 text-outline" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-neutral-400" />
+              <ChevronDown className="w-4 h-4 text-outline" />
             )}
           </button>
 
           {showDummyAccounts && (
-            <div className="p-3 pt-0 border-t border-neutral-800 space-y-1.5 max-h-56 overflow-y-auto">
-              <p className="text-[11px] text-neutral-400 pb-1">
+            <div className="p-3 pt-0 border-t border-outline-variant/20 space-y-2 max-h-56 overflow-y-auto">
+              <p className="text-[11px] text-outline pb-1">
                 Pilih akun simulasi untuk login instan:
               </p>
               {dummyAccounts.map((account) => (
@@ -383,17 +371,17 @@ export function LoginForm() {
                   type="button"
                   disabled={loadingAccountId !== null}
                   onClick={() => handleDummyLogin(account.id)}
-                  className="w-full p-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-750 hover:border-hmif-gold/50 border border-neutral-700 text-left transition-colors flex items-center justify-between gap-2"
+                  className="w-full min-h-[48px] p-2.5 rounded-lg bg-surface-container hover:bg-surface-container-highest hover:border-primary/50 border border-outline-variant/30 text-left transition-colors flex items-center justify-between gap-2 cursor-pointer"
                 >
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block truncate">
+                    <span className="text-xs font-semibold text-on-surface block truncate">
                       {account.name}
                     </span>
-                    <span className="text-[11px] text-neutral-400 block truncate">
+                    <span className="text-[11px] text-outline block truncate">
                       {account.role.toUpperCase()} {account.nim ? `• ${account.nim}` : ''}
                     </span>
                   </div>
-                  <span className="text-[11px] text-hmif-gold font-medium shrink-0">
+                  <span className="text-[11px] text-primary font-semibold shrink-0">
                     {loadingAccountId === account.id ? 'Masuk...' : 'Pilih →'}
                   </span>
                 </button>
