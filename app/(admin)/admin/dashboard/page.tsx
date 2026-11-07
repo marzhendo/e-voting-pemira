@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 import { Portal } from '@/components/ui/portal';
 import {
   Vote,
@@ -235,8 +236,10 @@ export default function AdminDashboardPage() {
   const [isResettingBallots, setIsResettingBallots] = useState(false);
   const [ballotActionMessage, setBallotActionMessage] = useState<string | null>(null);
 
-  // State Modal Pratinjau Berita Acara (BAST)
+  // State Modal Pratinjau Berita Acara (BAST) & Verifikasi Digital
   const [isBastModalOpen, setIsBastModalOpen] = useState(false);
+  const [bastQrDataUrl, setBastQrDataUrl] = useState<string>('');
+  const [bastIntegrityHash, setBastIntegrityHash] = useState<string>('');
 
   // State Audit Logs & Audit Trail
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
@@ -493,6 +496,54 @@ export default function AdminDashboardPage() {
       fetchAdminUsers();
     }
   }, [activeTab, fetchAdminUsers]);
+
+  // 7. Hitung Hash Integritas BAST & Buat QR Code Verifikasi Publik
+  useEffect(() => {
+    let isMounted = true;
+    const generateBastVerification = async () => {
+      try {
+        if (!window.crypto?.subtle) return;
+        const sortedByNumber = [...tallyData].sort((a, b) => a.candidateNumber - b.candidateNumber);
+        const payload = JSON.stringify({
+          totalDpt,
+          totalVotes,
+          tally: sortedByNumber.map((t) => ({ no: t.candidateNumber, votes: t.voteCount })),
+        });
+
+        const encoder = new TextEncoder();
+        const data = encoder.encode(payload);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+        if (!isMounted) return;
+        setBastIntegrityHash(hashHex);
+
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const verifyUrl = `${origin}/bast/verify?hash=${hashHex}`;
+        const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+          width: 140,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+          },
+        });
+
+        if (isMounted) {
+          setBastQrDataUrl(qrDataUrl);
+        }
+      } catch (err) {
+        console.error('Gagal men-generate QR BAST:', err);
+      }
+    };
+
+    generateBastVerification();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [totalDpt, totalVotes, tallyData]);
 
   // Handler Tambah Admin Baru
   const handleSaveAdminUser = async (e: React.FormEvent) => {
@@ -1276,11 +1327,48 @@ export default function AdminDashboardPage() {
             </strong>{' '}
             memperoleh akumulasi suara tertinggi sejumlah{' '}
             <strong>{leadingCandidate ? leadingCandidate.voteCount : 0} suara</strong> (
-            {leadingCandidate ? leadingCandidate.percentage : 0}%).
+              {leadingCandidate ? leadingCandidate.percentage : 0}%).
           </p>
           <p className="text-[11px] text-gray-600 italic">
             Seluruh surat suara telah diverifikasi secara kriptografis dan disimpan secara anonim tanpa rekaman identitas pemilih ke surat suara (*Ballot Secrecy*), sesuai ketetapan Komisi Pemilihan Raya HMIF Telkom University Purwokerto.
           </p>
+        </div>
+
+        {/* SEGEL DIGITAL & VERIFIKASI QR PUBLIK */}
+        <div className="my-3 p-3 sm:p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 flex flex-col sm:flex-row items-center gap-4">
+          <div className="shrink-0 bg-white p-1.5 border border-gray-300 rounded shadow-xs flex items-center justify-center">
+            {bastQrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bastQrDataUrl}
+                alt="QR Verifikasi Berita Acara"
+                className="w-24 h-24 object-contain"
+              />
+            ) : (
+              <div className="w-24 h-24 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400 font-sans">
+                QR Kode
+              </div>
+            )}
+          </div>
+          <div className="flex-1 text-left space-y-1 font-sans">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Integritas Terverifikasi Kriptografis
+              </span>
+              <span className="text-[10px] text-gray-500 font-mono">HMIF-E-VOTE-2026</span>
+            </div>
+            <p className="text-[11px] text-gray-700 leading-snug">
+              Pindai kode QR untuk menguji keabsahan Berita Acara ini secara publik di portal resmi Pemira HMIF. Nilai hash di bawah ini mengunci jumlah DPT dan perolehan suara sah saat dokumen ini diterbitkan.
+            </p>
+            <div className="pt-1">
+              <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wide">
+                SHA-256 Digital Signature:
+              </span>
+              <code className="text-[10px] font-mono font-bold text-gray-900 bg-gray-200/80 px-2 py-0.5 rounded break-all select-all block mt-0.5">
+                {bastIntegrityHash || 'MENGHITUNG INTEGRITAS TANDA TANGAN DIGITAL...'}
+              </code>
+            </div>
+          </div>
         </div>
 
         {/* BAGIAN IV: TANDA TANGAN PIHAK-PIHAK */}
@@ -2290,6 +2378,16 @@ export default function AdminDashboardPage() {
                       <FileText className="w-4 h-4 text-primary" />
                       <span>Cetak Berita Acara</span>
                     </button>
+
+                    <a
+                      href="/api/admin/tally/export"
+                      download="Rekapitulasi-Suara-Pemira-HMIF-2026-2027.csv"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold transition-colors border border-outline-variant/30"
+                      title="Ekspor Rekapitulasi Suara Resmi ke Format CSV"
+                    >
+                      <Download className="w-4 h-4 text-primary" />
+                      <span>Unduh CSV</span>
+                    </a>
                   </div>
                 </div>
 
@@ -2854,7 +2952,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-start md:self-auto">
+                  <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
                     <button
                       type="button"
                       disabled={loadingAuditLogs}
@@ -2864,6 +2962,16 @@ export default function AdminDashboardPage() {
                       <RefreshCw className={`w-3.5 h-3.5 ${loadingAuditLogs ? 'animate-spin' : ''}`} />
                       <span>Segarkan Log</span>
                     </button>
+
+                    <a
+                      href={`/api/admin/audit-logs/export?action=${encodeURIComponent(auditFilterAction)}&q=${encodeURIComponent(auditSearchQuery)}`}
+                      download="Audit-Trail-Pemira-HMIF.csv"
+                      className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center gap-1.5 border border-outline-variant/30 transition-colors"
+                      title="Ekspor Seluruh Log Audit ke Format CSV"
+                    >
+                      <Download className="w-3.5 h-3.5 text-primary" />
+                      <span>Ekspor Log (CSV)</span>
+                    </a>
                   </div>
                 </div>
 

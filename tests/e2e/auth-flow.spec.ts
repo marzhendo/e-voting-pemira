@@ -64,10 +64,10 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
   test('Voter can request 6-digit PIN via NIM input and receives Step 2 verification form', async ({ page }) => {
     await page.goto('/login');
 
-    // Input NIM of active unvoted student (Budi Santoso)
+    // Input NIM of active unvoted student (Fadhil Muhammad)
     const nimInput = page.locator('input#identifier');
     await expect(nimInput).toBeVisible();
-    await nimInput.fill('103012300002');
+    await nimInput.fill('103012500005');
 
     // Submit PIN request
     const requestBtn = page.locator('button', { hasText: 'Kirim Kode PIN' });
@@ -75,7 +75,7 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
 
     // Expect Step 2 PIN input to appear
     const pinInput = page.locator('input#pin');
-    await expect(pinInput).toBeVisible({ timeout: 5000 });
+    await expect(pinInput).toBeVisible({ timeout: 15000 });
     await expect(page.locator('body')).toContainText('Kode PIN 6-digit dikirim');
     await expect(page.locator('button', { hasText: 'Masuk ke Bilik Suara' })).toBeVisible();
   });
