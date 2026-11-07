@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSession, createSessionToken, setSessionCookie, type SessionUser } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateReceipt } from '@/lib/receipt/generator';
+import { castBallotAtomicDev } from '@/lib/ballots/store';
 
 const castBallotSchema = z.object({
   candidateId: z.string().uuid('ID kandidat harus berformat UUID yang valid.'),
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
       console.warn('[CastBallotRoute] Database RPC error:', rpcError);
 
       if (process.env.APP_ENV !== 'production') {
+        castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
         const updatedUser: SessionUser = { ...session, hasVoted: true };
         const updatedToken = await createSessionToken(updatedUser);
         setSessionCookie(updatedToken);

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { authenticateDummyUser, isDummyAuthAllowed, DUMMY_ACCOUNTS } from '@/lib/auth/dummy';
 import { createSessionToken, setSessionCookie, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/auth/session';
+import { resetVoterVoteStatus, markVoterAsVoted } from '@/lib/dpt/store';
 
 const dummyLoginSchema = z.object({
   accountId: z.string().min(1, 'Account ID is required'),
@@ -41,6 +42,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { accountId } = parsed.data;
+
+    // Sinkronkan state DPT dev agar akun Happy Path selalu fresh dan akun Voted selalu voted
+    if (process.env.APP_ENV !== 'production') {
+      if (accountId === 'voter1') {
+        resetVoterVoteStatus('103012300001');
+      } else if (accountId === 'voter2') {
+        markVoterAsVoted('103012300002');
+      }
+    }
+
     const authResult = await authenticateDummyUser(accountId);
 
     if (!authResult.success || !authResult.user) {

@@ -3,7 +3,8 @@
  * Cloud Run load balancer rotates internal IPs dynamically, so request.socket / client.host
  * cannot be relied upon. The real client IP is always the first address in X-Forwarded-For.
  */
-export function getClientIp(headers: Headers): string {
+export function getClientIp(input: Headers | { headers: Headers }): string {
+  const headers = 'headers' in input ? input.headers : input;
   const forwardedFor = headers.get('x-forwarded-for');
   if (forwardedFor) {
     const firstIp = forwardedFor.split(',')[0].trim();

@@ -12,7 +12,7 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
   });
 
   test('Voter can log in via dev mock and is routed to /vote', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
 
     // Expand dev mock drawer
     const devDrawerButton = page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' });
@@ -30,7 +30,7 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
   });
 
   test('Voter cannot access admin dashboard and is restricted', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
 
     // Log in as voter
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
@@ -45,7 +45,7 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
   });
 
   test('KPR Admin can log in and access /admin/dashboard', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
 
     // Expand dev mock drawer
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
@@ -78,5 +78,31 @@ test.describe('Authentication & Route Protection (RBAC) E2E Tests', () => {
     await expect(pinInput).toBeVisible({ timeout: 5000 });
     await expect(page.locator('body')).toContainText('Kode PIN 6-digit dikirim');
     await expect(page.locator('button', { hasText: 'Masuk ke Bilik Suara' })).toBeVisible();
+  });
+
+  test('Dev mock drawer is completely hidden on standard /login and accessible only via ?dev=true', async ({ page }) => {
+    // Normal visit without query params: dev drawer must NOT exist in the DOM
+    await page.goto('/login');
+    const devDrawer = page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' });
+    await expect(devDrawer).toBeHidden();
+
+    // Query param ?dev=true should reveal dev mock drawer
+    await page.goto('/login?dev=true');
+    await expect(devDrawer).toBeVisible();
+  });
+
+  test('Superadmin (Marzhendo Galang) can log in and access /admin/dashboard with full permissions', async ({ page }) => {
+    await page.goto('/login?dev=true');
+    await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
+
+    // Find and click Superadmin account
+    const superAdminBtn = page.locator('button', { hasText: 'Marzhendo Galang (Superadmin)' });
+    await expect(superAdminBtn).toBeVisible();
+    await superAdminBtn.click();
+
+    // Verify successful routing to admin dashboard
+    await expect(page).toHaveURL(/\/admin\/dashboard/);
+    await expect(page.locator('aside')).toContainText('PEMIRA HMIF');
+    await expect(page.locator('body')).toContainText('Overview & Partisipasi');
   });
 });

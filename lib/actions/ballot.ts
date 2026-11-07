@@ -102,7 +102,7 @@ export async function castBallotAction(candidateId: string): Promise<CastBallotA
 
     // Dev fallback jika database Supabase belum terhubung saat pengujian lokal
     if (!isSupabaseConfigured()) {
-      const devResult = castBallotAtomicDev(session.nim, candidateId);
+      const devResult = castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
 
       if (!devResult.success) {
         if (devResult.code === 'ALREADY_VOTED') {

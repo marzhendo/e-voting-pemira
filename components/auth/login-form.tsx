@@ -137,9 +137,14 @@ export function LoginForm() {
         return;
       }
 
-      setSuccessNotice('Terverifikasi. Membuka bilik suara...');
+      const isStaff = data.user?.role && data.user.role !== 'voter';
+      setSuccessNotice(
+        isStaff
+          ? 'Terverifikasi sebagai Administrator. Membuka dashboard...'
+          : 'Terverifikasi. Membuka bilik suara...'
+      );
       setTimeout(() => {
-        window.location.href = data.redirectTo || '/vote';
+        window.location.href = data.redirectTo || (isStaff ? '/admin/dashboard' : '/vote');
       }, 600);
     } catch {
       setErrorMessage('Terjadi gangguan jaringan saat memverifikasi kode PIN.');
@@ -339,8 +344,8 @@ export function LoginForm() {
         <span>Hanya untuk mahasiswa aktif Informatika terdaftar di DPT.</span>
       </div>
 
-      {/* Panel Pengujian Mode Dummy (Collapsible Drawer for Dev Testing) */}
-      {dummyEnabled && (
+      {/* Panel Pengujian Mode Dummy (Khusus saat parameter ?dev=true disertakan untuk pengujian otomatis) */}
+      {dummyEnabled && (searchParams.get('dev') === 'true' || searchParams.get('dev') === '1') && (
         <div className="mt-4 rounded-xl border border-outline-variant/30 bg-surface-container-low overflow-hidden text-on-surface">
           <button
             type="button"

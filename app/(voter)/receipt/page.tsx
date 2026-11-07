@@ -66,12 +66,12 @@ export default function ReceiptPage() {
       const res = await fetch(`/api/receipt/verify?token=${encodeURIComponent(receiptToken)}`);
       const data = await res.json();
 
-      if (data.verified) {
+      if (data.verified || data.valid) {
         setVerifyStatus(
-          `✓ Tanda terima sah dan terverifikasi di server KPR pada ${data.votingSessionDate}.`
+          `✓ Tanda terima sah dan terverifikasi di server KPR pada ${data.votingSessionDate || 'sesi pemilihan'}.`
         );
       } else {
-        setVerifyStatus('⚠️ Tanda terima tidak ditemukan dalam basis data.');
+        setVerifyStatus(`⚠️ ${data.message || 'Tanda terima tidak ditemukan dalam basis data.'}`);
       }
     } catch {
       setVerifyStatus('Gagal memverifikasi tanda terima.');

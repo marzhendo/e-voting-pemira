@@ -1,5 +1,6 @@
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { findVoterByIdentifier } from '@/lib/dpt/store';
+import { findAdminByEmail } from '@/lib/admin/store';
 import type { AdminRole } from '@/lib/supabase/types';
 import type { SessionUser } from './session';
 
@@ -28,6 +29,7 @@ export async function resolveUserIdentity(params: {
     const normalizedEmail = params.email.trim().toLowerCase();
 
     // Dev store fallback saat Supabase belum dikonfigurasi
+    const dynamicAdmin = findAdminByEmail(normalizedEmail);
     if (!isSupabaseConfigured() && process.env.APP_ENV !== 'production') {
       const devVoter = findVoterByIdentifier(normalizedEmail);
       if (devVoter) {
@@ -47,10 +49,25 @@ export async function resolveUserIdentity(params: {
             email: devVoter.email,
             name: devVoter.name,
             nim: devVoter.nim,
-            role: 'voter',
+            role: dynamicAdmin ? dynamicAdmin.role : (devVoter.role || (devVoter.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter')),
             isDptVerified: true,
             hasVoted: false,
             generation: devVoter.generation,
+          },
+        };
+      } else if (dynamicAdmin) {
+        return {
+          success: true,
+          code: 'ADMIN_ONLY',
+          message: 'Berhasil masuk sebagai Panitia / Pengawas Pemira.',
+          user: {
+            id: dynamicAdmin.id,
+            email: normalizedEmail,
+            name: dynamicAdmin.name || params.name || 'Panitia Pemira',
+            nim: dynamicAdmin.nim,
+            role: dynamicAdmin.role,
+            isDptVerified: false,
+            hasVoted: false,
           },
         };
       }

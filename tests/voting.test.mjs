@@ -57,4 +57,20 @@ describe('Voting Engine & Receipt Cryptography Unit Tests', () => {
     assert.ok(!keys.includes('nim'));
     assert.ok(!keys.includes('voter_id'));
   });
+
+  test('Receipt verification logic matches SHA-256 hash against voter whitelist', () => {
+    const receipt = generateReceipt();
+    const mockVoters = [
+      { nim: '103012300001', has_voted: true, receipt_hash: receipt.receiptHash, generation: 2023 }
+    ];
+
+    const targetHash = hashReceiptToken(receipt.rawToken);
+    const matched = mockVoters.find(v => v.receipt_hash === targetHash && v.has_voted);
+    assert.ok(matched, 'Receipt must match correctly');
+    assert.strictEqual(matched.generation, 2023);
+
+    const invalidHash = hashReceiptToken('HMIF-PEMIRA-INVALID-TOKEN-1234');
+    const notMatched = mockVoters.find(v => v.receipt_hash === invalidHash && v.has_voted);
+    assert.strictEqual(notMatched, undefined);
+  });
 });

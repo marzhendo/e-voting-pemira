@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Modal Scroll & Body Lock Verification', () => {
   test('Vote confirmation modal locks body & html scroll and stays fixed', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await page.waitForURL('/vote');
@@ -63,7 +63,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
   });
 
   test('Admin broadcast email confirmation modal locks body & html scroll', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
     await page.waitForURL('/admin/dashboard');
@@ -118,7 +118,7 @@ test.describe('Modal Scroll & Body Lock Verification', () => {
   });
 
   test('Candidate detail modal is vertically centered, does not cut off header, and locks scroll', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await page.waitForURL('/vote');

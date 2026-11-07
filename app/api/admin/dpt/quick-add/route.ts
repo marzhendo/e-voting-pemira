@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { recordAuditLog } from '@/lib/audit/store';
 import { addSingleVoter } from '@/lib/dpt/store';
 
 const quickAddSchema = z.object({
@@ -57,6 +59,17 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        const ip = getClientIp(req);
+        await recordAuditLog({
+          actorEmail: session?.email || 'admin@pemira.local',
+          actorName: session?.name || 'Panitia KPR',
+          actorRole: session?.role || 'kpr_admin',
+          action: 'DPT_QUICK_ADD',
+          description: `Menambahkan pemilih mandiri baru ke DPT: ${name} (${nim}) - Angkatan ${generation}.`,
+          ipAddress: ip,
+          details: { nim, name, email, generation },
+        });
+
         return NextResponse.json({
           success: true,
           message: `Pemilih ${name} (${nim}) berhasil ditambahkan ke DPT.`,
@@ -77,6 +90,17 @@ export async function POST(req: NextRequest) {
     if (!res.success) {
       return NextResponse.json({ error: res.error }, { status: 400 });
     }
+
+    const ip = getClientIp(req);
+    await recordAuditLog({
+      actorEmail: session?.email || 'admin@pemira.local',
+      actorName: session?.name || 'Panitia KPR',
+      actorRole: session?.role || 'kpr_admin',
+      action: 'DPT_QUICK_ADD',
+      description: `Menambahkan pemilih mandiri baru ke DPT: ${name} (${nim}) - Angkatan ${generation} (Dev Mode).`,
+      ipAddress: ip,
+      details: { nim, name, email, generation },
+    });
 
     return NextResponse.json({
       success: true,

@@ -41,6 +41,13 @@ import {
   Eye,
   Image as ImageIcon,
   Menu,
+  Printer,
+  History,
+  UserCog,
+  ToggleLeft,
+  ToggleRight,
+  KeyRound,
+  Activity,
 } from 'lucide-react';
 
 interface TallyItem {
@@ -81,6 +88,29 @@ interface CandidateItem {
   vice_chairman_cv_url?: string | null;
 }
 
+interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  actor_email: string;
+  actor_name: string;
+  actor_role: string;
+  action: string;
+  description: string;
+  ip_address: string;
+  details?: Record<string, unknown> | null;
+}
+
+interface AdminUserItem {
+  id: string;
+  nim?: string;
+  name: string;
+  email: string;
+  role: 'super_admin' | 'kpr_admin' | 'auditor';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 function formatDateTimeLocal(isoString: string): string {
   try {
     const d = new Date(isoString);
@@ -96,7 +126,7 @@ export default function AdminDashboardPage() {
   const router = useRouter();
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'candidates' | 'dpt' | 'tally' | 'settings' | 'emails'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'candidates' | 'dpt' | 'tally' | 'settings' | 'emails' | 'audit' | 'admins'>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Admin user & roles
@@ -205,6 +235,41 @@ export default function AdminDashboardPage() {
   const [isResettingBallots, setIsResettingBallots] = useState(false);
   const [ballotActionMessage, setBallotActionMessage] = useState<string | null>(null);
 
+  // State Modal Pratinjau Berita Acara (BAST)
+  const [isBastModalOpen, setIsBastModalOpen] = useState(false);
+
+  // State Audit Logs & Audit Trail
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const [auditFilterAction, setAuditFilterAction] = useState<string>('all');
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [auditStats, setAuditStats] = useState<{
+    total: number;
+    settingsCount: number;
+    candidatesCount: number;
+    dptCount: number;
+    broadcastCount: number;
+    adminCount: number;
+  } | null>(null);
+
+  // State Manajemen Admin
+  const [adminUsers, setAdminUsers] = useState<AdminUserItem[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [adminStats, setAdminStats] = useState<{
+    total: number;
+    superAdminCount: number;
+    kprAdminCount: number;
+    auditorCount: number;
+  } | null>(null);
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [adminFormName, setAdminFormName] = useState('');
+  const [adminFormEmail, setAdminFormEmail] = useState('');
+  const [adminFormNim, setAdminFormNim] = useState('');
+  const [adminFormRole, setAdminFormRole] = useState<'kpr_admin' | 'auditor' | 'super_admin'>('kpr_admin');
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminActionMessage, setAdminActionMessage] = useState<string | null>(null);
+  const [adminErrorMessage, setAdminErrorMessage] = useState<string | null>(null);
+
   // Kunci scroll halaman (body & html) saat modal atau menu drawer terbuka
   useEffect(() => {
     const shouldLock =
@@ -212,7 +277,8 @@ export default function AdminDashboardPage() {
       isEmergencyModalOpen ||
       isConfirmBroadcastOpen ||
       isSidebarOpen ||
-      isQuickAddModalOpen;
+      isQuickAddModalOpen ||
+      adminModalOpen;
     if (shouldLock) {
       const originalBodyOverflow = document.body.style.overflow;
       const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -225,6 +291,7 @@ export default function AdminDashboardPage() {
           else if (isEmergencyModalOpen && !settingsSaving) setIsEmergencyModalOpen(false);
           else if (candidateModalOpen && !savingCandidate && !uploadingPhoto && !uploadingChairmanCv && !uploadingViceChairmanCv) setCandidateModalOpen(false);
           else if (isQuickAddModalOpen && !quickAddLoading) setIsQuickAddModalOpen(false);
+          else if (adminModalOpen && !adminSaving) setAdminModalOpen(false);
           else if (isSidebarOpen) setIsSidebarOpen(false);
         }
       };
@@ -242,6 +309,7 @@ export default function AdminDashboardPage() {
     isConfirmBroadcastOpen,
     isSidebarOpen,
     isQuickAddModalOpen,
+    adminModalOpen,
     isBroadcasting,
     settingsSaving,
     savingCandidate,
@@ -249,6 +317,7 @@ export default function AdminDashboardPage() {
     uploadingChairmanCv,
     uploadingViceChairmanCv,
     quickAddLoading,
+    adminSaving,
   ]);
 
   // 1. Muat profil sesi admin
@@ -377,6 +446,159 @@ export default function AdminDashboardPage() {
       fetchVoters();
     }
   }, [activeTab, fetchVoters]);
+
+  // 5. Muat data Audit Logs & Rekam Jejak
+  const fetchAuditLogs = useCallback((action = auditFilterAction, search = auditSearchQuery) => {
+    setLoadingAuditLogs(true);
+    const params = new URLSearchParams();
+    if (action && action !== 'all') params.set('action', action);
+    if (search && search.trim()) params.set('q', search.trim());
+    params.set('limit', '50');
+
+    fetch(`/api/admin/audit-logs?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success) {
+          setAuditLogs(data.logs || []);
+          if (data.stats) setAuditStats(data.stats);
+        }
+      })
+      .catch((err) => console.warn('[AuditLogs] Fetch error:', err))
+      .finally(() => setLoadingAuditLogs(false));
+  }, [auditFilterAction, auditSearchQuery]);
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab, fetchAuditLogs]);
+
+  // 6. Muat data Manajemen Admin
+  const fetchAdminUsers = useCallback(() => {
+    setLoadingAdmins(true);
+    fetch('/api/admin/manage-admins')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success) {
+          setAdminUsers(data.admins || []);
+          if (data.stats) setAdminStats(data.stats);
+        }
+      })
+      .catch((err) => console.warn('[ManageAdmins] Fetch error:', err))
+      .finally(() => setLoadingAdmins(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'admins') {
+      fetchAdminUsers();
+    }
+  }, [activeTab, fetchAdminUsers]);
+
+  // Handler Tambah Admin Baru
+  const handleSaveAdminUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminSaving(true);
+    setAdminActionMessage(null);
+    setAdminErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/manage-admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: adminFormName.trim(),
+          email: adminFormEmail.trim(),
+          nim: adminFormNim.trim() || undefined,
+          role: adminFormRole,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAdminErrorMessage(data.error || 'Gagal menambahkan administrator.');
+      } else {
+        setAdminActionMessage(`✓ Administrator ${data.admin?.name || ''} berhasil ditambahkan.`);
+        setAdminModalOpen(false);
+        setAdminFormName('');
+        setAdminFormEmail('');
+        setAdminFormNim('');
+        setAdminFormRole('kpr_admin');
+        fetchAdminUsers();
+      }
+    } catch {
+      setAdminErrorMessage('Terjadi kesalahan jaringan saat menyimpan administrator.');
+    } finally {
+      setAdminSaving(false);
+    }
+  };
+
+  // Handler Ubah Status Aktif Admin
+  const handleToggleAdminStatus = async (admin: AdminUserItem) => {
+    try {
+      const res = await fetch('/api/admin/manage-admins', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: admin.id,
+          isActive: !admin.is_active,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminActionMessage(`✓ Status ${admin.name} diubah menjadi ${!admin.is_active ? 'Aktif' : 'Nonaktif'}.`);
+        fetchAdminUsers();
+      } else {
+        alert(data.error || 'Gagal mengubah status administrator.');
+      }
+    } catch {
+      alert('Terjadi kesalahan jaringan.');
+    }
+  };
+
+  // Handler Ubah Peran Admin
+  const handleUpdateAdminRole = async (id: string, newRole: 'super_admin' | 'kpr_admin' | 'auditor') => {
+    try {
+      const res = await fetch('/api/admin/manage-admins', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          role: newRole,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminActionMessage('✓ Peran administrator berhasil diperbarui.');
+        fetchAdminUsers();
+      } else {
+        alert(data.error || 'Gagal memperbarui peran.');
+      }
+    } catch {
+      alert('Terjadi kesalahan jaringan.');
+    }
+  };
+
+  // Handler Cabut / Hapus Admin
+  const handleDeleteAdminUser = async (admin: AdminUserItem) => {
+    if (!confirm(`Apakah Anda yakin ingin mencabut akses administrator untuk ${admin.name} (${admin.email})?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/manage-admins?id=${encodeURIComponent(admin.id)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminActionMessage(`✓ Akses administrator untuk ${admin.name} berhasil dicabut.`);
+        fetchAdminUsers();
+      } else {
+        alert(data.error || 'Gagal mencabut akses administrator.');
+      }
+    } catch {
+      alert('Terjadi kesalahan jaringan saat mencabut administrator.');
+    }
+  };
 
   // Handle Logout
   const handleLogout = async () => {
@@ -876,8 +1098,241 @@ export default function AdminDashboardPage() {
   const regularCandidates = candidates.filter((c) => c.candidate_number > 0);
   const regularCount = regularCandidates.length;
 
+  const renderBeritaAcaraContent = () => {
+    const currentDateFormatted = new Intl.DateTimeFormat('id-ID', {
+      dateStyle: 'full',
+    }).format(new Date());
+
+    const currentTimeFormatted =
+      new Intl.DateTimeFormat('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta',
+      }).format(new Date()) + ' WIB';
+
+    const sortedCandidates = [...tallyData].sort((a, b) => b.voteCount - a.voteCount);
+    const leadingCandidate = sortedCandidates[0];
+
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* KOP SURAT RESMI */}
+        <div className="flex items-center justify-between gap-4 pb-4 border-b-4 border-double border-black">
+          <div className="w-20 h-20 shrink-0 flex items-center justify-center">
+            <Image
+              src="/assets/img/hmif-logo.png"
+              alt="Logo HMIF"
+              width={72}
+              height={72}
+              priority
+              className="object-contain"
+            />
+          </div>
+          <div className="flex-1 text-center font-sans">
+            <div className="text-xs sm:text-sm font-bold tracking-wider uppercase text-gray-900">
+              KOMISI PEMILIHAN RAYA (KPR)
+            </div>
+            <div className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-black">
+              HIMPUNAN MAHASISWA INFORMATIKA (HMIF)
+            </div>
+            <div className="text-xs sm:text-sm font-bold tracking-wider uppercase text-gray-900">
+              TELKOM UNIVERSITY PURWOKERTO
+            </div>
+            <p className="text-[10px] text-gray-600 mt-1 leading-tight">
+              Sekretariat: Gedung Student Center Lt. 2, Jl. D.I. Panjaitan No. 128, Purwokerto 53147
+              <br />
+              Laman Resmi: pemirahmif.org • Surel: kpr.hmif@student.telkomuniversity.ac.id
+            </p>
+          </div>
+          <div className="w-20 h-20 shrink-0 hidden sm:block" />
+        </div>
+
+        {/* JUDUL DOKUMEN */}
+        <div className="text-center space-y-1 pt-2 font-sans">
+          <div className="text-sm sm:text-base font-bold underline uppercase tracking-wide">
+            BERITA ACARA REKAPITULASI DAN PENETAPAN HASIL PEROLEHAN SUARA
+          </div>
+          <p className="text-xs font-semibold text-gray-800">
+            PEMILIHAN RAYA KETUA DAN WAKIL KETUA HMIF PERIODE 2026/2027
+          </p>
+          <p className="text-[11px] font-mono text-gray-600">
+            Nomor: 009/BA-KPR/HMIF/XI/2026
+          </p>
+        </div>
+
+        {/* PARAGRAF PEMBUKA */}
+        <p className="text-justify leading-relaxed text-xs sm:text-[13px]">
+          Pada hari ini, <strong>{currentDateFormatted}</strong> pukul {currentTimeFormatted}, bertempat di Sekretariat Komisi Pemilihan Raya (KPR) HMIF Telkom University Purwokerto, telah diselesaikan rekapitulasi akhir penghitungan suara elektronik (<em>E-Voting</em>) Pemira HMIF 2026/2027 yang diselenggarakan berasaskan Langsung, Umum, Bebas, Rahasia, Jujur, dan Adil (LUBER JURDIL) dengan rincian sebagai berikut:
+        </p>
+
+        {/* BAGIAN I: DATA PARTISIPASI PEMILIH */}
+        <div className="space-y-2">
+          <h4 className="font-bold font-sans text-xs uppercase tracking-wider text-gray-900">
+            I. DATA PARTISIPASI DAN DAFTAR PEMILIH TETAP (DPT)
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-sans">
+            <div className="p-2.5 border border-gray-300 rounded bg-gray-50">
+              <span className="text-[10px] text-gray-600 block">Total DPT Terdaftar:</span>
+              <span className="font-bold text-sm text-black font-mono">{totalDpt} Mahasiswa</span>
+            </div>
+            <div className="p-2.5 border border-gray-300 rounded bg-gray-50">
+              <span className="text-[10px] text-gray-600 block">Total Suara Masuk:</span>
+              <span className="font-bold text-sm text-black font-mono">{totalVotes} Suara</span>
+            </div>
+            <div className="p-2.5 border border-gray-300 rounded bg-gray-50">
+              <span className="text-[10px] text-gray-600 block">Tingkat Partisipasi (Turnout):</span>
+              <span className="font-bold text-sm text-black font-mono">{turnoutPercentage}%</span>
+            </div>
+          </div>
+
+          {generationData.length > 0 && (
+            <table className="w-full text-xs font-sans border-collapse border border-gray-300 mt-2">
+              <thead>
+                <tr className="bg-gray-100 text-gray-800">
+                  <th className="border border-gray-300 p-1.5 text-center w-12">No.</th>
+                  <th className="border border-gray-300 p-1.5 text-left">Angkatan Mahasiswa</th>
+                  <th className="border border-gray-300 p-1.5 text-center">Jumlah DPT</th>
+                  <th className="border border-gray-300 p-1.5 text-center">Suara Digunakan</th>
+                  <th className="border border-gray-300 p-1.5 text-center">Partisipasi (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {generationData.map((gen, idx) => (
+                  <tr key={gen.generation} className="text-gray-900">
+                    <td className="border border-gray-300 p-1.5 text-center">{idx + 1}</td>
+                    <td className="border border-gray-300 p-1.5 font-medium">Informatika Angkatan {gen.generation}</td>
+                    <td className="border border-gray-300 p-1.5 text-center font-mono">{gen.totalVoters}</td>
+                    <td className="border border-gray-300 p-1.5 text-center font-mono">{gen.votedCount}</td>
+                    <td className="border border-gray-300 p-1.5 text-center font-mono">{gen.turnoutPercentage}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* BAGIAN II: REKAPITULASI HASIL PEROLEHAN SUARA */}
+        <div className="space-y-2 pt-2">
+          <h4 className="font-bold font-sans text-xs uppercase tracking-wider text-gray-900">
+            II. HASIL PEROLEHAN SUARA PASANGAN CALON
+          </h4>
+          <table className="w-full text-xs font-sans border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100 text-gray-800">
+                <th className="border border-gray-300 p-2 text-center w-12">No.</th>
+                <th className="border border-gray-300 p-2 text-center w-16">No. Urut</th>
+                <th className="border border-gray-300 p-2 text-left">Nama Pasangan Calon / Opsi</th>
+                <th className="border border-gray-300 p-2 text-center w-28">Perolehan Suara</th>
+                <th className="border border-gray-300 p-2 text-center w-24">Persentase</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tallyData.map((cand, idx) => (
+                <tr key={cand.candidateId} className="text-gray-900">
+                  <td className="border border-gray-300 p-2 text-center">{idx + 1}</td>
+                  <td className="border border-gray-300 p-2 text-center font-bold font-mono">
+                    {cand.candidateNumber === 0 ? '-' : cand.candidateNumber.toString().padStart(2, '0')}
+                  </td>
+                  <td className="border border-gray-300 p-2 font-medium">
+                    {cand.candidateNumber === 0
+                      ? 'Kotak Kosong (Abstain Sah)'
+                      : `${cand.leaderName} & ${cand.viceLeaderName}`}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-center font-mono font-bold">
+                    {cand.voteCount} Suara
+                  </td>
+                  <td className="border border-gray-300 p-2 text-center font-mono font-bold">
+                    {cand.percentage}%
+                  </td>
+                </tr>
+              ))}
+              <tr className="bg-gray-50 font-bold text-gray-900">
+                <td colSpan={3} className="border border-gray-300 p-2 text-right">
+                  TOTAL SUARA SAH MASUK:
+                </td>
+                <td className="border border-gray-300 p-2 text-center font-mono">
+                  {totalVotes} Suara
+                </td>
+                <td className="border border-gray-300 p-2 text-center font-mono">
+                  100%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* BAGIAN III: KETETAPAN DAN PENJAMINAN KEAMANAN */}
+        <div className="space-y-1.5 pt-2 text-justify text-xs sm:text-[13px]">
+          <h4 className="font-bold font-sans text-xs uppercase tracking-wider text-gray-900">
+            III. KETETAPAN DAN INTEGRITAS SISTEM
+          </h4>
+          <p>
+            Berdasarkan hasil rekapitulasi suara di atas, pasangan calon{' '}
+            <strong>
+              {leadingCandidate
+                ? leadingCandidate.candidateNumber === 0
+                  ? 'Kotak Kosong'
+                  : `${leadingCandidate.leaderName} & ${leadingCandidate.viceLeaderName}`
+                : '-'}
+            </strong>{' '}
+            memperoleh akumulasi suara tertinggi sejumlah{' '}
+            <strong>{leadingCandidate ? leadingCandidate.voteCount : 0} suara</strong> (
+            {leadingCandidate ? leadingCandidate.percentage : 0}%).
+          </p>
+          <p className="text-[11px] text-gray-600 italic">
+            Seluruh surat suara telah diverifikasi secara kriptografis dan disimpan secara anonim tanpa rekaman identitas pemilih ke surat suara (*Ballot Secrecy*), sesuai ketetapan Komisi Pemilihan Raya HMIF Telkom University Purwokerto.
+          </p>
+        </div>
+
+        {/* BAGIAN IV: TANDA TANGAN PIHAK-PIHAK */}
+        <div className="pt-6 font-sans text-xs">
+          <p className="text-right text-gray-700 mb-6">
+            Purwokerto, {currentDateFormatted}
+          </p>
+          <div className="grid grid-cols-2 gap-y-10 gap-x-8 text-center">
+            <div>
+              <p className="font-bold text-gray-800">Ketua Panitia KPR HMIF</p>
+              <div className="h-14 flex items-center justify-center">
+                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan &amp; Cap )</span>
+              </div>
+              <p className="font-bold underline text-black">Marzhendo Galang Saputra</p>
+              <p className="text-[11px] text-gray-600">NIM. 103112400102</p>
+            </div>
+
+            <div>
+              <p className="font-bold text-gray-800">Sekretaris KPR HMIF</p>
+              <div className="h-14 flex items-center justify-center">
+                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan )</span>
+              </div>
+              <p className="font-bold underline text-black">Siti Nurhaliza</p>
+              <p className="text-[11px] text-gray-600">NIM. 103012400015</p>
+            </div>
+
+            <div>
+              <p className="font-bold text-gray-800">Saksi Paslon 01</p>
+              <div className="h-14 flex items-center justify-center">
+                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan )</span>
+              </div>
+              <p className="font-bold underline text-black">( ........................................ )</p>
+              <p className="text-[11px] text-gray-600">Saksi Mandat Resmi</p>
+            </div>
+
+            <div>
+              <p className="font-bold text-gray-800">Pengawas Pemira / DPM</p>
+              <div className="h-14 flex items-center justify-center">
+                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan )</span>
+              </div>
+              <p className="font-bold underline text-black">( ........................................ )</p>
+              <p className="text-[11px] text-gray-600">Dewan Perwakilan Mahasiswa</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-surface font-montserrat text-on-surface antialiased min-h-screen flex selection:bg-primary selection:text-on-primary">
+    <>
+      <div className="print:hidden bg-surface font-montserrat text-on-surface antialiased min-h-screen flex selection:bg-primary selection:text-on-primary">
       {/* Mobile Sidebar Backdrop */}
       {isSidebarOpen && (
         <div
@@ -1036,6 +1491,40 @@ export default function AdminDashboardPage() {
               <Mail className="w-4 h-4" />
               <span>Broadcast Email</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('audit');
+                setIsSidebarOpen(false);
+              }}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === 'audit'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Audit Log</span>
+            </button>
+
+            {userRole === 'super_admin' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('admins');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'admins'
+                    ? 'bg-primary text-on-primary shadow-sm'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+              >
+                <UserCog className="w-4 h-4" />
+                <span>Kelola Admin</span>
+              </button>
+            )}
           </nav>
         </div>
 
@@ -1795,10 +2284,10 @@ export default function AdminDashboardPage() {
 
                     <button
                       type="button"
-                      onClick={() => window.print()}
+                      onClick={() => setIsBastModalOpen(true)}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-xs font-semibold hover:bg-surface-bright transition-colors border border-outline-variant/30"
                     >
-                      <Download className="w-4 h-4 text-primary" />
+                      <FileText className="w-4 h-4 text-primary" />
                       <span>Cetak Berita Acara</span>
                     </button>
                   </div>
@@ -2343,6 +2832,453 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB 7: AUDIT LOG & REKAM JEJAK SISTEM */}
+            {activeTab === 'audit' && (
+              <div className="space-y-6">
+                {/* Header Section */}
+                <div className="rounded-2xl bg-surface-container p-6 sm:p-7 border border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
+                      <History className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-bold text-on-surface flex items-center gap-2">
+                        Audit Trail &amp; Rekam Jejak Sistem
+                      </h2>
+                      <p className="text-xs text-outline mt-0.5">
+                        Transparansi penuh seluruh aktivitas konfigurasi, perubahan paslon, DPT, dan aksi administratif panitia.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start md:self-auto">
+                    <button
+                      type="button"
+                      disabled={loadingAuditLogs}
+                      onClick={() => fetchAuditLogs()}
+                      className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center gap-1.5 border border-outline-variant/30 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingAuditLogs ? 'animate-spin' : ''}`} />
+                      <span>Segarkan Log</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Audit Statistics Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Total Log</span>
+                    <span className="text-xl sm:text-2xl font-bold text-on-surface mt-2 font-mono">
+                      {auditStats?.total || auditLogs.length}
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Konfigurasi</span>
+                    <span className="text-xl sm:text-2xl font-bold text-blue-400 mt-2 font-mono">
+                      {auditStats?.settingsCount || 0}
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Paslon</span>
+                    <span className="text-xl sm:text-2xl font-bold text-emerald-400 mt-2 font-mono">
+                      {auditStats?.candidatesCount || 0}
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">DPT &amp; Pemilih</span>
+                    <span className="text-xl sm:text-2xl font-bold text-amber-400 mt-2 font-mono">
+                      {auditStats?.dptCount || 0}
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Broadcast</span>
+                    <span className="text-xl sm:text-2xl font-bold text-purple-400 mt-2 font-mono">
+                      {auditStats?.broadcastCount || 0}
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Administrator</span>
+                    <span className="text-xl sm:text-2xl font-bold text-primary mt-2 font-mono">
+                      {auditStats?.adminCount || 0}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Filter & Search Bar */}
+                <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-outline" />
+                    <input
+                      type="text"
+                      placeholder="Cari pelaksana, email, atau rincian aksi..."
+                      value={auditSearchQuery}
+                      onChange={(e) => {
+                        setAuditSearchQuery(e.target.value);
+                        fetchAuditLogs(auditFilterAction, e.target.value);
+                      }}
+                      className="w-full pl-10 pr-4 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary placeholder:text-outline/60"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3.5 h-3.5 text-outline shrink-0 ml-1" />
+                    <select
+                      value={auditFilterAction}
+                      onChange={(e) => {
+                        setAuditFilterAction(e.target.value);
+                        fetchAuditLogs(e.target.value, auditSearchQuery);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">Semua Kategori Aktivitas</option>
+                      <option value="ELECTION_SETTINGS_UPDATE">Pengaturan Jadwal &amp; Jam</option>
+                      <option value="MAINTENANCE_TOGGLE">Mode Pemeliharaan</option>
+                      <option value="CANDIDATE_CREATE">Pendaftaran Paslon</option>
+                      <option value="CANDIDATE_UPDATE">Pembaruan Paslon</option>
+                      <option value="CANDIDATE_DELETE">Penghapusan Paslon</option>
+                      <option value="KOTAK_KOSONG_TOGGLE">Sakelar Kotak Kosong</option>
+                      <option value="DPT_QUICK_ADD">Tambah Pemilih Cepat</option>
+                      <option value="DPT_BATCH_IMPORT">Impor DPT Massal</option>
+                      <option value="BROADCAST_EMAIL_SENT">Broadcast Email</option>
+                      <option value="BALLOTS_RESET">Reset Surat Suara</option>
+                      <option value="ADMIN_CREATE">Tambah Administrator</option>
+                      <option value="ADMIN_UPDATE_ROLE">Ubah Peran Administrator</option>
+                      <option value="ADMIN_REVOKE">Cabut Akses Administrator</option>
+                    </select>
+
+                    {(auditFilterAction !== 'all' || auditSearchQuery) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuditFilterAction('all');
+                          setAuditSearchQuery('');
+                          fetchAuditLogs('all', '');
+                        }}
+                        className="px-3 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-outline hover:text-on-surface text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Audit Logs Table */}
+                <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-surface-container-highest/60 text-outline uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
+                        <tr>
+                          <th className="py-3 px-4">Waktu</th>
+                          <th className="py-3 px-4">Pelaksana / Admin</th>
+                          <th className="py-3 px-4">Kategori Aksi</th>
+                          <th className="py-3 px-4">Deskripsi Aktivitas</th>
+                          <th className="py-3 px-4 text-right">Alamat IP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/10 text-on-surface">
+                        {loadingAuditLogs ? (
+                          <tr>
+                            <td colSpan={5} className="py-12 text-center text-outline">
+                              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
+                              <span>Memuat rekam jejak audit...</span>
+                            </td>
+                          </tr>
+                        ) : auditLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-12 text-center text-outline">
+                              <ShieldAlert className="w-8 h-8 mx-auto mb-2 text-outline/40" />
+                              <p className="font-semibold text-sm text-on-surface">Tidak ada log audit yang cocok</p>
+                              <p className="text-xs text-outline mt-1">Coba sesuaikan kata kunci pencarian atau kategori filter.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          auditLogs.map((log) => {
+                            const dateObj = new Date(log.timestamp);
+                            const formattedTime = !isNaN(dateObj.getTime())
+                              ? dateObj.toLocaleString('id-ID', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                })
+                              : log.timestamp;
+
+                            // Badge style per action type
+                            let badgeBg = 'bg-surface-container-highest text-outline border-outline-variant/30';
+                            let categoryLabel = log.action;
+                            if (log.action.startsWith('ELECTION_') || log.action.startsWith('MAINTENANCE_')) {
+                              badgeBg = 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+                              categoryLabel = 'Konfigurasi';
+                            } else if (log.action.startsWith('CANDIDATE_') || log.action.startsWith('KOTAK_')) {
+                              badgeBg = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                              categoryLabel = 'Kandidat';
+                            } else if (log.action.startsWith('DPT_')) {
+                              badgeBg = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+                              categoryLabel = 'DPT Pemilih';
+                            } else if (log.action.startsWith('BROADCAST_')) {
+                              badgeBg = 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+                              categoryLabel = 'Broadcast';
+                            } else if (log.action.startsWith('ADMIN_')) {
+                              badgeBg = 'bg-primary/10 text-primary border-primary/30';
+                              categoryLabel = 'Akses Admin';
+                            } else if (log.action.startsWith('BALLOTS_')) {
+                              badgeBg = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+                              categoryLabel = 'Reset Suara';
+                            }
+
+                            return (
+                              <tr key={log.id} className="hover:bg-surface-container-high/40 transition-colors">
+                                <td className="py-3.5 px-4 font-mono text-[11px] whitespace-nowrap text-outline">
+                                  {formattedTime}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-semibold text-on-surface">{log.actor_name}</div>
+                                  <div className="text-[11px] text-outline font-mono">{log.actor_email}</div>
+                                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container-highest text-outline">
+                                    {log.actor_role.replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold border ${badgeBg}`}>
+                                    {categoryLabel}
+                                  </span>
+                                  <span className="block text-[10px] text-outline font-mono mt-1">
+                                    {log.action}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-medium text-on-surface leading-relaxed max-w-lg">
+                                    {log.description}
+                                  </div>
+                                  {log.details && Object.keys(log.details).length > 0 && (
+                                    <details className="mt-1.5 text-[11px] text-outline cursor-pointer">
+                                      <summary className="hover:text-primary transition-colors select-none font-semibold">
+                                        Rincian Parameter
+                                      </summary>
+                                      <pre className="mt-1.5 p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/20 font-mono text-[10px] text-on-surface overflow-x-auto max-w-md">
+                                        {JSON.stringify(log.details, null, 2)}
+                                      </pre>
+                                    </details>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-right font-mono text-[11px] text-outline whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Shield className="w-3 h-3 text-outline/60" />
+                                    <span>{log.ip_address}</span>
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 8: MANAJEMEN ADMIN (SUPERADMIN ONLY) */}
+            {activeTab === 'admins' && (
+              <div className="space-y-6">
+                {userRole !== 'super_admin' ? (
+                  <div className="p-8 rounded-2xl bg-surface-container border border-error/30 text-center max-w-xl mx-auto space-y-3">
+                    <ShieldAlert className="w-12 h-12 text-error mx-auto" />
+                    <h3 className="text-base font-bold text-on-surface">Akses Dibatasi Khusus Superadmin</h3>
+                    <p className="text-xs text-outline leading-relaxed">
+                      Wewenang penambahan panitia dan pembagian peran hanya dapat dikelola langsung oleh akun Superadmin utama (<span className="text-primary font-mono">marzhendogalangs@gmail.com</span>).
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Header Section */}
+                    <div className="rounded-2xl bg-surface-container p-6 sm:p-7 border border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
+                          <UserCog className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg sm:text-xl font-bold text-on-surface flex items-center gap-2">
+                            Manajemen Administrator &amp; Panitia
+                          </h2>
+                          <p className="text-xs text-outline mt-0.5">
+                            Kontrol otorisasi peran panitia Komisi Pemilihan Raya (KPR), Auditor Independen (DPM), dan Superadmin.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start md:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdminErrorMessage(null);
+                            setAdminModalOpen(true);
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          <span>Tambah Admin Baru</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Feedback Messages */}
+                    {adminActionMessage && (
+                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between">
+                        <span>{adminActionMessage}</span>
+                        <button
+                          type="button"
+                          onClick={() => setAdminActionMessage(null)}
+                          className="text-emerald-400 hover:opacity-80 p-1"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Statistics Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
+                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Total Pengelola</span>
+                        <span className="text-2xl font-bold text-on-surface mt-2 block font-mono">
+                          {adminStats?.total || adminUsers.length}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
+                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Superadmin</span>
+                        <span className="text-2xl font-bold text-primary mt-2 block font-mono">
+                          {adminStats?.superAdminCount || 0}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
+                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Panitia KPR</span>
+                        <span className="text-2xl font-bold text-blue-400 mt-2 block font-mono">
+                          {adminStats?.kprAdminCount || 0}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
+                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Auditor Independen</span>
+                        <span className="text-2xl font-bold text-purple-400 mt-2 block font-mono">
+                          {adminStats?.auditorCount || 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Table of Admins */}
+                    <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-surface-container-highest/60 text-outline uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
+                            <tr>
+                              <th className="py-3 px-4">Nama Lengkap &amp; NIM</th>
+                              <th className="py-3 px-4">Email SSO / Akun</th>
+                              <th className="py-3 px-4">Peran (Role)</th>
+                              <th className="py-3 px-4">Status Akun</th>
+                              <th className="py-3 px-4 text-right">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-outline-variant/10 text-on-surface">
+                            {loadingAdmins ? (
+                              <tr>
+                                <td colSpan={5} className="py-12 text-center text-outline">
+                                  <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
+                                  <span>Memuat daftar administrator...</span>
+                                </td>
+                              </tr>
+                            ) : adminUsers.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="py-8 text-center text-outline">
+                                  Belum ada administrator terdaftar.
+                                </td>
+                              </tr>
+                            ) : (
+                              adminUsers.map((admin) => {
+                                const isPrimarySuperadmin = admin.email === 'marzhendogalangs@gmail.com';
+
+                                return (
+                                  <tr key={admin.id} className="hover:bg-surface-container-high/40 transition-colors">
+                                    <td className="py-3.5 px-4">
+                                      <div className="font-semibold text-on-surface flex items-center gap-2">
+                                        <span>{admin.name}</span>
+                                        {isPrimarySuperadmin && (
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/20 text-primary border border-primary/30">
+                                            Owner
+                                          </span>
+                                        )}
+                                      </div>
+                                      {admin.nim && (
+                                        <div className="text-[11px] text-outline font-mono mt-0.5">
+                                          NIM: {admin.nim}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="py-3.5 px-4 font-mono text-[11px] text-on-surface">
+                                      {admin.email}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      {isPrimarySuperadmin ? (
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30 inline-block">
+                                          Superadmin
+                                        </span>
+                                      ) : (
+                                        <select
+                                          value={admin.role}
+                                          onChange={(e) =>
+                                            handleUpdateAdminRole(
+                                              admin.id,
+                                              e.target.value as 'super_admin' | 'kpr_admin' | 'auditor'
+                                            )
+                                          }
+                                          className="px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer font-medium"
+                                        >
+                                          <option value="kpr_admin">Panitia KPR</option>
+                                          <option value="auditor">Auditor Independen</option>
+                                          <option value="super_admin">Superadmin</option>
+                                        </select>
+                                      )}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      <button
+                                        type="button"
+                                        disabled={isPrimarySuperadmin}
+                                        onClick={() => handleToggleAdminStatus(admin)}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                          admin.is_active
+                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
+                                            : 'bg-outline/10 text-outline border border-outline/30 hover:bg-outline/20'
+                                        } ${isPrimarySuperadmin ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                      >
+                                        <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-emerald-400' : 'bg-outline'}`} />
+                                        <span>{admin.is_active ? 'Aktif' : 'Nonaktif'}</span>
+                                      </button>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                      {!isPrimarySuperadmin && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteAdminUser(admin)}
+                                          className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                          title="Cabut Akses Administrator"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -3074,6 +4010,205 @@ export default function AdminDashboardPage() {
           </div>
         </Portal>
       )}
+
+      {/* MODAL TAMBAH ADMINISTRATOR BARU */}
+      {adminModalOpen && (
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !adminSaving) {
+                setAdminModalOpen(false);
+              }
+            }}
+          >
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
+                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                      <UserPlus className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-on-surface">Tambah Administrator Baru</h3>
+                      <p className="text-xs text-outline mt-0.5">Berikan hak akses panitia atau auditor Pemira.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminModalOpen(false)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {adminErrorMessage && (
+                  <div className="p-3 rounded-xl bg-error/10 border border-error/30 text-error text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{adminErrorMessage}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveAdminUser} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      Nama Lengkap Administrator <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Dimas Wahyu Pratama"
+                      value={adminFormName}
+                      onChange={(e) => setAdminFormName(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      Email SSO Kampus / Akun <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="Contoh: dimas@student.telkomuniversity.ac.id"
+                      value={adminFormEmail}
+                      onChange={(e) => setAdminFormEmail(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                    />
+                    <span className="text-[10px] text-outline mt-1 block">
+                      Email ini digunakan untuk login SSO / OTP ke bilik dan dashboard.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      NIM (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 103012300088"
+                      value={adminFormNim}
+                      onChange={(e) => setAdminFormNim(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-outline font-semibold mb-1">
+                      Wewenang &amp; Peran (Role) <span className="text-error">*</span>
+                    </label>
+                    <select
+                      value={adminFormRole}
+                      onChange={(e) => setAdminFormRole(e.target.value as 'kpr_admin' | 'auditor' | 'super_admin')}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                    >
+                      <option value="kpr_admin">Panitia KPR (Hak operasional penuh, paslon, DPT &amp; broadcast)</option>
+                      <option value="auditor">Auditor Independen (Pengawas read-only &amp; rekapitulasi pasca pemilihan)</option>
+                      <option value="super_admin">Superadmin (Wewenang tertinggi &amp; manajemen admin)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+                    <button
+                      type="button"
+                      disabled={adminSaving}
+                      onClick={() => setAdminModalOpen(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={adminSaving}
+                      className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                    >
+                      {adminSaving ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Menyimpan...</span>
+                        </>
+                      ) : (
+                        <span>Simpan Administrator</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal Pratinjau Dokumen Berita Acara (BAST) */}
+      {isBastModalOpen && (
+        <Portal>
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center animate-in fade-in duration-200"
+            onClick={() => setIsBastModalOpen(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-4xl bg-white text-black rounded-2xl shadow-2xl overflow-hidden my-auto border border-gray-300 flex flex-col max-h-[90vh]"
+            >
+              {/* Controls Bar Atas */}
+              <div className="bg-gray-100 px-6 py-3.5 border-b border-gray-300 flex items-center justify-between text-gray-800 shrink-0">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-amber-600" />
+                  <span className="font-bold text-sm">Pratinjau Berita Acara Rekapitulasi Suara (BAST)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Cetak / Simpan PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsBastModalOpen(false)}
+                    className="p-2 rounded-lg hover:bg-gray-200 text-gray-600 transition-colors cursor-pointer"
+                    aria-label="Tutup"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Dokumen Paper Preview */}
+              <div className="p-8 sm:p-12 overflow-y-auto font-serif text-[13px] leading-relaxed text-black bg-white">
+                {renderBeritaAcaraContent()}
+              </div>
+
+              {/* Controls Bar Bawah */}
+              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 shrink-0">
+                <span>Dokumen sah Komisi Pemilihan Raya HMIF Telkom University Purwokerto</span>
+                <button
+                  type="button"
+                  onClick={() => setIsBastModalOpen(false)}
+                  className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium cursor-pointer"
+                >
+                  Tutup Pratinjau
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
+
+    {/* Dokumen Bersih Khusus Cetak Kertas A4 (Print-Only) */}
+    <div className="hidden print:block bg-white text-black font-serif text-[12px] leading-relaxed p-6">
+      {renderBeritaAcaraContent()}
+    </div>
+  </>
   );
 }

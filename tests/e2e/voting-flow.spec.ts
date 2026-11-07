@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Voting Chamber & Digital Receipt Journey E2E Tests', () => {
   test('Full voter journey: select candidate, confirm vote, and receive digital receipt', async ({ page }) => {
     // 1. Login as active eligible voter: Ahmad Rizky Pratama
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await expect(page).toHaveURL(/\/vote/);
@@ -33,11 +33,17 @@ test.describe('Voting Chamber & Digital Receipt Journey E2E Tests', () => {
     await expect(page.getByRole('heading', { name: 'Suara Tercatat' })).toBeVisible();
     await expect(page.locator('body')).toContainText('Token Bukti Pemilihan');
     await expect(page.locator('body')).toContainText('Rahasia (Asas Luber)');
+
+    // 6. Test Receipt Verification button
+    const verifyReceiptBtn = page.getByRole('button', { name: /Cek Keabsahan Bukti Pemilihan/i });
+    await expect(verifyReceiptBtn).toBeVisible();
+    await verifyReceiptBtn.click();
+    await expect(page.locator('body')).toContainText('Tanda terima sah dan terverifikasi');
   });
 
   test('Voter who has already voted cannot re-enter /vote and is routed to /receipt', async ({ page }) => {
     // Login as Budi Santoso (mock user who has already voted)
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Budi Santoso' }).click();
 
@@ -51,7 +57,7 @@ test.describe('Voting Chamber & Digital Receipt Journey E2E Tests', () => {
   });
 
   test('Session expiration popup modal triggers when timer expires and redirects to /login', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await expect(page).toHaveURL(/\/vote/);
@@ -74,7 +80,7 @@ test.describe('Voting Chamber & Digital Receipt Journey E2E Tests', () => {
 
   test('Voter can open candidate detail modal to inspect vision & mission and access separate Chairman & Vice Chairman CV download buttons', async ({ page }) => {
     // 1. Login as Ahmad Rizky Pratama
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await expect(page).toHaveURL(/\/vote/);

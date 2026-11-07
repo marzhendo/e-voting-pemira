@@ -4,6 +4,8 @@ import path from 'path';
 import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/admin';
 import { smtpMailService } from '@/lib/mail/smtp-service';
 import { findVoterByIdentifier } from '@/lib/dpt/store';
+import { findAdminByEmail } from '@/lib/admin/store';
+import type { AdminRole } from '@/lib/supabase/types';
 import type { SessionUser } from './session';
 
 export interface OtpRequestResult {
@@ -28,6 +30,7 @@ interface InMemoOtpState {
   email: string;
   generation: number;
   hasVoted: boolean;
+  role?: AdminRole | 'voter';
   otpHash: string | null;
   otpExpiresAt: number | null;
   otpAttempts: number;
@@ -269,6 +272,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         email: dptVoter.email,
         generation: dptVoter.generation,
         hasVoted: dptVoter.has_voted,
+        role: dptVoter.role || (dptVoter.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter'),
         otpHash: null,
         otpExpiresAt: null,
         otpAttempts: 0,
@@ -281,6 +285,8 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
       voterState.name = dptVoter.name;
       voterState.email = dptVoter.email;
       voterState.generation = dptVoter.generation;
+      if (dptVoter.role) voterState.role = dptVoter.role;
+      if (dptVoter.email === 'marzhendogalangs@gmail.com') voterState.role = 'super_admin';
     }
   } else {
     for (const v of devMockStore.values()) {
@@ -289,6 +295,29 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         break;
       }
     }
+  }
+
+  // Cek apakah pengakses merupakan administrator terdaftar
+  const dynamicAdmin = findAdminByEmail(cleanId) || (dptVoter ? findAdminByEmail(dptVoter.email) : null);
+  if (voterState && dynamicAdmin) {
+    voterState.role = dynamicAdmin.role;
+  } else if (!voterState && dynamicAdmin) {
+    const adminNim = dynamicAdmin.nim || '999999999999';
+    if (!devMockStore.has(adminNim)) {
+      devMockStore.set(adminNim, {
+        nim: adminNim,
+        name: dynamicAdmin.name,
+        email: dynamicAdmin.email,
+        generation: 2026,
+        hasVoted: false,
+        role: dynamicAdmin.role,
+        otpHash: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+        otpLastSentAt: null,
+      });
+    }
+    voterState = devMockStore.get(adminNim);
   }
 
   if (!voterState) {
@@ -457,6 +486,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         })
         .eq('id', voter.id);
 
+      const adminMatch = findAdminByEmail(voter.email);
       return {
         success: true,
         voter: {
@@ -464,7 +494,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
           email: voter.email,
           name: voter.name,
           nim: voter.nim,
-          role: 'voter',
+          role: adminMatch ? adminMatch.role : 'voter',
           isDptVerified: true,
           hasVoted: voter.has_voted,
           generation: voter.generation,
@@ -487,6 +517,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         email: dptVoter.email,
         generation: dptVoter.generation,
         hasVoted: dptVoter.has_voted,
+        role: dptVoter.role || (dptVoter.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter'),
         otpHash: null,
         otpExpiresAt: null,
         otpAttempts: 0,
@@ -499,6 +530,8 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
       voterState.name = dptVoter.name;
       voterState.email = dptVoter.email;
       voterState.generation = dptVoter.generation;
+      if (dptVoter.role) voterState.role = dptVoter.role;
+      if (dptVoter.email === 'marzhendogalangs@gmail.com') voterState.role = 'super_admin';
     }
   } else {
     for (const v of devMockStore.values()) {
@@ -507,6 +540,29 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         break;
       }
     }
+  }
+
+  // Cek apakah pengakses merupakan administrator terdaftar
+  const dynamicAdmin = findAdminByEmail(cleanId) || (dptVoter ? findAdminByEmail(dptVoter.email) : null);
+  if (voterState && dynamicAdmin) {
+    voterState.role = dynamicAdmin.role;
+  } else if (!voterState && dynamicAdmin) {
+    const adminNim = dynamicAdmin.nim || '999999999999';
+    if (!devMockStore.has(adminNim)) {
+      devMockStore.set(adminNim, {
+        nim: adminNim,
+        name: dynamicAdmin.name,
+        email: dynamicAdmin.email,
+        generation: 2026,
+        hasVoted: false,
+        role: dynamicAdmin.role,
+        otpHash: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+        otpLastSentAt: null,
+      });
+    }
+    voterState = devMockStore.get(adminNim);
   }
 
   if (!voterState) {
@@ -578,9 +634,9 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
       email: voterState.email,
       name: voterState.name,
       nim: voterState.nim,
-      role: 'voter',
+      role: voterState.role || (voterState.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter'),
       isDptVerified: true,
-      hasVoted: false,
+      hasVoted: voterState.hasVoted,
       generation: voterState.generation,
     },
   };

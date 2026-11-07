@@ -22,7 +22,7 @@ test.describe('Mobile Viewport & Touch Responsiveness E2E Tests', () => {
 
   test('Mobile Vote Chamber has responsive photo card, tap targets, and safe area', async ({ page }) => {
     // Login as student
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     const devDrawerButton = page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' });
     await devDrawerButton.click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
@@ -49,7 +49,7 @@ test.describe('Mobile Viewport & Touch Responsiveness E2E Tests', () => {
 
   test('Mobile Admin Dashboard opens collapsible sidebar drawer via hamburger menu', async ({ page }) => {
     // Login as Admin
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     const devDrawerButton = page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' });
     await devDrawerButton.click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();

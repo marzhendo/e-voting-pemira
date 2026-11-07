@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
+import { recordAuditLog } from '@/lib/audit/store';
 import { importVotersBatch } from '@/lib/dpt/store';
 
 const dptImportRowSchema = z.object({
@@ -115,14 +116,17 @@ export async function POST(request: NextRequest) {
         const insertedCount = insertedData ? insertedData.length : validatedRecords.length;
 
         // 3. Catat ke Audit Log
-        await adminSupabase.from('audit_logs').insert({
-          actor_email: session?.email || 'unknown_admin',
-          action: 'IMPORT_DPT',
+        await recordAuditLog({
+          actorEmail: session?.email || 'admin@pemira.local',
+          actorName: session?.name || 'Panitia KPR',
+          actorRole: session?.role || 'kpr_admin',
+          action: 'DPT_BATCH_IMPORT',
+          description: `Mengimpor ${insertedCount} pemilih baru ke dalam DPT.`,
+          ipAddress: clientIp,
           details: {
             total_imported: insertedCount,
             cohorts_included: Array.from(new Set(validatedRecords.map((r) => r.generation))),
           },
-          ip_address: clientIp,
         });
 
         return NextResponse.json({
@@ -138,6 +142,20 @@ export async function POST(request: NextRequest) {
 
     // Dev store fallback
     const result = importVotersBatch(validatedRecords);
+    const clientIp = getClientIp(request);
+    await recordAuditLog({
+      actorEmail: session?.email || 'admin@pemira.local',
+      actorName: session?.name || 'Panitia KPR',
+      actorRole: session?.role || 'kpr_admin',
+      action: 'DPT_BATCH_IMPORT',
+      description: `Mengimpor ${result.insertedCount} pemilih baru ke dalam DPT (Mode Dev).`,
+      ipAddress: clientIp,
+      details: {
+        total_imported: result.insertedCount,
+        cohorts_included: Array.from(new Set(validatedRecords.map((r) => r.generation))),
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: `Berhasil mengimpor ${result.insertedCount} pemilih baru ke dalam Daftar Pemilih Tetap (DPT) (Mode Dev).`,

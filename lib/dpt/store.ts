@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type { AdminRole } from '@/lib/supabase/types';
 
 export interface VoterRecord {
   id: string;
@@ -8,6 +9,9 @@ export interface VoterRecord {
   email: string;
   generation: number;
   has_voted: boolean;
+  role?: AdminRole | 'voter';
+  receipt_hash?: string;
+  voted_at?: string;
   updated_at?: string;
   created_at?: string;
 }
@@ -85,6 +89,16 @@ const DEFAULT_VOTERS: VoterRecord[] = [
     has_voted: false,
     updated_at: new Date().toISOString(),
   },
+  {
+    id: 'admin-super-marzhendo',
+    nim: '999999999999',
+    name: 'Marzhendo Galang (Superadmin)',
+    email: 'marzhendogalangs@gmail.com',
+    generation: 2024,
+    role: 'super_admin',
+    has_voted: false,
+    updated_at: new Date().toISOString(),
+  },
 ];
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -103,10 +117,6 @@ function ensureDataDir(): void {
 let inMemoryVoters: VoterRecord[] | null = null;
 
 export function getAllVoters(): VoterRecord[] {
-  if (inMemoryVoters !== null) {
-    return inMemoryVoters;
-  }
-
   ensureDataDir();
   try {
     if (fs.existsSync(STORE_PATH)) {
@@ -116,6 +126,10 @@ export function getAllVoters(): VoterRecord[] {
     }
   } catch (err) {
     console.warn('[DptStore] Failed to read store file, using defaults:', err);
+  }
+
+  if (inMemoryVoters !== null) {
+    return inMemoryVoters;
   }
 
   inMemoryVoters = [...DEFAULT_VOTERS];
@@ -260,15 +274,22 @@ export function addSingleVoter(voter: {
   return { success: true, voter: newVoter };
 }
 
-export function markVoterAsVoted(identifier: string): boolean {
+export function markVoterAsVoted(identifier: string, receiptHash?: string): boolean {
   const current = getAllVoters();
   const clean = identifier.trim().toLowerCase();
   let found = false;
+  const now = new Date().toISOString();
 
   const updated = current.map((v) => {
     if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean) {
       found = true;
-      return { ...v, has_voted: true, updated_at: new Date().toISOString() };
+      return {
+        ...v,
+        has_voted: true,
+        receipt_hash: receiptHash || v.receipt_hash,
+        voted_at: v.voted_at || now,
+        updated_at: now,
+      };
     }
     return v;
   });
@@ -277,6 +298,24 @@ export function markVoterAsVoted(identifier: string): boolean {
     saveVotersStore(updated);
   }
   return found;
+}
+
+export function resetVoterVoteStatus(identifier: string): void {
+  const current = getAllVoters();
+  const clean = identifier.trim().toLowerCase();
+  const updated = current.map((v) => {
+    if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean) {
+      return {
+        ...v,
+        has_voted: false,
+        receipt_hash: undefined,
+        voted_at: undefined,
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return v;
+  });
+  saveVotersStore(updated);
 }
 
 export function resetVotersStore(): void {

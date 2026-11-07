@@ -70,7 +70,8 @@ export function saveBallotsStore(ballots: AnonymousBallot[]): void {
  */
 export function castBallotAtomicDev(
   nim: string,
-  candidateId: string
+  candidateId: string,
+  receiptHash?: string
 ): { success: boolean; code: string; message: string; ballotId?: string } {
   const voter = findVoterByIdentifier(nim);
 
@@ -101,8 +102,8 @@ export function castBallotAtomicDev(
     };
   }
 
-  // 1. Kunci status pemilih
-  markVoterAsVoted(voter.nim);
+  // 1. Kunci status pemilih dan simpan hash tanda terima (Ballot Secrecy Terjaga)
+  markVoterAsVoted(voter.nim, receiptHash);
 
   // 2. Simpan suara anonim (Ballot Secrecy Terpenuhi)
   const currentBallots = getAllBallots();

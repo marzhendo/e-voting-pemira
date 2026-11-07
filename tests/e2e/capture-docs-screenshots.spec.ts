@@ -32,6 +32,7 @@ test.describe('Documentation Screenshot Captures', () => {
 
     // 3. Voting Chamber (Bilik Suara)
     // Log in as active eligible voter: Ahmad Rizky Pratama
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await expect(page).toHaveURL(/\/vote/);
@@ -61,7 +62,7 @@ test.describe('Documentation Screenshot Captures', () => {
     await saveScreenshot(page, '05-digital-receipt.png', true);
 
     // 6. Admin Dashboard - Overview Tab
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
     await expect(page).toHaveURL(/\/admin\/dashboard/);
@@ -102,7 +103,7 @@ test.describe('Documentation Screenshot Captures', () => {
   });
 
   test('Capture session expired modal', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await expect(page).toHaveURL(/\/vote/);
@@ -114,7 +115,7 @@ test.describe('Documentation Screenshot Captures', () => {
   });
 
   test('Capture candidate detail and CV modal', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ahmad Rizky Pratama' }).click();
     await expect(page).toHaveURL(/\/vote/);

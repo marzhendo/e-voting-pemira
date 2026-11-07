@@ -5,6 +5,7 @@ import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getDevElectionSettings, updateDevElectionSettings } from '@/lib/election/dev-settings-store';
 import { getClientIp } from '@/lib/auth/client-ip';
+import { recordAuditLog } from '@/lib/audit/store';
 import type { Database } from '@/lib/supabase/types';
 
 const updateSettingsSchema = z.object({
@@ -120,6 +121,8 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const clientIp = getClientIp(request);
+
     // Jika Supabase tidak terkonfigurasi (dev mode), simpan di in-memory store
     if (!isSupabaseConfigured()) {
       const devUpdates: Record<string, boolean | string> = {};
@@ -130,6 +133,19 @@ export async function PATCH(request: NextRequest) {
       if (allow_kotak_kosong_multi !== undefined) devUpdates.allow_kotak_kosong_multi = allow_kotak_kosong_multi;
 
       const updated = updateDevElectionSettings(devUpdates);
+
+      await recordAuditLog({
+        actorEmail: session?.email || 'admin@pemirahmif',
+        actorName: session?.name || 'Administrator',
+        actorRole: session?.role || 'kpr_admin',
+        action: maintenance_mode !== undefined ? 'MAINTENANCE_TOGGLE' : 'ELECTION_SETTINGS_UPDATE',
+        description: maintenance_mode !== undefined
+          ? `Mengubah status maintenance mode menjadi ${maintenance_mode ? 'AKTIF' : 'NONAKTIF'}. Alasan: ${reason || '-'}`
+          : `Memperbarui jadwal/status bilik suara (Buka: ${is_voting_open ?? updated.is_voting_open}).`,
+        ipAddress: clientIp,
+        details: { updates: devUpdates, reason },
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Pengaturan pemilihan berhasil diperbarui (Dev Mode).',
@@ -138,7 +154,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     const adminSupabase = createAdminClient();
-    const clientIp = getClientIp(request.headers);
 
     // Kumpulkan field yang akan diupdate
     const updatePayload: Database['public']['Tables']['election_settings']['Update'] = {

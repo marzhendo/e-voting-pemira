@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
+import { recordAuditLog } from '@/lib/audit/store';
 import { smtpMailService } from '@/lib/mail/smtp-service';
 import { getAllVoters } from '@/lib/dpt/store';
 
@@ -188,28 +189,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Catat ke Audit Log jika Supabase terhubung
-    if (isSupabaseConfigured()) {
-      try {
-        const adminSupabase = createAdminClient();
-        const clientIp = getClientIp(request.headers);
-        await adminSupabase.from('audit_logs').insert({
-          actor_email: session?.email || 'unknown_admin',
-          action: 'BROADCAST_EMAIL',
-          details: {
-            targetGroup,
-            generation,
-            totalTarget: recipients.length,
-            sentCount,
-            failedCount,
-            subject,
-          },
-          ip_address: clientIp,
-        });
-      } catch (logErr) {
-        console.warn('[BroadcastEmailRoute] Audit log insert warning:', logErr);
-      }
-    }
+    // Catat ke Audit Log & Audit Trail
+    const clientIp = getClientIp(request);
+    await recordAuditLog({
+      actorEmail: session?.email || 'admin@pemira.local',
+      actorName: session?.name || 'Panitia KPR',
+      actorRole: session?.role || 'kpr_admin',
+      action: 'BROADCAST_EMAIL_SENT',
+      description: `Mengirim broadcast email "${subject}" ke target ${targetGroup} (${sentCount} terkirim, ${failedCount} gagal).`,
+      ipAddress: clientIp,
+      details: {
+        targetGroup,
+        generation,
+        totalTarget: recipients.length,
+        sentCount,
+        failedCount,
+        subject,
+      },
+    });
 
     return NextResponse.json({
       success: true,

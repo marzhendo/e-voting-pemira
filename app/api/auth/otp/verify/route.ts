@@ -62,15 +62,23 @@ export async function POST(req: NextRequest) {
       process.env.APP_ENV === 'production' &&
       !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
 
-    const destination = result.voter.hasVoted ? '/receipt' : '/vote';
+    const isStaff = result.voter.role && result.voter.role !== 'voter';
+    const destination = isStaff
+      ? '/admin/dashboard'
+      : result.voter.hasVoted
+      ? '/receipt'
+      : '/vote';
 
     const response = NextResponse.json({
       success: true,
-      message: 'Verifikasi berhasil. Mengarahkan ke bilik suara...',
+      message: isStaff
+        ? 'Verifikasi berhasil. Mengarahkan ke dashboard administrator...'
+        : 'Verifikasi berhasil. Mengarahkan ke bilik suara...',
       redirectTo: destination,
       user: {
         name: result.voter.name,
         nim: result.voter.nim,
+        role: result.voter.role,
         hasVoted: result.voter.hasVoted,
       },
     });

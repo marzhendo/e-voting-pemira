@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { recordAuditLog } from '@/lib/audit/store';
 import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
 import { calculateLiveTally, resetBallotsStore } from '@/lib/ballots/store';
 
@@ -209,7 +211,7 @@ export async function GET() {
 /**
  * DELETE: Mereset surat suara pengujian lokal (Khusus mode pengembangan / Non-Production)
  */
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   const session = await getSession();
   const authCheck = verifyAdminAccess(session);
 
@@ -222,5 +224,16 @@ export async function DELETE() {
   }
 
   resetBallotsStore();
+
+  const clientIp = getClientIp(request);
+  await recordAuditLog({
+    actorEmail: session?.email || 'admin@pemira.local',
+    actorName: session?.name || 'Panitia KPR',
+    actorRole: session?.role || 'kpr_admin',
+    action: 'BALLOTS_RESET',
+    description: 'Mereset surat suara simulasi pengujian lokal dev.',
+    ipAddress: clientIp,
+  });
+
   return NextResponse.json({ success: true, message: 'Surat suara simulasi berhasil direset.' });
 }

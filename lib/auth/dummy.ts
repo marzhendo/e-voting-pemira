@@ -57,10 +57,11 @@ export const DUMMY_ACCOUNTS: DummyAccount[] = [
   },
   {
     id: 'superadmin',
-    name: 'Koordinator IT / Superadmin',
-    email: 'superadmin@student.telkomuniversity.ac.id',
+    name: 'Marzhendo Galang (Superadmin)',
+    email: 'marzhendogalangs@gmail.com',
+    nim: '999999999999',
     role: 'super_admin',
-    description: 'Hak akses tertinggi untuk konfigurasi sistem dan maintenance darurat.',
+    description: 'Akun Superadmin resmi dengan hak akses penuh sistem dan maintenance darurat.',
   },
   {
     id: 'kpradmin',

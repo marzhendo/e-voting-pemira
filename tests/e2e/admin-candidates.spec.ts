@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
   test('Admin can view candidates, open modal, and add new candidate', async ({ page }) => {
     // 1. Login as Admin
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
     await expect(page).toHaveURL(/\/admin\/dashboard/);
@@ -38,7 +38,7 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
 
   test('Election settings tab allows toggling voting state and schedule settings', async ({ page }) => {
     // Login as Admin
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
     await expect(page).toHaveURL(/\/admin\/dashboard/);
@@ -54,7 +54,7 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
 
   test('Broadcast email tab allows filtering recipients and previewing message', async ({ page }) => {
     // Login as Admin
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
     await expect(page).toHaveURL(/\/admin\/dashboard/);
@@ -86,7 +86,7 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
 
   test('Admin can edit Paslon 1 name, manage photo, and toggle Kotak Kosong for multi-candidates', async ({ page }) => {
     // 1. Login as Admin
-    await page.goto('/login');
+    await page.goto('/login?dev=true');
     await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
     await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
     await expect(page).toHaveURL(/\/admin\/dashboard/);
@@ -133,5 +133,30 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
       await kotakKosongToggle.click();
       await expect(page.locator('body')).toContainText('Diikutsertakan');
     }
+  });
+
+  test('Admin can open Berita Acara (BAST) preview modal from tally tab', async ({ page }) => {
+    await page.goto('/login?dev=true');
+    await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
+    await page.locator('button', { hasText: 'Ketua Panitia KPR' }).click();
+    await expect(page).toHaveURL(/\/admin\/dashboard/);
+
+    // Switch to "Rekapitulasi Suara" tab
+    await page.locator('button', { hasText: 'Rekapitulasi Suara' }).click();
+    await expect(page.locator('h1')).toContainText('Rekapitulasi Suara');
+
+    // Click Cetak Berita Acara button
+    const bastBtn = page.getByRole('button', { name: 'Cetak Berita Acara' });
+    await expect(bastBtn).toBeVisible();
+    await bastBtn.click();
+
+    // Verify modal is open with formal document content
+    await expect(page.locator('body')).toContainText('BERITA ACARA REKAPITULASI DAN PENETAPAN HASIL PEROLEHAN SUARA');
+    await expect(page.locator('body')).toContainText('HIMPUNAN MAHASISWA INFORMATIKA');
+    await expect(page.locator('body')).toContainText('Ketua Panitia KPR HMIF');
+
+    // Close preview modal
+    await page.getByRole('button', { name: 'Tutup Pratinjau' }).click();
+    await expect(page.locator('text=Pratinjau Berita Acara Rekapitulasi Suara (BAST)')).toBeHidden();
   });
 });

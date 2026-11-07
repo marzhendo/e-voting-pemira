@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { recordAuditLog } from '@/lib/audit/store';
 import {
   type CandidateRecord,
   getDevCandidates,
@@ -103,6 +105,20 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (!error && data) {
+          const ip = getClientIp(req);
+          await recordAuditLog({
+            actorEmail: session?.email || 'admin@pemira.local',
+            actorName: session?.name || 'Panitia KPR',
+            actorRole: session?.role || 'kpr_admin',
+            action: 'CANDIDATE_CREATE',
+            description: `Mendaftarkan Paslon #${newCandidate.candidate_number} (${newCandidate.leader_name} & ${newCandidate.vice_leader_name}).`,
+            ipAddress: ip,
+            details: {
+              candidate_number: newCandidate.candidate_number,
+              leader_name: newCandidate.leader_name,
+              vice_leader_name: newCandidate.vice_leader_name,
+            },
+          });
           return NextResponse.json({ success: true, candidate: data });
         }
       } catch (dbErr) {
@@ -129,6 +145,22 @@ export async function POST(req: NextRequest) {
         (a, b) => a.candidate_number - b.candidate_number
       );
       setDevCandidates(updatedList);
+
+      const ip = getClientIp(req);
+      await recordAuditLog({
+        actorEmail: session?.email || 'admin@pemira.local',
+        actorName: session?.name || 'Panitia KPR',
+        actorRole: session?.role || 'kpr_admin',
+        action: 'CANDIDATE_CREATE',
+        description: `Mendaftarkan Paslon #${newCandidate.candidate_number} (${newCandidate.leader_name} & ${newCandidate.vice_leader_name}) (Dev Mode).`,
+        ipAddress: ip,
+        details: {
+          candidate_number: newCandidate.candidate_number,
+          leader_name: newCandidate.leader_name,
+          vice_leader_name: newCandidate.vice_leader_name,
+        },
+      });
+
       return NextResponse.json({ success: true, candidate: created });
     }
 
@@ -169,6 +201,19 @@ export async function PUT(req: NextRequest) {
           .single();
 
         if (!error && data) {
+          const ip = getClientIp(req);
+          const isKotakKosong = updates.candidate_number === 0 || id === 'dev-cand-0';
+          await recordAuditLog({
+            actorEmail: session?.email || 'admin@pemira.local',
+            actorName: session?.name || 'Panitia KPR',
+            actorRole: session?.role || 'kpr_admin',
+            action: isKotakKosong ? 'KOTAK_KOSONG_TOGGLE' : 'CANDIDATE_UPDATE',
+            description: isKotakKosong
+              ? `Memperbarui status opsi Kotak Kosong (Aktif: ${updates.is_active}).`
+              : `Memperbarui data Paslon ID ${id} (${updates.leader_name || 'Kandidat'}).`,
+            ipAddress: ip,
+            details: updates,
+          });
           return NextResponse.json({ success: true, candidate: data });
         }
       } catch (dbErr) {
@@ -181,6 +226,21 @@ export async function PUT(req: NextRequest) {
       const updatedList = currentList.map((c) => (c.id === id ? { ...c, ...updates } : c));
       setDevCandidates(updatedList);
       const updated = updatedList.find((c) => c.id === id);
+
+      const ip = getClientIp(req);
+      const isKotakKosong = updates.candidate_number === 0 || id === 'dev-cand-0';
+      await recordAuditLog({
+        actorEmail: session?.email || 'admin@pemira.local',
+        actorName: session?.name || 'Panitia KPR',
+        actorRole: session?.role || 'kpr_admin',
+        action: isKotakKosong ? 'KOTAK_KOSONG_TOGGLE' : 'CANDIDATE_UPDATE',
+        description: isKotakKosong
+          ? `Memperbarui status opsi Kotak Kosong (Aktif: ${updates.is_active}) (Dev Mode).`
+          : `Memperbarui data Paslon ID ${id} (${updated?.leader_name || 'Kandidat'}) (Dev Mode).`,
+        ipAddress: ip,
+        details: updates,
+      });
+
       return NextResponse.json({ success: true, candidate: updated });
     }
 
@@ -225,6 +285,16 @@ export async function DELETE(req: NextRequest) {
           .eq('id', id);
 
         if (!error) {
+          const ip = getClientIp(req);
+          await recordAuditLog({
+            actorEmail: session?.email || 'admin@pemira.local',
+            actorName: session?.name || 'Panitia KPR',
+            actorRole: session?.role || 'kpr_admin',
+            action: 'CANDIDATE_DELETE',
+            description: `Menghapus Paslon ID ${id} (${target?.leader_name || 'Pasangan Calon'}).`,
+            ipAddress: ip,
+            details: { id, leader_name: target?.leader_name, candidate_number: target?.candidate_number },
+          });
           return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus.' });
         }
       } catch (dbErr) {
@@ -235,6 +305,18 @@ export async function DELETE(req: NextRequest) {
     if (process.env.APP_ENV !== 'production') {
       const filtered = getDevCandidates().filter((c) => c.id !== id);
       setDevCandidates(filtered);
+
+      const ip = getClientIp(req);
+      await recordAuditLog({
+        actorEmail: session?.email || 'admin@pemira.local',
+        actorName: session?.name || 'Panitia KPR',
+        actorRole: session?.role || 'kpr_admin',
+        action: 'CANDIDATE_DELETE',
+        description: `Menghapus Paslon ID ${id} (${target?.leader_name || 'Pasangan Calon'}) (Dev Mode).`,
+        ipAddress: ip,
+        details: { id, leader_name: target?.leader_name, candidate_number: target?.candidate_number },
+      });
+
       return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus (Dev Mode).' });
     }
 
