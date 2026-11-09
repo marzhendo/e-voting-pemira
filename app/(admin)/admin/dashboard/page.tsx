@@ -232,6 +232,19 @@ export default function AdminDashboardPage() {
   const [quickAddLoading, setQuickAddLoading] = useState(false);
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
 
+  // State Hapus Selektif & Reset DPT (Khusus Superadmin)
+  const [selectedVoterIds, setSelectedVoterIds] = useState<string[]>([]);
+  const [voterToDelete, setVoterToDelete] = useState<VoterRow | null>(null);
+  const [isDeletingSingleVoter, setIsDeletingSingleVoter] = useState(false);
+  const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
+  const [isDeletingBatchVoters, setIsDeletingBatchVoters] = useState(false);
+  const [isResetDptModalOpen, setIsResetDptModalOpen] = useState(false);
+  const [resetDptMode, setResetDptMode] = useState<'reset_to_default' | 'clear_all' | 'reset_vote_status'>('reset_to_default');
+  const [resetDptConfirmText, setResetDptConfirmText] = useState('');
+  const [isResettingDpt, setIsResettingDpt] = useState(false);
+  const [dptActionMessage, setDptActionMessage] = useState<string | null>(null);
+  const [dptErrorMessage, setDptErrorMessage] = useState<string | null>(null);
+
   // State Reset Ballots Simulasi
   const [isResettingBallots, setIsResettingBallots] = useState(false);
   const [ballotActionMessage, setBallotActionMessage] = useState<string | null>(null);
@@ -281,7 +294,10 @@ export default function AdminDashboardPage() {
       isConfirmBroadcastOpen ||
       isSidebarOpen ||
       isQuickAddModalOpen ||
-      adminModalOpen;
+      adminModalOpen ||
+      voterToDelete !== null ||
+      isBatchDeleteModalOpen ||
+      isResetDptModalOpen;
     if (shouldLock) {
       const originalBodyOverflow = document.body.style.overflow;
       const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -295,6 +311,9 @@ export default function AdminDashboardPage() {
           else if (candidateModalOpen && !savingCandidate && !uploadingPhoto && !uploadingChairmanCv && !uploadingViceChairmanCv) setCandidateModalOpen(false);
           else if (isQuickAddModalOpen && !quickAddLoading) setIsQuickAddModalOpen(false);
           else if (adminModalOpen && !adminSaving) setAdminModalOpen(false);
+          else if (voterToDelete && !isDeletingSingleVoter) setVoterToDelete(null);
+          else if (isBatchDeleteModalOpen && !isDeletingBatchVoters) setIsBatchDeleteModalOpen(false);
+          else if (isResetDptModalOpen && !isResettingDpt) setIsResetDptModalOpen(false);
           else if (isSidebarOpen) setIsSidebarOpen(false);
         }
       };
@@ -321,6 +340,12 @@ export default function AdminDashboardPage() {
     uploadingViceChairmanCv,
     quickAddLoading,
     adminSaving,
+    voterToDelete,
+    isDeletingSingleVoter,
+    isBatchDeleteModalOpen,
+    isDeletingBatchVoters,
+    isResetDptModalOpen,
+    isResettingDpt,
   ]);
 
   // 1. Muat profil sesi admin
@@ -1118,6 +1143,132 @@ export default function AdminDashboardPage() {
       setQuickAddError('Terjadi kesalahan jaringan saat menambahkan pemilih.');
     } finally {
       setQuickAddLoading(false);
+    }
+  };
+
+  // Handler Seleksi Pemilih DPT (Multi-Select)
+  const toggleSelectVoter = (id: string) => {
+    setSelectedVoterIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const isAllVisibleVotersSelected =
+    voters.length > 0 && voters.every((v) => selectedVoterIds.includes(v.id));
+
+  const toggleSelectAllVoters = () => {
+    if (isAllVisibleVotersSelected) {
+      setSelectedVoterIds([]);
+    } else {
+      setSelectedVoterIds(voters.map((v) => v.id));
+    }
+  };
+
+  // Handler Hapus 1 Pemilih DPT (Khusus Superadmin)
+  const handleConfirmDeleteSingle = async () => {
+    if (!voterToDelete) return;
+    setIsDeletingSingleVoter(true);
+    setDptActionMessage(null);
+    setDptErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_single',
+          id: voterToDelete.id,
+          nim: voterToDelete.nim,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDptErrorMessage(data.error || 'Gagal menghapus pemilih.');
+      } else {
+        setDptActionMessage(`✓ Pemilih ${voterToDelete.name} (NIM: ${voterToDelete.nim}) berhasil dihapus dari DPT.`);
+        setVoterToDelete(null);
+        setSelectedVoterIds((prev) => prev.filter((id) => id !== voterToDelete.id));
+        fetchVoters();
+        fetchTally();
+      }
+    } catch {
+      setDptErrorMessage('Terjadi kesalahan jaringan saat menghapus pemilih.');
+    } finally {
+      setIsDeletingSingleVoter(false);
+    }
+  };
+
+  // Handler Hapus Massal / Selektif (Batch Delete)
+  const handleConfirmDeleteBatch = async () => {
+    if (selectedVoterIds.length === 0) return;
+    setIsDeletingBatchVoters(true);
+    setDptActionMessage(null);
+    setDptErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_batch',
+          ids: selectedVoterIds,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDptErrorMessage(data.error || 'Gagal menghapus pemilih terpilih.');
+      } else {
+        setDptActionMessage(`✓ Berhasil menghapus ${data.deletedCount || selectedVoterIds.length} pemilih terpilih dari DPT.`);
+        setIsBatchDeleteModalOpen(false);
+        setSelectedVoterIds([]);
+        fetchVoters();
+        fetchTally();
+      }
+    } catch {
+      setDptErrorMessage('Terjadi kesalahan jaringan saat menghapus pemilih massal.');
+    } finally {
+      setIsDeletingBatchVoters(false);
+    }
+  };
+
+  // Handler Reset DPT (Khusus Superadmin)
+  const handleConfirmResetDpt = async () => {
+    if (resetDptConfirmText.trim().toUpperCase() !== 'RESET DPT') {
+      setDptErrorMessage('Silakan ketik kata konfirmasi "RESET DPT" dengan benar.');
+      return;
+    }
+
+    setIsResettingDpt(true);
+    setDptActionMessage(null);
+    setDptErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reset_all',
+          mode: resetDptMode,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDptErrorMessage(data.error || 'Gagal mereset data DPT.');
+      } else {
+        setDptActionMessage(`✓ ${data.message || 'Data DPT berhasil direset.'}`);
+        setIsResetDptModalOpen(false);
+        setResetDptConfirmText('');
+        setSelectedVoterIds([]);
+        fetchVoters();
+        fetchTally();
+      }
+    } catch {
+      setDptErrorMessage('Terjadi kesalahan jaringan saat mereset data DPT.');
+    } finally {
+      setIsResettingDpt(false);
     }
   };
 
@@ -2116,7 +2267,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => setIsQuickAddModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/30 transition-colors shadow-sm"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/30 transition-colors shadow-sm cursor-pointer"
                     >
                       <UserPlus className="w-3.5 h-3.5 text-primary" />
                       <span>+ Pemilih Uji Coba</span>
@@ -2125,7 +2276,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={handleDownloadTemplate}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface border border-outline-variant/30 transition-colors"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface border border-outline-variant/30 transition-colors cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5 text-primary" />
                       <span>Template CSV</span>
@@ -2134,11 +2285,27 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all shadow-sm"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all shadow-sm cursor-pointer"
                     >
                       <UploadCloud className="w-4 h-4" />
                       <span>Upload DPT</span>
                     </button>
+
+                    {userRole === 'super_admin' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsResetDptModalOpen(true);
+                          setResetDptConfirmText('');
+                          setDptErrorMessage(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-xs font-bold text-error border border-error/30 transition-colors shadow-sm cursor-pointer"
+                        title="Reset atau Kosongkan Data DPT (Khusus Superadmin)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-error" />
+                        <span>Reset DPT</span>
+                      </button>
+                    )}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -2150,9 +2317,38 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {importSuccessMessage && (
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5 text-xs text-emerald-400 flex items-center gap-2">
-                    <Check className="w-4 h-4" />
-                    <span>{importSuccessMessage}</span>
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5 text-xs text-emerald-400 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      <span>{importSuccessMessage}</span>
+                    </div>
+                    <button onClick={() => setImportSuccessMessage(null)} className="text-emerald-400 hover:text-white cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {dptActionMessage && (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5 text-xs text-emerald-400 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      <span>{dptActionMessage}</span>
+                    </div>
+                    <button onClick={() => setDptActionMessage(null)} className="text-emerald-400 hover:text-white cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {dptErrorMessage && (
+                  <div className="rounded-xl border border-error/30 bg-error/10 p-3.5 text-xs text-error flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>{dptErrorMessage}</span>
+                    </div>
+                    <button onClick={() => setDptErrorMessage(null)} className="text-error hover:text-white cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
 
@@ -2264,35 +2460,93 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
+                {/* Batch Action Bar untuk Seleksi Pemilih */}
+                {selectedVoterIds.length > 0 && (
+                  <div className="rounded-2xl bg-primary/10 border border-primary/30 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                      <span className="text-xs font-bold text-on-surface">
+                        {selectedVoterIds.length} pemilih dipilih
+                      </span>
+                      <span className="text-[11px] text-outline hidden sm:inline">
+                        (dari {voters.length} pemilih yang ditampilkan)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVoterIds([])}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      {userRole === 'super_admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsBatchDeleteModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus Terpilih ({selectedVoterIds.length})</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Voters Table */}
                 <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-surface-container-high/60 border-b border-outline-variant/30 text-outline uppercase tracking-wider font-semibold">
+                          {userRole === 'super_admin' && (
+                            <th className="py-3 px-4 w-10 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isAllVisibleVotersSelected}
+                                onChange={toggleSelectAllVoters}
+                                className="rounded border-outline-variant/40 text-primary focus:ring-0 cursor-pointer"
+                                title="Pilih semua pemilih di halaman ini"
+                              />
+                            </th>
+                          )}
                           <th className="py-3 px-5">NIM</th>
                           <th className="py-3 px-5">Nama Mahasiswa</th>
                           <th className="py-3 px-5">Email SSO</th>
                           <th className="py-3 px-5">Angkatan</th>
                           <th className="py-3 px-5">Status</th>
+                          {userRole === 'super_admin' && (
+                            <th className="py-3 px-5 text-right w-20">Aksi</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant/20">
                         {loadingVoters ? (
                           <tr>
-                            <td colSpan={5} className="py-8 text-center text-outline">
+                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-outline">
                               Memuat data pemilih...
                             </td>
                           </tr>
                         ) : voters.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-8 text-center text-outline">
+                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-outline">
                               Tidak ada data yang cocok dengan pencarian.
                             </td>
                           </tr>
                         ) : (
                           voters.map((v) => (
                             <tr key={v.id} className="hover:bg-surface-container-high/40 transition-colors">
+                              {userRole === 'super_admin' && (
+                                <td className="py-3 px-4 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedVoterIds.includes(v.id)}
+                                    onChange={() => toggleSelectVoter(v.id)}
+                                    className="rounded border-outline-variant/40 text-primary focus:ring-0 cursor-pointer"
+                                  />
+                                </td>
+                              )}
                               <td className="py-3 px-5 font-mono font-semibold text-primary">{v.nim}</td>
                               <td className="py-3 px-5 font-medium text-on-surface">{v.name}</td>
                               <td className="py-3 px-5 font-mono text-[11px] text-outline">{v.email}</td>
@@ -2314,6 +2568,24 @@ export default function AdminDashboardPage() {
                                   </span>
                                 )}
                               </td>
+                              {userRole === 'super_admin' && (
+                                <td className="py-3 px-5 text-right">
+                                  {v.email?.toLowerCase() === 'marzhendogalangs@gmail.com' ? (
+                                    <span className="text-[10px] text-primary/70 font-mono italic" title="Akun Superadmin Utama (Dilindungi)">
+                                      Utama
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setVoterToDelete(v)}
+                                      className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                      title={`Hapus ${v.name} (${v.nim}) dari DPT`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           ))
                         )}
@@ -4306,6 +4578,356 @@ export default function AdminDashboardPage() {
                 >
                   Tutup Pratinjau
                 </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS 1 PEMILIH (KHUSUS SUPERADMIN) */}
+      {voterToDelete && (
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isDeletingSingleVoter) {
+                setVoterToDelete(null);
+              }
+            }}
+          >
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
+                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error shrink-0">
+                      <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-on-surface">Konfirmasi Hapus Pemilih</h3>
+                      <p className="text-xs text-outline mt-0.5">Penghapusan data pemilih dari Daftar Pemilih Tetap.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isDeletingSingleVoter}
+                    onClick={() => setVoterToDelete(null)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-outline">Nama Mahasiswa:</span>
+                      <span className="font-semibold text-on-surface">{voterToDelete.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-outline">NIM:</span>
+                      <span className="font-mono font-semibold text-primary">{voterToDelete.nim}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-outline">Email SSO:</span>
+                      <span className="font-mono text-outline">{voterToDelete.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-outline">Angkatan:</span>
+                      <span className="text-on-surface">{voterToDelete.generation}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-outline">Status Hak Suara:</span>
+                      <span>
+                        {voterToDelete.has_voted ? (
+                          <span className="text-emerald-400 font-semibold">Sudah Memilih</span>
+                        ) : (
+                          <span className="text-outline">Belum Memilih</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {voterToDelete.has_voted ? (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 space-y-1">
+                      <div className="flex items-center gap-2 font-bold text-[11px] uppercase tracking-wider">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Peringatan Integritas Pemilu</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                        Mahasiswa ini tercatat sudah mencoblos. Menghapus akun ini <strong>tidak menghapus</strong> surat suara anonim di bilik suara (*Ballot Secrecy*), namun akan mengurangi total DPT terdaftar.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-outline leading-relaxed text-[11px]">
+                      Mahasiswa ini belum menggunakan hak suara. Penghapusan akan mencabut hak pilih akun ini secara permanen dari sistem.
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    disabled={isDeletingSingleVoter}
+                    onClick={() => setVoterToDelete(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingSingleVoter}
+                    onClick={handleConfirmDeleteSingle}
+                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {isDeletingSingleVoter ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menghapus...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus Pemilih</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS SELEKTIF BATCH (KHUSUS SUPERADMIN) */}
+      {isBatchDeleteModalOpen && (
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isDeletingBatchVoters) {
+                setIsBatchDeleteModalOpen(false);
+              }
+            }}
+          >
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
+                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error shrink-0">
+                      <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-on-surface">Hapus Selektif ({selectedVoterIds.length} Pemilih)</h3>
+                      <p className="text-xs text-outline mt-0.5">Penghapusan massal pemilih DPT yang dipilih.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isDeletingBatchVoters}
+                    onClick={() => setIsBatchDeleteModalOpen(false)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <p className="text-on-surface">
+                    Anda akan menghapus <strong>{selectedVoterIds.length} data pemilih</strong> terpilih dari Daftar Pemilih Tetap (DPT).
+                  </p>
+
+                  <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error space-y-1">
+                    <div className="flex items-center gap-2 font-bold text-[11px] uppercase tracking-wider">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>Konfirmasi Tindakan Eksekutif</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-error/90">
+                      Tindakan ini tidak dapat dibatalkan secara otomatis. Setiap akun yang dihapus akan kehilangan akses ke bilik suara. Catatan audit akan direkam atas nama Anda.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    disabled={isDeletingBatchVoters}
+                    onClick={() => setIsBatchDeleteModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingBatchVoters}
+                    onClick={handleConfirmDeleteBatch}
+                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {isDeletingBatchVoters ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menghapus...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus {selectedVoterIds.length} Pemilih</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* MODAL RESET DPT (KHUSUS SUPERADMIN) */}
+      {isResetDptModalOpen && (
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isResettingDpt) {
+                setIsResetDptModalOpen(false);
+              }
+            }}
+          >
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+              >
+                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-on-surface">Reset &amp; Kosongkan DPT</h3>
+                      <p className="text-xs text-outline mt-0.5">Operasi tingkat tinggi untuk mengelola database pemilih.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isResettingDpt}
+                    onClick={() => setIsResetDptModalOpen(false)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-xs">
+                  <div className="space-y-2">
+                    <label className="block text-outline font-semibold">Pilih Mode Reset:</label>
+                    
+                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_to_default' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
+                      <input
+                        type="radio"
+                        name="resetDptMode"
+                        value="reset_to_default"
+                        checked={resetDptMode === 'reset_to_default'}
+                        onChange={() => setResetDptMode('reset_to_default')}
+                        className="mt-0.5 text-primary focus:ring-0"
+                      />
+                      <div>
+                        <span className="font-bold text-on-surface block">Kembalikan ke Default Sistem</span>
+                        <span className="text-outline text-[11px] block mt-0.5">
+                          Menghapus data pemilih baru yang diimpor dan mengembalikan daftar ke pemilih inisial sistem.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'clear_all' ? 'bg-error/10 border-error/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
+                      <input
+                        type="radio"
+                        name="resetDptMode"
+                        value="clear_all"
+                        checked={resetDptMode === 'clear_all'}
+                        onChange={() => setResetDptMode('clear_all')}
+                        className="mt-0.5 text-error focus:ring-0"
+                      />
+                      <div>
+                        <span className="font-bold text-error block">Kosongkan Seluruh Pemilih Mahasiswa (0 Pemilih)</span>
+                        <span className="text-outline text-[11px] block mt-0.5">
+                          Menghapus semua data mahasiswa dari DPT agar panitia dapat mengunggah berkas CSV resmi yang baru. Akun Superadmin tetap dipertahankan.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_vote_status' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
+                      <input
+                        type="radio"
+                        name="resetDptMode"
+                        value="reset_vote_status"
+                        checked={resetDptMode === 'reset_vote_status'}
+                        onChange={() => setResetDptMode('reset_vote_status')}
+                        className="mt-0.5 text-primary focus:ring-0"
+                      />
+                      <div>
+                        <span className="font-bold text-on-surface block">Reset Status Voting Saja (Simulasi)</span>
+                        <span className="text-outline text-[11px] block mt-0.5">
+                          Mengubah seluruh status pemilih menjadi Belum Memilih tanpa menghapus data pemilih. Cocok untuk mengulang gladi bersih.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error space-y-2">
+                    <p className="font-bold text-[11px] uppercase tracking-wider">Ketik Konfirmasi:</p>
+                    <p className="text-[11px] leading-relaxed">
+                      Untuk mencegah reset yang tidak disengaja, ketik <strong>RESET DPT</strong> pada kolom di bawah ini:
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="RESET DPT"
+                      value={resetDptConfirmText}
+                      onChange={(e) => setResetDptConfirmText(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-error/40 text-on-surface focus:outline-none focus:border-error font-mono text-center uppercase tracking-widest font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    disabled={isResettingDpt}
+                    onClick={() => setIsResetDptModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isResettingDpt || resetDptConfirmText.trim().toUpperCase() !== 'RESET DPT'}
+                    onClick={handleConfirmResetDpt}
+                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-40 cursor-pointer"
+                  >
+                    {isResettingDpt ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Mereset DPT...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eksekusi Reset DPT</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

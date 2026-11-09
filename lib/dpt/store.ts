@@ -322,3 +322,94 @@ export function resetVotersStore(): void {
   inMemoryVoters = [...DEFAULT_VOTERS];
   saveVotersStore(inMemoryVoters);
 }
+
+/**
+ * Menghapus 1 pemilih dari DPT berdasarkan ID atau NIM (Khusus Superadmin).
+ * Mencegah penghapusan akun Superadmin utama.
+ */
+export function deleteSingleVoter(idOrNim: string): { success: boolean; error?: string; voter?: VoterRecord } {
+  const current = getAllVoters();
+  const clean = idOrNim.trim().toLowerCase();
+
+  const targetIndex = current.findIndex(
+    (v) => v.id.toLowerCase() === clean || v.nim.toLowerCase() === clean
+  );
+
+  if (targetIndex === -1) {
+    return { success: false, error: 'Pemilih tidak ditemukan dalam DPT.' };
+  }
+
+  const target = current[targetIndex];
+  // Lindungi akun Superadmin utama dari penghapusan
+  if (target.role === 'super_admin' || target.email.toLowerCase() === 'marzhendogalangs@gmail.com') {
+    return { success: false, error: 'Akun Superadmin utama tidak dapat dihapus dari sistem.' };
+  }
+
+  const updated = current.filter((_, idx) => idx !== targetIndex);
+  saveVotersStore(updated);
+  return { success: true, voter: target };
+}
+
+/**
+ * Menghapus banyak pemilih secara selektif (Batch Delete) berdasarkan daftar ID atau NIM.
+ */
+export function deleteVotersBatch(idsOrNims: string[]): { success: boolean; deletedCount: number; error?: string } {
+  const current = getAllVoters();
+  const targetSet = new Set(idsOrNims.map((i) => i.trim().toLowerCase()));
+
+  const toKeep: VoterRecord[] = [];
+  let deletedCount = 0;
+
+  for (const v of current) {
+    const isTarget = targetSet.has(v.id.toLowerCase()) || targetSet.has(v.nim.toLowerCase());
+    const isProtected = v.role === 'super_admin' || v.email.toLowerCase() === 'marzhendogalangs@gmail.com';
+
+    if (isTarget && !isProtected) {
+      deletedCount++;
+    } else {
+      toKeep.push(v);
+    }
+  }
+
+  saveVotersStore(toKeep);
+  return { success: true, deletedCount };
+}
+
+/**
+ * Mereset seluruh atau sebagian data DPT (Khusus Superadmin).
+ */
+export function resetAllVoters(mode: 'reset_to_default' | 'clear_all' | 'reset_vote_status'): { success: boolean; count: number } {
+  const current = getAllVoters();
+
+  if (mode === 'reset_to_default') {
+    inMemoryVoters = [...DEFAULT_VOTERS];
+    saveVotersStore(inMemoryVoters);
+    return { success: true, count: inMemoryVoters.length };
+  }
+
+  if (mode === 'clear_all') {
+    // Sisakan hanya superadmin utama
+    const superAdmins = current.filter(
+      (v) => v.role === 'super_admin' || v.email.toLowerCase() === 'marzhendogalangs@gmail.com'
+    );
+    const result = superAdmins.length > 0 ? superAdmins : DEFAULT_VOTERS.filter((v) => v.role === 'super_admin');
+    inMemoryVoters = [...result];
+    saveVotersStore(inMemoryVoters);
+    return { success: true, count: current.length - inMemoryVoters.length };
+  }
+
+  if (mode === 'reset_vote_status') {
+    const now = new Date().toISOString();
+    const updated = current.map((v) => ({
+      ...v,
+      has_voted: false,
+      receipt_hash: undefined,
+      voted_at: undefined,
+      updated_at: now,
+    }));
+    saveVotersStore(updated);
+    return { success: true, count: updated.length };
+  }
+
+  return { success: false, count: 0 };
+}
