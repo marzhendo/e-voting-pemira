@@ -79,7 +79,7 @@ export function castBallotAtomicDev(
     return {
       success: false,
       code: 'NOT_REGISTERED',
-      message: 'Akses Ditolak: Anda tidak terdaftar dalam Daftar Pemilih Tetap (DPT).',
+      message: 'Akses Ditolak: Kamu tidak terdaftar dalam Daftar Pemilih Tetap (DPT).',
     };
   }
 
@@ -87,7 +87,7 @@ export function castBallotAtomicDev(
     return {
       success: false,
       code: 'ALREADY_VOTED',
-      message: 'Hak suara Anda telah digunakan sebelumnya.',
+      message: 'Hak suara kamu telah digunakan sebelumnya.',
     };
   }
 

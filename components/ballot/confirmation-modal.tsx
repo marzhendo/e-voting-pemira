@@ -73,7 +73,7 @@ export function ConfirmationModal({
         <div className="flex min-h-full items-center justify-center p-4 text-left">
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 shadow-2xl flex flex-col gap-5 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 shadow-2xl flex flex-col gap-5 border border-outline-variant/30 my-auto animate-modal-enter"
           >
             {/* Modal Header */}
             <div className="flex items-start justify-between">
@@ -96,7 +96,7 @@ export function ConfirmationModal({
                 disabled={isSubmitting}
                 onClick={onClose}
                 aria-label="Tutup Konfirmasi"
-                className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
+                className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -112,7 +112,7 @@ export function ConfirmationModal({
 
               <div className="flex-1 min-w-0">
                 <span className="text-[11px] text-outline uppercase tracking-wider block font-semibold">
-                  Pilihan Anda:
+                  Pilihanmu:
                 </span>
                 <h3 className="text-base text-on-surface font-bold truncate">
                   {title}
@@ -129,7 +129,7 @@ export function ConfirmationModal({
                 type="button"
                 disabled={isSubmitting}
                 onClick={onClose}
-                className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 Ubah Pilihan
               </button>
@@ -138,7 +138,7 @@ export function ConfirmationModal({
                 type="button"
                 disabled={isSubmitting}
                 onClick={onConfirm}
-                className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary-fixed transition-all duration-150 flex items-center justify-center gap-2 shadow-md disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 {isSubmitting ? (
                   <>

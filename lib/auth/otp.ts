@@ -165,7 +165,54 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
   // 1. Cek Mode Live Supabase atau Dev In-Memory Fallback
   if (isSupabaseConfigured()) {
     try {
+      const pin = generate6DigitPin();
+      const pinHash = hashPin(pin);
+      const expiresAt = new Date(now + OTP_EXPIRATION_MS).toISOString();
+
       const adminClient = createAdminClient();
+      const { data: rpcResult, error: rpcError } = await adminClient.rpc('request_voter_otp_secure', {
+        p_identifier: cleanId,
+        p_pin_hash: pinHash,
+        p_expires_at: expiresAt,
+        p_cooldown_seconds: 60,
+      });
+
+      if (!rpcError && rpcResult) {
+        if (!rpcResult.success) {
+          return {
+            success: false,
+            code: (rpcResult.code as OtpRequestResult['code']) || 'SERVER_ERROR',
+            error: rpcResult.message || 'Terjadi kesalahan saat memproses permintaan PIN.',
+            cooldownSeconds: rpcResult.cooldownSeconds,
+          };
+        }
+
+        const voter = rpcResult.voter!;
+        // Kirim via SMTP Service
+        const sendResult = await smtpMailService.sendLoginPin({
+          to: voter.email,
+          voterName: voter.name,
+          nim: voter.nim,
+          pin,
+        });
+
+        if (!sendResult.success) {
+          return {
+            success: false,
+            code: 'MAIL_ERROR',
+            error: sendResult.error || 'Gagal mengirim email PIN ke server kampus.',
+          };
+        }
+
+        return {
+          success: true,
+          maskedEmail: maskEmail(voter.email),
+          cooldownSeconds: 60,
+        };
+      }
+
+      // Fallback jika stored procedure belum dimigrasi di remote DB
+      console.warn('[OtpService] RPC request_voter_otp_secure tidak tersedia, menggunakan direct query fallback:', rpcError?.message);
       let query = adminClient
         .from('voters_whitelist')
         .select('id, nim, name, email, generation, has_voted, otp_last_sent_at');
@@ -182,7 +229,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         return {
           success: false,
           code: 'NIM_NOT_IN_DPT',
-          error: 'NIM atau email Anda belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
+          error: 'NIM atau email kamu belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
         };
       }
 
@@ -190,7 +237,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         return {
           success: false,
           code: 'ALREADY_VOTED',
-          error: 'Hak suara Anda telah digunakan pada pemilihan ini.',
+          error: 'Hak suara kamu telah digunakan pada pemilihan ini.',
         };
       }
 
@@ -208,11 +255,6 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
           };
         }
       }
-
-      // Generate & Simpan Hash PIN Baru
-      const pin = generate6DigitPin();
-      const pinHash = hashPin(pin);
-      const expiresAt = new Date(now + OTP_EXPIRATION_MS).toISOString();
 
       const { error: updateError } = await adminClient
         .from('voters_whitelist')
@@ -324,7 +366,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
     return {
       success: false,
       code: 'NIM_NOT_IN_DPT',
-      error: 'NIM atau email Anda belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
+      error: 'NIM atau email kamu belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
     };
   }
 
@@ -332,7 +374,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
     return {
       success: false,
       code: 'ALREADY_VOTED',
-      error: 'Hak suara Anda telah digunakan pada pemilihan ini.',
+      error: 'Hak suara kamu telah digunakan pada pemilihan ini.',
     };
   }
 
@@ -393,7 +435,44 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
   // 1. Cek Mode Live Supabase
   if (isSupabaseConfigured()) {
     try {
+      const pinHash = hashPin(cleanPin);
       const adminClient = createAdminClient();
+
+      // Panggil Stored Procedure Atomik verify_voter_otp_secure (FOR UPDATE Row Lock)
+      const { data: rpcResult, error: rpcError } = await adminClient.rpc('verify_voter_otp_secure', {
+        p_identifier: cleanId,
+        p_pin_hash: pinHash,
+      });
+
+      if (!rpcError && rpcResult) {
+        if (!rpcResult.success) {
+          return {
+            success: false,
+            code: (rpcResult.code as OtpVerifyResult['code']) || 'SERVER_ERROR',
+            error: rpcResult.message || 'Gagal memverifikasi kode PIN.',
+            remainingAttempts: rpcResult.remainingAttempts,
+          };
+        }
+
+        const voter = rpcResult.voter!;
+        const adminMatch = findAdminByEmail(voter.email);
+        return {
+          success: true,
+          voter: {
+            id: voter.id,
+            email: voter.email,
+            name: voter.name,
+            nim: voter.nim,
+            role: adminMatch ? adminMatch.role : 'voter',
+            isDptVerified: true,
+            hasVoted: voter.has_voted,
+            generation: voter.generation,
+          },
+        };
+      }
+
+      // Fallback jika stored procedure belum dimigrasi di remote DB
+      console.warn('[OtpService] RPC verify_voter_otp_secure tidak tersedia, menggunakan direct query fallback:', rpcError?.message);
       let query = adminClient
         .from('voters_whitelist')
         .select('id, nim, name, email, generation, has_voted, otp_hash, otp_expires_at, otp_attempts');
@@ -418,7 +497,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         return {
           success: false,
           code: 'ALREADY_VOTED',
-          error: 'Hak suara Anda telah digunakan sebelumnya.',
+          error: 'Hak suara kamu telah digunakan sebelumnya.',
         };
       }
 
@@ -577,7 +656,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
     return {
       success: false,
       code: 'ALREADY_VOTED',
-      error: 'Hak suara Anda telah digunakan sebelumnya.',
+      error: 'Hak suara kamu telah digunakan sebelumnya.',
     };
   }
 

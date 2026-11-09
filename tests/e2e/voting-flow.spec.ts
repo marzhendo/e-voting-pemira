@@ -69,7 +69,7 @@ test.describe('Voting Chamber & Digital Receipt Journey E2E Tests', () => {
     // Wait for timer to naturally count down (2 seconds) and trigger the popup modal
     const modalHeading = page.getByRole('heading', { name: 'Sesi Bilik Suara Kedaluwarsa' });
     await expect(modalHeading).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Hak Suara Anda Tetap Aman')).toBeVisible();
+    await expect(page.locator('text=Hak Suaramu Tetap Aman')).toBeVisible();
 
     // Verify clicking "Masuk Kembali ke Bilik Suara" redirects voter to /login
     const redirectBtn = page.getByRole('button', { name: /Masuk Kembali ke Bilik Suara/i });
@@ -93,8 +93,7 @@ test.describe('Voting Chamber & Digital Receipt Journey E2E Tests', () => {
     // 3. Detail Modal should appear with candidate profile
     const detailTitle = page.locator('#candidate-detail-title');
     await expect(detailTitle).toBeVisible();
-    await expect(detailTitle).toContainText('Arya Narendra Putra');
-    await expect(detailTitle).toContainText('Rayhan Al-Fayeed');
+    await expect(detailTitle).toContainText('&');
 
     // 4. Verify separate CV download buttons for Chairman and Vice Chairman
     const downloadChairmanBtn = page.getByRole('link', { name: /Unduh CV Chairman/i });

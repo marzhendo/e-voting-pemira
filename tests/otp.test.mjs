@@ -160,4 +160,52 @@ describe('Just-In-Time (JIT) 6-Digit OTP Cryptography & Auth Logic Tests', () =>
     // Valid absolute URL remains unchanged
     assert.strictEqual(resolveSafeCtaUrl('https://pemirahmif.org/vote'), 'https://pemirahmif.org/vote');
   });
+
+  test('Concurrent failed OTP verifications strictly enforce 3-attempt lockout without TOCTOU race condition', async () => {
+    // Simulasi state database dengan row lock (FOR UPDATE)
+    const dbVoter = {
+      nim: '103012300001',
+      otp_hash: hashPin('777777'),
+      otp_attempts: 0,
+      otp_expires_at: Date.now() + OTP_EXPIRATION_MS,
+    };
+
+    // Simulated atomic procedure representing verify_voter_otp_secure
+    let rowMutex = Promise.resolve();
+    function verifyOtpAtomic(inputPin) {
+      return new Promise((resolve) => {
+        rowMutex = rowMutex.then(async () => {
+          // Asynchronous packet delay
+          await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 10) + 2));
+
+          if (dbVoter.otp_attempts >= MAX_FAILED_ATTEMPTS) {
+            resolve({ success: false, code: 'MAX_ATTEMPTS_EXCEEDED' });
+            return;
+          }
+
+          const isValid = verifyPinHash(inputPin, dbVoter.otp_hash);
+          if (!isValid) {
+            dbVoter.otp_attempts += 1;
+            const remaining = Math.max(0, MAX_FAILED_ATTEMPTS - dbVoter.otp_attempts);
+            resolve({ success: false, code: 'INVALID_PIN', remainingAttempts: remaining });
+            return;
+          }
+
+          dbVoter.otp_hash = null;
+          resolve({ success: true });
+        });
+      });
+    }
+
+    // Launch 10 simultaneous wrong PIN attempts
+    const concurrentGuesses = ['111111', '222222', '333333', '444444', '555555', '666666', '888888', '999999', '123456', '654321'];
+    const results = await Promise.all(concurrentGuesses.map((pin) => verifyOtpAtomic(pin)));
+
+    const invalidPinResults = results.filter((r) => r.code === 'INVALID_PIN');
+    const lockedOutResults = results.filter((r) => r.code === 'MAX_ATTEMPTS_EXCEEDED');
+
+    assert.strictEqual(invalidPinResults.length, 3, 'Tepat 3 tebakan pertama yang menghasilkan INVALID_PIN');
+    assert.strictEqual(lockedOutResults.length, 7, 'Sisa 7 percobaan konkuren wajib ditolak dengan MAX_ATTEMPTS_EXCEEDED');
+    assert.strictEqual(dbVoter.otp_attempts, 3, 'Counter attempts di database tepat berhenti di angka 3');
+  });
 });

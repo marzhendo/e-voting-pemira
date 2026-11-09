@@ -46,26 +46,26 @@ export function KotakKosongCard({
             </div>
 
             <div
-              className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+              className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all duration-200 ${
                 isSelected
-                  ? 'bg-primary border-primary text-on-primary'
-                  : 'border-outline/40 bg-surface-container-highest text-transparent'
+                  ? 'bg-primary border-primary text-on-primary scale-100 shadow-sm'
+                  : 'border-outline/40 bg-surface-container-highest text-transparent scale-90'
               }`}
             >
-              <Check className="w-3.5 h-3.5 stroke-[3]" />
+              <Check className={`w-3.5 h-3.5 stroke-[3] transition-transform duration-200 ${isSelected ? 'scale-100' : 'scale-75'}`} />
             </div>
           </div>
 
           {/* Kotak Kosong Visual */}
-          <div className="relative w-full h-72 sm:h-80 rounded-xl overflow-hidden bg-surface-container-highest/60 border border-dashed border-outline-variant/40 flex flex-col items-center justify-center text-center p-6 select-none">
+          <div className="relative w-full h-48 sm:h-64 md:h-72 rounded-xl overflow-hidden bg-surface-container-highest/60 border border-dashed border-outline-variant/40 flex flex-col items-center justify-center text-center p-6 select-none">
             <div className="w-16 h-16 rounded-2xl bg-surface-container flex items-center justify-center text-outline mb-3">
               <SquareDashed className="w-8 h-8 text-outline" />
             </div>
             <span className="text-sm font-bold text-on-surface">
-              Kolom Kosong
+              Kotak Kosong
             </span>
             <p className="text-xs text-on-surface-variant max-w-xs mt-1.5 leading-relaxed">
-              Pilihan resmi bagi pemilih yang tidak menentukan suara pada calon tunggal.
+              Pilihan sah bagi pemilih yang tidak menentukan suara pada paslon terdaftar.
             </p>
           </div>
 
@@ -75,7 +75,7 @@ export function KotakKosongCard({
               Opsi Kotak Kosong
             </h4>
             <p className="text-xs text-outline leading-relaxed">
-              Suara Anda tetap sah dan dihitung dalam rekapitulasi resmi Pemira HMIF.
+              Suara tetap sah dan dihitung dalam rekapitulasi resmi Pemira HMIF.
             </p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export function KotakKosongCard({
         {/* Footer */}
         <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
           <span className="text-xs text-outline font-medium">
-            {isSelected ? '✓ Terpilih' : 'Ketuk untuk memilih'}
+            {isSelected ? '✓ Terpilih' : 'Belum dipilih'}
           </span>
           <button
             type="button"
@@ -91,7 +91,7 @@ export function KotakKosongCard({
               e.stopPropagation();
               onSelect(candidate);
             }}
-            className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
               isSelected
                 ? 'bg-primary text-on-primary shadow-sm'
                 : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'
@@ -132,7 +132,7 @@ export function KotakKosongCard({
             </span>
           </div>
           <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-            Pilihan resmi bagi pemilih yang tidak memilih pasangan calon yang terdaftar.
+            Pilihan sah bagi pemilih yang tidak menentukan suara pada paslon terdaftar. Suara tetap dihitung dalam rekapitulasi.
           </p>
         </div>
       </div>
@@ -144,7 +144,7 @@ export function KotakKosongCard({
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-150 flex items-center justify-center cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
             isSelected
               ? 'bg-primary text-on-primary shadow-sm'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'
@@ -154,13 +154,13 @@ export function KotakKosongCard({
         </button>
 
         <div
-          className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+          className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all duration-200 ${
             isSelected
-              ? 'bg-primary border-primary text-on-primary'
-              : 'border-outline/40 bg-surface-container-highest text-transparent'
+              ? 'bg-primary border-primary text-on-primary scale-100 shadow-sm'
+              : 'border-outline/40 bg-surface-container-highest text-transparent scale-90'
           }`}
         >
-          <Check className="w-3.5 h-3.5 stroke-[3]" />
+          <Check className={`w-3.5 h-3.5 stroke-[3] transition-transform duration-200 ${isSelected ? 'scale-100' : 'scale-75'}`} />
         </div>
       </div>
     </div>

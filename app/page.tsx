@@ -32,7 +32,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Link
               href="/admin/dashboard"
-              className="text-xs text-outline hover:text-on-surface transition-colors min-h-[44px] min-w-[44px] inline-flex items-center px-3 rounded-lg"
+              className="text-xs text-outline hover:text-on-surface transition-colors min-h-[44px] min-w-[44px] inline-flex items-center px-3 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               Console KPR
             </Link>
@@ -41,7 +41,7 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 animate-page-enter">
         <div className="max-w-2xl mx-auto text-center flex flex-col items-center gap-6 py-10 sm:py-16">
           {/* Heading */}
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-on-surface leading-tight">
@@ -57,7 +57,7 @@ export default function HomePage() {
           <div className="pt-2 w-full sm:w-auto">
             <Link
               href="/login"
-              className="w-full sm:w-auto min-h-[48px] px-8 py-3 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98]"
+              className="w-full sm:w-auto min-h-[48px] px-8 py-3 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-xs font-bold uppercase tracking-wider transition-all duration-150 ease-out inline-flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               <span>Masuk ke Bilik Suara</span>
               <ArrowRight className="w-4 h-4" />

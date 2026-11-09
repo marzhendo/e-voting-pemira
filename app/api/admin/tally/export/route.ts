@@ -50,68 +50,90 @@ export async function GET() {
 
     if (isSupabaseConfigured()) {
       const adminSupabase = createAdminClient();
-      const { data: settings } = await adminSupabase
-        .from('election_settings')
-        .select('is_voting_open, end_time')
-        .eq('id', 1)
-        .single();
 
-      isClosed = !settings?.is_voting_open || new Date() > new Date(settings?.end_time || '');
+      // Coba panggil RPC agregasi server-side
+      const { data: rpcSummary } = await adminSupabase.rpc('get_election_tally_summary');
 
-      // Auditor dilarang mengekspor tally paslon jika pemungutan suara masih berjalan
-      if (session?.role === 'auditor' && !isClosed) {
-        return NextResponse.json(
-          { error: 'Akses Ditolak: Peran Auditor hanya dapat mengekspor rekapitulasi setelah pemilihan resmi ditutup.' },
-          { status: 403 }
-        );
+      if (rpcSummary && rpcSummary.success) {
+        isClosed = rpcSummary.electionSettings.isClosed;
+
+        // Auditor dilarang mengekspor tally paslon jika pemungutan suara masih berjalan
+        if (session?.role === 'auditor' && !isClosed) {
+          return NextResponse.json(
+            { error: 'Akses Ditolak: Peran Auditor hanya dapat mengekspor rekapitulasi setelah pemilihan resmi ditutup.' },
+            { status: 403 }
+          );
+        }
+
+        tallyData = rpcSummary.tally || [];
+        generationData = rpcSummary.turnout.byGeneration || [];
+        totalDpt = rpcSummary.turnout.totalDpt;
+        totalVotes = rpcSummary.turnout.totalVotesRecorded;
+        turnoutPercentage = rpcSummary.turnout.turnoutPercentage;
+      } else {
+        const { data: settings } = await adminSupabase
+          .from('election_settings')
+          .select('is_voting_open, end_time')
+          .eq('id', 1)
+          .single();
+
+        isClosed = !settings?.is_voting_open || new Date() > new Date(settings?.end_time || '');
+
+        // Auditor dilarang mengekspor tally paslon jika pemungutan suara masih berjalan
+        if (session?.role === 'auditor' && !isClosed) {
+          return NextResponse.json(
+            { error: 'Akses Ditolak: Peran Auditor hanya dapat mengekspor rekapitulasi setelah pemilihan resmi ditutup.' },
+            { status: 403 }
+          );
+        }
+
+        const { data: candidates } = await adminSupabase
+          .from('candidates')
+          .select('id, candidate_number, leader_name, vice_leader_name')
+          .order('candidate_number', { ascending: true });
+
+        const { data: ballots } = await adminSupabase.from('ballots').select('candidate_id');
+        const { data: voters } = await adminSupabase.from('voters_whitelist').select('generation, has_voted');
+
+        const voteCounts: Record<string, number> = {};
+        for (const b of ballots || []) {
+          voteCounts[b.candidate_id] = (voteCounts[b.candidate_id] || 0) + 1;
+        }
+
+        totalVotes = ballots?.length || 0;
+        totalDpt = voters?.length || 0;
+        turnoutPercentage = totalDpt > 0 ? Number(((totalVotes / totalDpt) * 100).toFixed(2)) : 0;
+
+        tallyData = (candidates || []).map((cand) => {
+          const count = voteCounts[cand.id] || 0;
+          const pct = totalVotes > 0 ? Number(((count / totalVotes) * 100).toFixed(2)) : 0;
+          return {
+            candidateId: cand.id,
+            candidateNumber: cand.candidate_number,
+            leaderName: cand.leader_name,
+            viceLeaderName: cand.vice_leader_name,
+            voteCount: count,
+            percentage: pct,
+          };
+        });
+
+        // Grouping by generation
+        const genMap: Record<number, { total: number; voted: number }> = {};
+        for (const v of voters || []) {
+          if (!genMap[v.generation]) genMap[v.generation] = { total: 0, voted: 0 };
+          genMap[v.generation].total++;
+          if (v.has_voted) genMap[v.generation].voted++;
+        }
+
+        generationData = Object.entries(genMap)
+          .map(([genStr, stat]) => ({
+            generation: Number(genStr),
+            totalVoters: stat.total,
+            votedCount: stat.voted,
+            turnoutPercentage: stat.total > 0 ? Number(((stat.voted / stat.total) * 100).toFixed(2)) : 0,
+          }))
+          .sort((a, b) => a.generation - b.generation);
       }
-
-      const { data: candidates } = await adminSupabase
-        .from('candidates')
-        .select('id, candidate_number, leader_name, vice_leader_name')
-        .order('candidate_number', { ascending: true });
-
-      const { data: ballots } = await adminSupabase.from('ballots').select('candidate_id');
-      const { data: voters } = await adminSupabase.from('voters_whitelist').select('generation, has_voted');
-
-      const voteCounts: Record<string, number> = {};
-      for (const b of ballots || []) {
-        voteCounts[b.candidate_id] = (voteCounts[b.candidate_id] || 0) + 1;
-      }
-
-      totalVotes = ballots?.length || 0;
-      totalDpt = voters?.length || 0;
-      turnoutPercentage = totalDpt > 0 ? Number(((totalVotes / totalDpt) * 100).toFixed(2)) : 0;
-
-      tallyData = (candidates || []).map((cand) => {
-        const count = voteCounts[cand.id] || 0;
-        const pct = totalVotes > 0 ? Number(((count / totalVotes) * 100).toFixed(2)) : 0;
-        return {
-          candidateId: cand.id,
-          candidateNumber: cand.candidate_number,
-          leaderName: cand.leader_name,
-          viceLeaderName: cand.vice_leader_name,
-          voteCount: count,
-          percentage: pct,
-        };
-      });
-
-      // Grouping by generation
-      const genMap: Record<number, { total: number; voted: number }> = {};
-      for (const v of voters || []) {
-        if (!genMap[v.generation]) genMap[v.generation] = { total: 0, voted: 0 };
-        genMap[v.generation].total++;
-        if (v.has_voted) genMap[v.generation].voted++;
-      }
-
-      generationData = Object.entries(genMap)
-        .map(([genStr, stat]) => ({
-          generation: Number(genStr),
-          totalVoters: stat.total,
-          votedCount: stat.voted,
-          turnoutPercentage: stat.total > 0 ? Number(((stat.voted / stat.total) * 100).toFixed(2)) : 0,
-        }))
-        .sort((a, b) => a.generation - b.generation);
     } else {
       // Dev mode store
       const devSettings = getDevElectionSettings();

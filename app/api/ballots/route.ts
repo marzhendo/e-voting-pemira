@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return NextResponse.json(
       {
-        error: 'Sesi Anda telah berakhir atau belum masuk. Silakan login kembali.',
+        error: 'Sesi kamu telah berakhir atau belum masuk. Silakan login kembali.',
         code: 'UNAUTHORIZED',
       },
       { status: 401 }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   if (!session.isDptVerified || !session.nim) {
     return NextResponse.json(
       {
-        error: 'Akses Ditolak: Akun Anda tidak terdaftar dalam Daftar Pemilih Tetap (DPT).',
+        error: 'Akses Ditolak: Akun kamu tidak terdaftar dalam Daftar Pemilih Tetap (DPT).',
         code: 'NOT_REGISTERED',
       },
       { status: 403 }
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   if (session.hasVoted) {
     return NextResponse.json(
       {
-        error: 'Hak suara Anda telah digunakan sebelumnya. Anda tidak dapat memilih kembali.',
+        error: 'Hak suara kamu telah digunakan sebelumnya. Kamu tidak dapat memilih kembali.',
         code: 'ALREADY_VOTED',
       },
       { status: 409 }
@@ -87,7 +87,10 @@ export async function POST(request: NextRequest) {
       console.warn('[CastBallotRoute] Database RPC error:', rpcError);
 
       if (process.env.APP_ENV !== 'production') {
-        castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
+        const devResult = castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
+        if (!devResult.success) {
+          return NextResponse.json({ error: devResult.message, code: devResult.code }, { status: 400 });
+        }
         const updatedUser: SessionUser = { ...session, hasVoted: true };
         const updatedToken = await createSessionToken(updatedUser);
         setSessionCookie(updatedToken);
@@ -95,7 +98,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           code: 'SUCCESS',
-          message: 'Suara Anda berhasil dicatat secara sah (Mode Pengujian Lokal).',
+          message: 'Suara kamu berhasil dicatat secara sah (Mode Pengujian Lokal).',
           receipt: {
             token: receipt.rawToken,
             date: receipt.sessionDate,
@@ -114,6 +117,26 @@ export async function POST(request: NextRequest) {
 
     // 5. Tangani Respon Bisnis dari Stored Procedure
     if (!rpcResult || !rpcResult.success) {
+      // In non-production, if voter is a mock account not in remote DB, fallback to dev atomic store
+      if (process.env.APP_ENV !== 'production' && (session.id?.startsWith('mock-') || session.id?.startsWith('dev-'))) {
+        const devResult = castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
+        if (devResult.success) {
+          const updatedUser: SessionUser = { ...session, hasVoted: true };
+          const updatedToken = await createSessionToken(updatedUser);
+          setSessionCookie(updatedToken);
+
+          return NextResponse.json({
+            success: true,
+            code: 'SUCCESS',
+            message: 'Suara kamu berhasil dicatat secara sah (Mode Pengujian Lokal).',
+            receipt: {
+              token: receipt.rawToken,
+              date: receipt.sessionDate,
+            },
+          });
+        }
+      }
+
       const code = rpcResult?.code || 'UNKNOWN_ERROR';
       const message = rpcResult?.message || 'Gagal merekam suara ke bilik suara.';
 
@@ -149,7 +172,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       code: 'SUCCESS',
-      message: 'Suara Anda berhasil dicatat secara sah ke dalam bilik suara elektronik.',
+      message: 'Suara kamu berhasil dicatat secara sah ke dalam bilik suara elektronik.',
       receipt: {
         token: receipt.rawToken,
         date: receipt.sessionDate,

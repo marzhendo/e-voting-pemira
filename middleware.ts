@@ -42,15 +42,13 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/admin')) {
     if (!session) {
       const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('error', 'AUTH_REQUIRED');
-      loginUrl.searchParams.set('message', 'Silakan masuk dengan akun panitia terlebih dahulu.');
+      loginUrl.searchParams.set('error', 'ADMIN_AUTH_REQUIRED');
       return NextResponse.redirect(loginUrl);
     }
 
     if (!session.role || session.role === 'voter') {
       const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('error', 'FORBIDDEN');
-      loginUrl.searchParams.set('message', 'Akses Ditolak: Halaman ini hanya untuk Panitia / Pengawas Pemira.');
+      loginUrl.searchParams.set('error', 'ADMIN_FORBIDDEN');
       return NextResponse.redirect(loginUrl);
     }
 
@@ -65,7 +63,7 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/vote') {
     if (!session) {
       const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('error', 'AUTH_REQUIRED');
+      loginUrl.searchParams.set('error', 'VOTE_SESSION_REQUIRED');
       return NextResponse.redirect(loginUrl);
     }
 
@@ -73,7 +71,6 @@ export async function middleware(request: NextRequest) {
     if (!session.isDptVerified) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('error', 'NOT_REGISTERED');
-      loginUrl.searchParams.set('message', 'NIM Anda tidak terdaftar dalam DPT.');
       return NextResponse.redirect(loginUrl);
     }
 

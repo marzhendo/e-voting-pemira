@@ -236,6 +236,83 @@ export interface Database {
           message: string;
         };
       };
+      request_voter_otp_secure: {
+        Args: {
+          p_identifier: string;
+          p_pin_hash: string;
+          p_expires_at: string;
+          p_cooldown_seconds?: number;
+        };
+        Returns: {
+          success: boolean;
+          code: string;
+          message?: string;
+          cooldownSeconds?: number;
+          voter?: {
+            id: string;
+            nim: string;
+            name: string;
+            email: string;
+            generation: number;
+            has_voted: boolean;
+          };
+        };
+      };
+      verify_voter_otp_secure: {
+        Args: {
+          p_identifier: string;
+          p_pin_hash: string;
+        };
+        Returns: {
+          success: boolean;
+          code: string;
+          message?: string;
+          remainingAttempts?: number;
+          voter?: {
+            id: string;
+            nim: string;
+            name: string;
+            email: string;
+            generation: number;
+            has_voted: boolean;
+          };
+        };
+      };
+      get_election_tally_summary: {
+        Args: Record<string, never>;
+        Returns: {
+          success: boolean;
+          timestamp: string;
+          electionSettings: {
+            isVotingOpen: boolean;
+            isClosed: boolean;
+            maintenanceMode: boolean;
+            startTime: string;
+            endTime: string;
+            allowKotakKosongMulti: boolean;
+          };
+          turnout: {
+            totalDpt: number;
+            totalVotesRecorded: number;
+            totalVotersParticipated: number;
+            turnoutPercentage: number;
+            byGeneration: Array<{
+              generation: number;
+              totalVoters: number;
+              votedCount: number;
+              turnoutPercentage: number;
+            }>;
+          };
+          tally: Array<{
+            candidateId: string;
+            candidateNumber: number;
+            leaderName: string;
+            viceLeaderName: string;
+            voteCount: number;
+            percentage: number;
+          }>;
+        };
+      };
     };
     Views: Record<string, never>;
     Enums: Record<string, never>;

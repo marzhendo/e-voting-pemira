@@ -193,16 +193,25 @@ export function queryVoters(params?: {
 export function findVoterByIdentifier(identifier: string): VoterRecord | null {
   const all = getAllVoters();
   const clean = identifier.trim().toLowerCase();
-  return (
-    all.find(
-      (v) =>
-        v.nim.toLowerCase() === clean ||
-        v.email.toLowerCase() === clean ||
-        (clean === 'voter1' && v.nim === '103012300001') ||
-        (clean === 'voter2' && v.nim === '103012300002') ||
-        (clean === 'voter3' && v.nim === '103012400003')
-    ) || null
+  const found = all.find(
+    (v) =>
+      v.nim.toLowerCase() === clean ||
+      v.email.toLowerCase() === clean ||
+      (clean === 'voter1' && v.nim === '103012300001') ||
+      (clean === 'voter2' && v.nim === '103012300002') ||
+      (clean === 'voter3' && v.nim === '103012400003')
   );
+  if (found) return found;
+
+  const fallback = DEFAULT_VOTERS.find(
+    (v) =>
+      v.nim.toLowerCase() === clean ||
+      v.email.toLowerCase() === clean ||
+      (clean === 'voter1' && v.nim === '103012300001') ||
+      (clean === 'voter2' && v.nim === '103012300002') ||
+      (clean === 'voter3' && v.nim === '103012400003')
+  );
+  return fallback || null;
 }
 
 export function importVotersBatch(
@@ -281,7 +290,7 @@ export function markVoterAsVoted(identifier: string, receiptHash?: string): bool
   const now = new Date().toISOString();
 
   const updated = current.map((v) => {
-    if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean) {
+    if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean) {
       found = true;
       return {
         ...v,
@@ -294,6 +303,22 @@ export function markVoterAsVoted(identifier: string, receiptHash?: string): bool
     return v;
   });
 
+  if (!found) {
+    const defaultVoter = DEFAULT_VOTERS.find(
+      (v) => v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean
+    );
+    if (defaultVoter) {
+      updated.push({
+        ...defaultVoter,
+        has_voted: true,
+        receipt_hash: receiptHash || 'mock-receipt-hash',
+        voted_at: now,
+        updated_at: now,
+      });
+      found = true;
+    }
+  }
+
   if (found) {
     saveVotersStore(updated);
   }
@@ -303,8 +328,10 @@ export function markVoterAsVoted(identifier: string, receiptHash?: string): bool
 export function resetVoterVoteStatus(identifier: string): void {
   const current = getAllVoters();
   const clean = identifier.trim().toLowerCase();
+  let found = false;
   const updated = current.map((v) => {
     if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean) {
+      found = true;
       return {
         ...v,
         has_voted: false,
@@ -315,6 +342,22 @@ export function resetVoterVoteStatus(identifier: string): void {
     }
     return v;
   });
+
+  if (!found) {
+    const defaultVoter = DEFAULT_VOTERS.find(
+      (v) => v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean
+    );
+    if (defaultVoter) {
+      updated.push({
+        ...defaultVoter,
+        has_voted: false,
+        receipt_hash: undefined,
+        voted_at: undefined,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+
   saveVotersStore(updated);
 }
 

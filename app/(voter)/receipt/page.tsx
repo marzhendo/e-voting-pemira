@@ -91,7 +91,7 @@ export default function ReceiptPage() {
   };
 
   return (
-    <div className="bg-background text-on-surface font-montserrat antialiased min-h-screen flex flex-col justify-between selection:bg-primary selection:text-on-primary">
+    <div className="bg-surface text-on-surface font-montserrat antialiased min-h-screen flex flex-col justify-between selection:bg-primary selection:text-on-primary">
       {/* Top Header */}
       <header className="w-full border-b border-outline-variant/20 bg-surface/90 backdrop-blur-md">
         <div className="h-16 max-w-4xl mx-auto px-4 sm:px-6 flex items-center justify-between">
@@ -124,13 +124,13 @@ export default function ReceiptPage() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 animate-page-enter">
         <div className="w-full max-w-lg flex flex-col gap-5 py-6">
           {/* Official Digital Ballot Pass */}
           <div className="bg-surface-container rounded-2xl border border-outline-variant/30 shadow-xl overflow-hidden">
             {/* Pass Header */}
             <div className="p-6 pb-5 border-b border-outline-variant/20 flex flex-col items-center text-center gap-3">
-              <div className="w-14 h-14 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
+              <div className="w-14 h-14 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary animate-pop-in">
                 <CheckCircle2 className="w-8 h-8 stroke-[2.2]" />
               </div>
 
@@ -142,7 +142,7 @@ export default function ReceiptPage() {
                   Suara Tercatat
                 </h1>
                 <p className="text-xs text-outline mt-1">
-                  Hak suara Anda telah tercatat dalam sistem KPR.
+                  Hak suaramu telah resmi tercatat. Terima kasih sudah berpartisipasi!
                 </p>
               </div>
             </div>
@@ -160,7 +160,7 @@ export default function ReceiptPage() {
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors flex items-center justify-center shrink-0 cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                     title="Salin Token"
                   >
                     {copied ? (
@@ -173,7 +173,7 @@ export default function ReceiptPage() {
               </div>
 
               {/* Session Details */}
-              <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
                 <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20">
                   <span className="text-outline text-xs block">Waktu Pencatatan:</span>
                   <span className="font-medium text-on-surface mt-0.5 flex items-center gap-1.5">
@@ -196,14 +196,14 @@ export default function ReceiptPage() {
                   type="button"
                   disabled={isVerifying}
                   onClick={handleVerifyReceipt}
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-semibold min-h-[44px] px-3 rounded-lg hover:bg-surface-container-highest transition-colors cursor-pointer -mx-3"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 font-semibold min-h-[44px] px-3 rounded-lg hover:bg-surface-container-highest transition-colors cursor-pointer -mx-3 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span>{isVerifying ? 'Memeriksa...' : 'Cek Keabsahan Bukti Pemilihan'}</span>
                 </button>
 
                 {verifyStatus && (
-                  <div className="mt-2 p-3 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/20">
+                  <div className="mt-2 p-3 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/20 animate-slide-fade-in">
                     {verifyStatus}
                   </div>
                 )}
@@ -213,22 +213,22 @@ export default function ReceiptPage() {
             {/* Note & Actions Footer */}
             <div className="p-6 pt-0 flex flex-col gap-3">
               <p className="text-xs text-outline text-center leading-relaxed">
-                Simpan token ini sebagai bukti partisipasi. Pilihan Anda bersifat rahasia.
+                Simpan token ini atau tangkap layar (screenshot) sebagai bukti telah memilih.
               </p>
 
               <div className="flex flex-col gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full h-11 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                  className="w-full h-11 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all duration-150 flex items-center justify-center gap-2 shadow-sm cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Keluar dari Sesi</span>
+                  <span>Selesai &amp; Keluar</span>
                 </button>
 
                 <Link
                   href="/"
-                  className="w-full h-11 min-h-[44px] rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-full h-11 min-h-[44px] rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   Kembali ke Beranda
                 </Link>

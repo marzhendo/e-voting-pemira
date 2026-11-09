@@ -15,6 +15,76 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+function getAuthErrorDisplay(
+  urlError: string | null,
+  urlMessage: string | null,
+  errorMessage: string | null
+): { title: string; message: string } | null {
+  // 1. Error dari aksi klien (input NIM / verifikasi PIN)
+  if (errorMessage) {
+    if (errorMessage.toLowerCase().includes('pin')) {
+      return {
+        title: 'Kode PIN Tidak Sesuai',
+        message: errorMessage,
+      };
+    }
+    if (errorMessage.toLowerCase().includes('dpt') || errorMessage.toLowerCase().includes('terdaftar')) {
+      return {
+        title: 'NIM Belum Terdaftar di DPT',
+        message: errorMessage,
+      };
+    }
+    if (errorMessage.toLowerCase().includes('hak suara')) {
+      return {
+        title: 'Hak Suara Sudah Digunakan',
+        message: errorMessage,
+      };
+    }
+    return {
+      title: 'Gagal Masuk',
+      message: errorMessage,
+    };
+  }
+
+  // 2. Pemetaan pengalihan URL (Middleware) ke bahasa yang manusiawi
+  if (urlError === 'ADMIN_AUTH_REQUIRED' || (urlError === 'AUTH_REQUIRED' && urlMessage?.includes('panitia'))) {
+    return {
+      title: 'Perlu Akun Panitia',
+      message: 'Halaman dashboard hanya dapat diakses oleh Panitia KPR. Jika kamu pemilih, silakan masuk ke bilik suara menggunakan NIM.',
+    };
+  }
+
+  if (urlError === 'ADMIN_FORBIDDEN' || urlError === 'FORBIDDEN') {
+    return {
+      title: 'Akses Terbatas',
+      message: 'Akunmu terdaftar sebagai pemilih, bukan panitia. Silakan kembali ke Bilik Suara.',
+    };
+  }
+
+  if (urlError === 'VOTE_SESSION_REQUIRED' || urlError === 'SESSION_REQUIRED' || urlError === 'AUTH_REQUIRED') {
+    return {
+      title: 'Sesi Perlu Diperbarui',
+      message: 'Demi keamanan hak pilihmu, silakan masukkan NIM untuk menerima kode PIN baru.',
+    };
+  }
+
+  if (urlError === 'NOT_REGISTERED') {
+    return {
+      title: 'NIM Belum Terdaftar di DPT',
+      message: 'NIM kamu belum tercatat di data pemilih tetap. Mahasiswa aktif Informatika dapat konfirmasi ke Panitia KPR.',
+    };
+  }
+
+  if (urlMessage) {
+    return {
+      title: 'Perhatian',
+      message: urlMessage,
+    };
+  }
+
+  return null;
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
 
@@ -186,17 +256,21 @@ export function LoginForm() {
     }
   }
 
+  const errorDisplay = getAuthErrorDisplay(urlError, urlMessage, errorMessage);
+
   return (
     <div className="w-full space-y-4">
       {/* Banner Error / Notifikasi */}
-      {(errorMessage || urlMessage) && (
-        <div className="rounded-xl border border-error/40 bg-error-container/20 p-3.5 text-xs text-error flex items-start gap-2.5 animate-in fade-in duration-200">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+      {errorDisplay && (
+        <div className="rounded-xl border border-error/40 bg-error-container/20 p-3.5 text-xs text-error flex items-start gap-2.5 animate-slide-fade-in">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-error" />
           <div className="flex-1">
             <div className="font-bold">
-              {urlError ? `Akses Ditolak (${urlError})` : 'Gagal Masuk'}
+              {errorDisplay.title}
             </div>
-            <div className="mt-0.5 text-on-surface-variant">{errorMessage || urlMessage}</div>
+            <div className="mt-0.5 text-on-surface-variant leading-relaxed">
+              {errorDisplay.message}
+            </div>
             {remainingAttempts !== null && (
               <div className="mt-1 font-semibold text-on-surface">
                 Sisa kesempatan percobaan: {remainingAttempts} kali.
@@ -216,7 +290,7 @@ export function LoginForm() {
 
       {/* STEP 1: INPUT NIM */}
       {step === 'nim' && (
-        <form onSubmit={handleRequestOtp} className="space-y-4">
+        <form onSubmit={handleRequestOtp} className="space-y-4 animate-slide-fade-in">
           <div>
             <label
               htmlFor="identifier"
@@ -233,7 +307,7 @@ export function LoginForm() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="Contoh: 103012300001"
                 disabled={isLoading}
-                className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-outline/60 text-sm font-medium focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-outline/60 text-sm font-medium focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
               <Mail className="w-4 h-4 text-outline absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -242,7 +316,7 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={isLoading || !identifier.trim()}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
+            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]"
           >
             {isLoading ? (
               <>
@@ -258,7 +332,7 @@ export function LoginForm() {
 
       {/* STEP 2: INPUT 6-DIGIT PIN */}
       {step === 'pin' && (
-        <form onSubmit={handleVerifyOtp} className="space-y-4 animate-in fade-in duration-200">
+        <form onSubmit={handleVerifyOtp} className="space-y-4 animate-slide-fade-in">
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
@@ -274,7 +348,7 @@ export function LoginForm() {
                   setErrorMessage(null);
                   setSuccessNotice(null);
                 }}
-                className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold min-h-[44px] px-3 py-2 rounded-lg hover:bg-surface-container transition-colors -my-2"
+                className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold min-h-[44px] px-3 py-2 rounded-lg hover:bg-surface-container transition-colors -my-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Ganti NIM</span>
@@ -294,20 +368,20 @@ export function LoginForm() {
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="• • • • • •"
                 disabled={isLoading}
-                className="w-full h-14 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-outline-variant/40 bg-surface-container text-primary placeholder:text-outline/40 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                className="w-full h-14 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-outline-variant/40 bg-surface-container text-primary placeholder:text-outline/40 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </div>
 
             <div className="flex items-center justify-between mt-2 text-xs text-outline">
               <span>Terkirim ke: <strong className="text-on-surface">{maskedEmail}</strong></span>
-              <span>Aktif: <strong className="text-on-surface">10 Menit</strong></span>
+              <span>Berlaku: <strong className="text-on-surface">10 Menit</strong></span>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={isLoading || pin.length !== 6}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
+            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]"
           >
             {isLoading ? (
               <>

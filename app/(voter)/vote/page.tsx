@@ -199,7 +199,7 @@ export default function VotePage() {
                 Pemira HMIF 2026/2027
               </span>
               <span className="text-xs text-outline hidden sm:block">
-                Bilik Suara Mahasiswa
+                Bilik Suara
               </span>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function VotePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-outline hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg hover:bg-surface-container"
+              className="text-outline hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg hover:bg-surface-container focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               <HelpCircle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Bantuan</span>
@@ -229,7 +229,7 @@ export default function VotePage() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full pt-20 flex-1 flex flex-col">
+      <main className="w-full pt-20 flex-1 flex flex-col animate-page-enter">
         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-28 sm:pb-32">
           {/* Header Title Section */}
           <div className="mb-6">
@@ -245,10 +245,10 @@ export default function VotePage() {
 
           {/* Maintenance / Closed Notice */}
           {(!votingActive || maintenanceMode) && (
-            <div className="mb-6 rounded-2xl border border-hmif-red/30 bg-hmif-red/10 p-4 text-on-surface flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-hmif-red shrink-0 mt-0.5" />
+            <div className="mb-6 rounded-2xl border border-error/30 bg-error-container/20 p-4 text-on-surface flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-bold text-sm text-hmif-red">
+                <h4 className="font-bold text-sm text-error">
                   {maintenanceMode
                     ? 'Bilik Suara Sedang Dalam Pemeliharaan'
                     : 'Pemungutan Suara Sedang Ditutup'}
@@ -257,7 +257,7 @@ export default function VotePage() {
                   {maintenanceMode
                     ? 'Sistem sedang dalam pemeliharaan. Coba lagi nanti atau hubungi Panitia KPR.'
                     : electionSchedule
-                    ? `Pemungutan suara hanya dapat dilakukan pada jadwal resmi: ${new Date(
+                    ? `Pemilihan hanya dibuka pada jadwal resmi: ${new Date(
                         electionSchedule.start
                       ).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} s/d ${new Date(
                         electionSchedule.end
@@ -270,7 +270,7 @@ export default function VotePage() {
 
           {/* Error Banner */}
           {electionError && (
-            <div className="mb-6 rounded-xl border border-hmif-red/30 bg-hmif-red/10 p-4 text-xs text-hmif-red flex items-start gap-2.5">
+            <div className="mb-6 rounded-xl border border-error/30 bg-error-container/20 p-4 text-xs text-error flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{electionError}</span>
             </div>
@@ -373,7 +373,7 @@ export default function VotePage() {
                 <button
                   type="button"
                   onClick={handleResetSelection}
-                  className="px-4 h-11 min-h-[44px] rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+                  className="px-4 h-11 min-h-[44px] rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   Batal
                 </button>
@@ -383,7 +383,7 @@ export default function VotePage() {
                 type="button"
                 disabled={!selectedCandidate || !votingActive || maintenanceMode || isSessionExpired}
                 onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto px-6 h-11 min-h-[44px] rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-md"
+                className="w-full sm:w-auto px-6 h-11 min-h-[44px] rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary-fixed transition-all duration-150 flex items-center justify-center gap-2 shadow-md active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <span>Konfirmasi Pilihan</span>
                 <ArrowRight className="w-4 h-4" />

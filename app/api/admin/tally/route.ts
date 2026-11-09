@@ -26,6 +26,36 @@ export async function GET() {
     try {
       const adminSupabase = createAdminClient();
 
+      // Coba eksekusi Stored Procedure Agregasi Server-side (Ultra Cepat < 5ms)
+      const { data: rpcSummary, error: rpcError } = await adminSupabase.rpc('get_election_tally_summary');
+
+      if (!rpcError && rpcSummary && rpcSummary.success) {
+        const isClosed = rpcSummary.electionSettings.isClosed;
+
+        // Auditor hanya berhak melihat perolehan suara paslon jika pemungutan suara telah ditutup resmi
+        if (session?.role === 'auditor' && !isClosed) {
+          return NextResponse.json(
+            {
+              error: 'Akses Ditolak: Peran Auditor hanya diperbolehkan melihat tally suara setelah pemungutan suara resmi ditutup oleh KPR.',
+              code: 'AUDITOR_TALLY_LOCKED',
+            },
+            { status: 403 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          timestamp: rpcSummary.timestamp || new Date().toISOString(),
+          electionSettings: rpcSummary.electionSettings,
+          turnout: rpcSummary.turnout,
+          tally: rpcSummary.tally,
+        });
+      }
+
+      if (rpcError) {
+        console.warn('[AdminTallyRoute] RPC get_election_tally_summary fallback:', rpcError.message);
+      }
+
       // 2. Baca Pengaturan Pemilihan
       const { data: settings, error: settingsError } = await adminSupabase
         .from('election_settings')

@@ -58,13 +58,13 @@ export function CandidateCard({
           </div>
 
           <div
-            className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+            className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all duration-200 ${
               isSelected
-                ? 'bg-primary border-primary text-on-primary'
-                : 'border-outline/40 bg-surface-container-highest text-transparent'
+                ? 'bg-primary border-primary text-on-primary scale-100 shadow-sm'
+                : 'border-outline/40 bg-surface-container-highest text-transparent scale-90'
             }`}
           >
-            <Check className="w-3.5 h-3.5 stroke-[3]" />
+            <Check className={`w-3.5 h-3.5 stroke-[3] transition-transform duration-200 ${isSelected ? 'scale-100' : 'scale-75'}`} />
           </div>
         </div>
 
@@ -99,10 +99,10 @@ export function CandidateCard({
           </p>
         </div>
 
-        {/* Fokus Visi Singkat */}
+        {/* Visi Utama */}
         <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/30 text-xs text-on-surface-variant">
           <span className="text-[11px] font-bold uppercase tracking-wider text-primary block mb-1">
-            Fokus Visi:
+            Visi Utama
           </span>
           <p className="line-clamp-2 text-xs leading-relaxed text-on-surface/90">
             &ldquo;{candidate.vision}&rdquo;
@@ -116,14 +116,14 @@ export function CandidateCard({
             e.stopPropagation();
             onOpenDetail?.(candidate);
           }}
-          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-all shadow-sm cursor-pointer"
+          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-all duration-150 shadow-sm cursor-pointer active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           <span className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
             <span>Detail Visi Misi &amp; CV Paslon</span>
           </span>
-          <span className="text-xs font-semibold text-primary">
-            Lihat Profil →
+          <span className="text-sm font-bold text-primary">
+            →
           </span>
         </button>
       </div>
@@ -131,7 +131,7 @@ export function CandidateCard({
       {/* Footer Aksi Card */}
       <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
         <span className="text-xs text-outline font-medium">
-          {isSelected ? '✓ Terpilih' : 'Ketuk untuk memilih'}
+          {isSelected ? '✓ Terpilih' : 'Belum dipilih'}
         </span>
         <button
           type="button"
@@ -139,7 +139,7 @@ export function CandidateCard({
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-150 flex items-center justify-center cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
             isSelected
               ? 'bg-primary text-on-primary shadow-sm'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'

@@ -6,7 +6,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-between antialiased selection:bg-primary selection:text-on-primary">
       {/* Main Viewport Container */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12 animate-page-enter">
         <div className="w-full max-w-4xl bg-surface-container border border-outline-variant/30 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
           {/* LEFT COLUMN: Identity & Context */}
           <section className="hidden lg:flex lg:col-span-7 p-8 sm:p-10 flex flex-col justify-center bg-surface-container-low lg:border-r border-outline-variant/20">
@@ -104,12 +104,12 @@ export default function LoginPage() {
 
             <div className="pt-6 border-t border-outline-variant/20 text-center mt-6">
               <p className="text-xs text-outline">
-                Kendala autentikasi?{' '}
+                Ada kendala saat login?{' '}
                 <a
                   href="https://wa.me/6281809300406"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-primary hover:underline inline-flex items-center gap-1 min-h-[44px] px-2 py-1"
+                  className="font-semibold text-primary hover:underline inline-flex items-center gap-1 min-h-[44px] px-2 py-1 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   Hubungi Panitia KPR
                 </a>

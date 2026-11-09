@@ -33,18 +33,25 @@ export async function GET() {
           .order('candidate_number', { ascending: true });
 
         if (!candError && candidates && candidates.length > 0) {
-          return NextResponse.json({
-            success: true,
-            electionStatus: {
-              isVotingActive,
-              isVotingOpen: settings.is_voting_open,
-              maintenanceMode: settings.maintenance_mode,
-              isWithinWindow,
-              startTime: settings.start_time,
-              endTime: settings.end_time,
+          return NextResponse.json(
+            {
+              success: true,
+              electionStatus: {
+                isVotingActive,
+                isVotingOpen: settings.is_voting_open,
+                maintenanceMode: settings.maintenance_mode,
+                isWithinWindow,
+                startTime: settings.start_time,
+                endTime: settings.end_time,
+              },
+              candidates,
             },
-            candidates,
-          });
+            {
+              headers: {
+                'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+              },
+            }
+          );
         }
       }
     } catch (error) {

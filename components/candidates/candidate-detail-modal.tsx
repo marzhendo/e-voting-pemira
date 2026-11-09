@@ -99,14 +99,14 @@ export function CandidateDetailModal({
           <div
             ref={modalRef}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col min-h-0 bg-surface-container rounded-2xl sm:rounded-3xl border border-outline-variant/40 shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col min-h-0 bg-surface-container rounded-2xl sm:rounded-3xl border border-outline-variant/40 shadow-2xl overflow-hidden my-auto animate-modal-enter"
           >
             {/* TOP NAVBAR / HEADER */}
             <div className="shrink-0 px-4 sm:px-8 py-3.5 sm:py-4 bg-surface-container/95 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between gap-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center gap-2 text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container-highest min-h-[44px] px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container-highest min-h-[44px] px-3.5 py-2 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Kembali ke Bilik Suara</span>
@@ -120,7 +120,7 @@ export function CandidateDetailModal({
                   type="button"
                   onClick={onClose}
                   aria-label="Tutup Detail"
-                  className="w-11 h-11 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-outline hover:text-on-surface transition-colors cursor-pointer"
+                  className="w-11 h-11 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-outline hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -150,7 +150,7 @@ export function CandidateDetailModal({
 
             {/* Nama & Deskripsi */}
             <div className="flex-1 text-center sm:text-left space-y-3">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest text-hmif-gold">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest text-primary">
                 <Award className="w-3.5 h-3.5" />
                 <span>Pemira HMIF 2026/2027</span>
               </div>
@@ -164,7 +164,7 @@ export function CandidateDetailModal({
               </h1>
 
               <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed max-w-xl">
-                Pasangan calon Chairman &amp; Vice Chairman Himpunan Mahasiswa Informatika (HMIF) Telkom University Purwokerto Periode Kepengurusan 2026/2027.
+                Pasangan calon Chairman &amp; Vice Chairman HMIF Telkom University Purwokerto Periode 2026/2027.
               </p>
             </div>
           </div>
@@ -197,7 +197,7 @@ export function CandidateDetailModal({
                       {candidate.leader_name}
                     </h3>
                     <p className="text-xs text-on-surface-variant mt-0.5">
-                      Kandidat Ketua Himpunan Mahasiswa Informatika
+                      Kandidat Chairman HMIF
                     </p>
                   </div>
                 </div>
@@ -209,7 +209,7 @@ export function CandidateDetailModal({
                     download={chairmanDownloadName}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full h-11 min-h-[44px] px-4 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant/30 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer group/btn"
+                    className="w-full h-11 min-h-[44px] px-4 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant/30 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer group/btn active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                   >
                     <Download className="w-4 h-4 text-primary group-hover/btn:text-on-primary transition-all" />
                     <span>Unduh CV Chairman (PDF)</span>
@@ -232,7 +232,7 @@ export function CandidateDetailModal({
                       {candidate.vice_leader_name}
                     </h3>
                     <p className="text-xs text-on-surface-variant mt-0.5">
-                      Kandidat Wakil Ketua Himpunan Mahasiswa Informatika
+                      Kandidat Vice Chairman HMIF
                     </p>
                   </div>
                 </div>
@@ -244,7 +244,7 @@ export function CandidateDetailModal({
                     download={viceChairmanDownloadName}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full h-11 min-h-[44px] px-4 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant/30 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer group/btn"
+                    className="w-full h-11 min-h-[44px] px-4 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant/30 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer group/btn active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                   >
                     <Download className="w-4 h-4 text-primary group-hover/btn:text-on-primary transition-all" />
                     <span>Unduh CV Vice Chairman (PDF)</span>
@@ -296,15 +296,15 @@ export function CandidateDetailModal({
         {/* BOTTOM ACTION BAR */}
         <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-outline">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Pilihan Anda tercatat secara rahasia dan aman.</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Suara dijamin rahasia dan tidak ditautkan ke NIM.</span>
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center"
+              className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               Tutup
             </button>
@@ -315,7 +315,7 @@ export function CandidateDetailModal({
                 onSelectCandidate(candidate);
                 onClose();
               }}
-              className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary-fixed text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary-fixed text-xs font-bold uppercase tracking-wider transition-all duration-150 flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               <Vote className="w-4 h-4" />
               <span>{isSelected ? 'Kembali ke Surat Suara' : `Pilih Paslon ${numberStr}`}</span>

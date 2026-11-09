@@ -417,7 +417,7 @@ export default function AdminDashboardPage() {
     if (activeTab === 'overview' || activeTab === 'tally') {
       const pollTimer = setInterval(() => {
         fetchTally(true);
-      }, 3000);
+      }, 15000); // Polling 15s untuk optimasi beban DB
       return () => clearInterval(pollTimer);
     }
   }, [fetchTally, activeTab]);

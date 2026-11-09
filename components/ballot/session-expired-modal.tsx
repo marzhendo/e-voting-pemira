@@ -45,10 +45,10 @@ export function SessionExpiredModal({
         <div className="flex min-h-full items-center justify-center p-4 text-center">
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-surface-container-high rounded-3xl p-6 sm:p-8 shadow-2xl border border-outline-variant/30 flex flex-col items-center text-center animate-in zoom-in-95 duration-200 overflow-hidden my-auto"
+            className="relative w-full max-w-md bg-surface-container-high rounded-3xl p-6 sm:p-8 shadow-2xl border border-outline-variant/30 flex flex-col items-center text-center animate-modal-enter overflow-hidden my-auto"
           >
             {/* Warning Icon Badge without trend-stacked glows */}
-            <div className="w-14 h-14 rounded-2xl bg-hmif-red/10 border border-hmif-red/30 flex items-center justify-center text-hmif-red mb-5 shadow-inner">
+            <div className="w-14 h-14 rounded-2xl bg-error-container/20 border border-error/30 flex items-center justify-center text-error mb-5 shadow-inner">
               <Clock className="w-7 h-7" />
             </div>
 
@@ -74,10 +74,10 @@ export function SessionExpiredModal({
                 <ShieldAlert className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <div className="text-xs">
                   <span className="font-semibold text-on-surface block">
-                    Hak Suara Anda Tetap Aman
+                    Hak Suaramu Tetap Aman
                   </span>
                   <span className="text-outline text-[11px] leading-normal block mt-0.5">
-                    Suara belum tercatat dan hak pilihmu tetap aman. Masuk kembali untuk melanjutkan.
+                    Sesi 15 menit telah habis dan suara belum tercatat. Masuk kembali dengan NIM untuk memilih.
                   </span>
                 </div>
               </div>
@@ -88,7 +88,7 @@ export function SessionExpiredModal({
               ref={buttonRef}
               type="button"
               onClick={onLoginRedirect}
-              className="w-full h-12 min-h-[48px] rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary-fixed focus:ring-4 focus:ring-primary/20 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              className="w-full h-12 min-h-[48px] rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary-fixed focus:ring-4 focus:ring-primary/20 transition-all duration-150 flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               <span>Masuk Kembali ke Bilik Suara</span>
               <ArrowRight className="w-4 h-4" />

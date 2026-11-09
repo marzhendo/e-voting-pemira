@@ -68,15 +68,30 @@ const config: Config = {
       },
       keyframes: {
         pageEnter: {
-          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'none' },
         },
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        slideFadeIn: {
+          '0%': { opacity: '0', transform: 'translateX(12px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        popIn: {
+          '0%': { opacity: '0', transform: 'scale(0.85)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        modalEnter: {
+          '0%': { opacity: '0', transform: 'scale(0.96) translateY(8px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
       },
       animation: {
-        'page-enter': 'pageEnter 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'page-enter': 'pageEnter 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'slide-fade-in': 'slideFadeIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'pop-in': 'popIn 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'modal-enter': 'modalEnter 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
         shimmer: 'shimmer 1.8s infinite',
       },
     },
