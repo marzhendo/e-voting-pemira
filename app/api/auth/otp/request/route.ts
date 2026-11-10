@@ -4,8 +4,27 @@ import { requestVoterOtp } from '@/lib/auth/otp';
 
 export const dynamic = 'force-dynamic';
 
+const STUDENT_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@student\.telkomuniversity\.ac\.id$/i;
+const NIM_REGEX = /^[0-9]{8,15}$/;
+
 const RequestOtpSchema = z.object({
-  identifier: z.string().min(4, 'NIM atau email wajib diisi.'),
+  identifier: z
+    .string()
+    .trim()
+    .min(4, 'NIM atau email wajib diisi.')
+    .refine(
+      (val) => {
+        const clean = val.toLowerCase();
+        // Whitelist khusus akun Superadmin utama
+        if (clean === 'marzhendogalangs@gmail.com') return true;
+        // Wajib NIM resmi (8-15 digit) atau email institusi mahasiswa
+        return NIM_REGEX.test(clean) || STUDENT_EMAIL_REGEX.test(clean);
+      },
+      {
+        message:
+          'Format identitas tidak sah. Mahasiswa wajib menggunakan NIM resmi atau email @student.telkomuniversity.ac.id.',
+      }
+    ),
 });
 
 export async function POST(req: NextRequest) {

@@ -162,7 +162,16 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
   const isEmail = cleanId.includes('@');
   const now = Date.now();
 
-  // 1. Cek Mode Live Supabase atau Dev In-Memory Fallback
+  // 1. Validasi Domain Email Institusi (Kecuali Superadmin Utama)
+  if (isEmail && cleanId !== 'marzhendogalangs@gmail.com' && !cleanId.endsWith('@student.telkomuniversity.ac.id')) {
+    return {
+      success: false,
+      code: 'NIM_NOT_IN_DPT',
+      error: 'Format email tidak valid. Mahasiswa wajib menggunakan email resmi berakhiran @student.telkomuniversity.ac.id.',
+    };
+  }
+
+  // 2. Cek Mode Live Supabase atau Dev In-Memory Fallback
   if (isSupabaseConfigured()) {
     try {
       const pin = generate6DigitPin();
@@ -455,7 +464,25 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         }
 
         const voter = rpcResult.voter!;
-        const adminMatch = findAdminByEmail(voter.email);
+        let assignedRole: AdminRole | 'voter' = 'voter';
+
+        // 1. Cek dari tabel admin_users Supabase secara dinamis
+        const { data: dbAdmin } = await adminClient
+          .from('admin_users')
+          .select('role')
+          .eq('email', voter.email.toLowerCase())
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (dbAdmin?.role) {
+          assignedRole = dbAdmin.role as AdminRole;
+        } else {
+          const adminMatch = findAdminByEmail(voter.email);
+          if (adminMatch?.role) {
+            assignedRole = adminMatch.role;
+          }
+        }
+
         return {
           success: true,
           voter: {
@@ -463,7 +490,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
             email: voter.email,
             name: voter.name,
             nim: voter.nim,
-            role: adminMatch ? adminMatch.role : 'voter',
+            role: assignedRole,
             isDptVerified: true,
             hasVoted: voter.has_voted,
             generation: voter.generation,
@@ -537,21 +564,26 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
 
       if (!isValid) {
         const nextAttempts = currentAttempts + 1;
+        const isLockedOut = nextAttempts >= MAX_FAILED_ATTEMPTS;
+
+        // Jika mencapai 3x gagal, segera hancurkan hash PIN dan waktu kadaluarsa
         await adminClient
           .from('voters_whitelist')
           .update({
             otp_attempts: nextAttempts,
+            otp_hash: isLockedOut ? null : otpHash,
+            otp_expires_at: isLockedOut ? null : otpExpiresAt,
           })
           .eq('id', voter.id);
 
-        const remaining = MAX_FAILED_ATTEMPTS - nextAttempts;
+        const remaining = Math.max(0, MAX_FAILED_ATTEMPTS - nextAttempts);
         return {
           success: false,
-          code: 'INVALID_PIN',
-          remainingAttempts: Math.max(0, remaining),
+          code: isLockedOut ? 'MAX_ATTEMPTS_EXCEEDED' : 'INVALID_PIN',
+          remainingAttempts: remaining,
           error: remaining > 0
             ? `Kode PIN salah. Sisa kesempatan: ${remaining} kali.`
-            : 'Kode PIN salah. Batas percobaan habis, silakan minta kode baru.',
+            : 'Kode PIN salah. Batas percobaan (3x) telah habis. Kode PIN telah dibatalkan demi keamanan. Silakan minta kode baru.',
         };
       }
 
@@ -688,15 +720,20 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
 
   if (!isValid) {
     voterState.otpAttempts += 1;
+    const isLockedOut = voterState.otpAttempts >= MAX_FAILED_ATTEMPTS;
+    if (isLockedOut) {
+      voterState.otpHash = null;
+      voterState.otpExpiresAt = null;
+    }
     saveDevMockStore();
-    const remaining = MAX_FAILED_ATTEMPTS - voterState.otpAttempts;
+    const remaining = Math.max(0, MAX_FAILED_ATTEMPTS - voterState.otpAttempts);
     return {
       success: false,
-      code: 'INVALID_PIN',
-      remainingAttempts: Math.max(0, remaining),
+      code: isLockedOut ? 'MAX_ATTEMPTS_EXCEEDED' : 'INVALID_PIN',
+      remainingAttempts: remaining,
       error: remaining > 0
         ? `Kode PIN salah. Sisa kesempatan: ${remaining} kali.`
-        : 'Kode PIN salah. Batas percobaan habis, silakan minta kode baru.',
+        : 'Kode PIN salah. Batas percobaan (3x) telah habis. Kode PIN telah dibatalkan demi keamanan. Silakan minta kode baru.',
     };
   }
 

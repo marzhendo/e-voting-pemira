@@ -5,6 +5,7 @@ import {
   createSessionToken,
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
+  isSecureCookieEnvironment,
 } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
@@ -57,10 +58,8 @@ export async function POST(req: NextRequest) {
     // 1. Buat JWT Session Token
     const sessionToken = await createSessionToken(result.voter);
 
-    // 2. Siapkan response dan set Cookie
-    const isProductionHttps =
-      process.env.APP_ENV === 'production' &&
-      !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
+    // 2. Siapkan response dan set Cookie (HTTPOnly, Secure, SameSite=Strict)
+    const isSecure = isSecureCookieEnvironment();
 
     const isStaff = result.voter.role && result.voter.role !== 'voter';
     const destination = isStaff
@@ -85,8 +84,8 @@ export async function POST(req: NextRequest) {
 
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
       httpOnly: true,
-      secure: isProductionHttps,
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: 'strict',
       maxAge: SESSION_MAX_AGE_SECONDS,
       path: '/',
     });

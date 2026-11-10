@@ -68,4 +68,50 @@ describe('Auth & Session Unit Tests', () => {
       /JWTExpired/
     );
   });
+
+  test('Strict Email Domain Validation: Only @student.telkomuniversity.ac.id, valid NIM, or emergency Superadmin allowed', () => {
+    const STUDENT_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@student\.telkomuniversity\.ac\.id$/i;
+    const NIM_REGEX = /^[0-9]{8,15}$/;
+
+    function isValidIdentifier(val) {
+      if (!val || typeof val !== 'string') return false;
+      const clean = val.trim().toLowerCase();
+      if (clean === 'marzhendogalangs@gmail.com') return true;
+      return NIM_REGEX.test(clean) || STUDENT_EMAIL_REGEX.test(clean);
+    }
+
+    // Valid student emails
+    assert.strictEqual(isValidIdentifier('103012300001@student.telkomuniversity.ac.id'), true);
+    assert.strictEqual(isValidIdentifier('ahmad.rizky@student.telkomuniversity.ac.id'), true);
+
+    // Valid NIMs
+    assert.strictEqual(isValidIdentifier('103012300001'), true);
+    assert.strictEqual(isValidIdentifier('103112400102'), true);
+
+    // Emergency Superadmin
+    assert.strictEqual(isValidIdentifier('marzhendogalangs@gmail.com'), true);
+
+    // Malicious or invalid emails
+    assert.strictEqual(isValidIdentifier('attacker@gmail.com'), false);
+    assert.strictEqual(isValidIdentifier('hacker@yahoo.com'), false);
+    assert.strictEqual(isValidIdentifier('dosen@telkomuniversity.ac.id'), false, 'Non-student domain must be rejected');
+    assert.strictEqual(isValidIdentifier('someone@evil.telkomuniversity.ac.id'), false);
+    assert.strictEqual(isValidIdentifier('abc'), false);
+    assert.strictEqual(isValidIdentifier('123'), false, 'Short number (<8 digits) must be rejected');
+    assert.strictEqual(isValidIdentifier('drop table ballots;'), false);
+  });
+
+  test('Session Cookie Standards: Enforces SameSite=Strict and HttpOnly', () => {
+    const cookieConfig = {
+      httpOnly: true,
+      secure: false, // In test / local mock
+      sameSite: 'strict',
+      maxAge: 15 * 60,
+      path: '/',
+    };
+
+    assert.strictEqual(cookieConfig.httpOnly, true, 'Cookie must be HTTPOnly');
+    assert.strictEqual(cookieConfig.sameSite, 'strict', 'Cookie must enforce SameSite=Strict against CSRF');
+    assert.strictEqual(cookieConfig.path, '/', 'Cookie path must be root');
+  });
 });

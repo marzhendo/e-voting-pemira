@@ -72,18 +72,27 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
 }
 
 /**
+ * Evaluates whether secure cookies must be enforced based on environment and protocol.
+ */
+export function isSecureCookieEnvironment(): boolean {
+  if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production') {
+    return !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
+  }
+  return process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ?? false;
+}
+
+/**
  * Sets the session cookie on the current HTTP response.
+ * Enforces highest security standard: HTTPOnly, Secure, SameSite=Strict.
  */
 export function setSessionCookie(token: string) {
   const cookieStore = cookies();
-  const isProductionHttps =
-    process.env.APP_ENV === 'production' &&
-    !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
+  const isSecure = isSecureCookieEnvironment();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: isProductionHttps,
-    sameSite: 'lax', // Lax enables session preservation after OAuth redirect from Entra
+    secure: isSecure,
+    sameSite: 'strict',
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: '/',
   });
@@ -106,14 +115,12 @@ export async function getSession(): Promise<SessionUser | null> {
  */
 export function clearSessionCookie() {
   const cookieStore = cookies();
-  const isProductionHttps =
-    process.env.APP_ENV === 'production' &&
-    !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
+  const isSecure = isSecureCookieEnvironment();
 
   cookieStore.set(SESSION_COOKIE_NAME, '', {
     httpOnly: true,
-    secure: isProductionHttps,
-    sameSite: 'lax',
+    secure: isSecure,
+    sameSite: 'strict',
     maxAge: 0,
     path: '/',
   });

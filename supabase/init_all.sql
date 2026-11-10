@@ -141,14 +141,20 @@ DROP POLICY IF EXISTS "Service role full access election_settings" ON public.ele
 CREATE POLICY "Service role full access election_settings"
     ON public.election_settings FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Ballots: Ditolak total dari browser publik (akses hanya via RPC / service_role)
+-- Ballots: Ditolak total dari browser publik (akses hanya via RPC / service_role). Hanya INSERT dan SELECT (Append-Only)
 DROP POLICY IF EXISTS "Deny direct public access to ballots" ON public.ballots;
 CREATE POLICY "Deny direct public access to ballots"
     ON public.ballots FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
 DROP POLICY IF EXISTS "Service role full access ballots" ON public.ballots;
-CREATE POLICY "Service role full access ballots"
-    ON public.ballots FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Service role insert ballots" ON public.ballots;
+DROP POLICY IF EXISTS "Service role read ballots for tally" ON public.ballots;
+
+CREATE POLICY "Service role insert ballots"
+    ON public.ballots FOR INSERT TO service_role WITH CHECK (true);
+
+CREATE POLICY "Service role read ballots for tally"
+    ON public.ballots FOR SELECT TO service_role USING (true);
 
 -- Voters Whitelist: Ditolak total dari browser publik
 DROP POLICY IF EXISTS "Deny direct public access to voters_whitelist" ON public.voters_whitelist;
@@ -159,14 +165,20 @@ DROP POLICY IF EXISTS "Service role full access voters_whitelist" ON public.vote
 CREATE POLICY "Service role full access voters_whitelist"
     ON public.voters_whitelist FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Audit Logs: Ditolak dari browser publik
+-- Audit Logs: Ditolak dari browser publik. Hanya INSERT dan SELECT (Append-Only)
 DROP POLICY IF EXISTS "Deny direct public access to audit_logs" ON public.audit_logs;
 CREATE POLICY "Deny direct public access to audit_logs"
     ON public.audit_logs FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
 DROP POLICY IF EXISTS "Service role full access audit_logs" ON public.audit_logs;
-CREATE POLICY "Service role full access audit_logs"
-    ON public.audit_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Service role insert audit_logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "Service role read audit_logs" ON public.audit_logs;
+
+CREATE POLICY "Service role insert audit_logs"
+    ON public.audit_logs FOR INSERT TO service_role WITH CHECK (true);
+
+CREATE POLICY "Service role read audit_logs"
+    ON public.audit_logs FOR SELECT TO service_role USING (true);
 
 -- Admin Users: Ditolak dari browser publik
 DROP POLICY IF EXISTS "Deny direct public access to admin_users" ON public.admin_users;
@@ -176,6 +188,77 @@ CREATE POLICY "Deny direct public access to admin_users"
 DROP POLICY IF EXISTS "Service role full access admin_users" ON public.admin_users;
 CREATE POLICY "Service role full access admin_users"
     ON public.admin_users FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- Cabut Izin DML UPDATE & DELETE untuk tabel Append-Only
+REVOKE UPDATE, DELETE ON TABLE public.ballots FROM PUBLIC, anon, authenticated, service_role;
+REVOKE UPDATE, DELETE ON TABLE public.audit_logs FROM PUBLIC, anon, authenticated, service_role;
+
+-- Enforce Append-Only Triggers
+CREATE OR REPLACE FUNCTION public.prevent_append_only_modification()
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'CRITICAL SECURITY VIOLATION: Tabel % bersifat APPEND-ONLY. Operasi % DILARANG KERAS oleh protokol integritas Pemira HMIF.', 
+        TG_TABLE_NAME, TG_OP;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_ballots_prevent_modification ON public.ballots;
+CREATE TRIGGER trg_ballots_prevent_modification
+BEFORE UPDATE OR DELETE ON public.ballots
+FOR EACH ROW EXECUTE FUNCTION public.prevent_append_only_modification();
+
+DROP TRIGGER IF EXISTS trg_audit_logs_prevent_modification ON public.audit_logs;
+CREATE TRIGGER trg_audit_logs_prevent_modification
+BEFORE UPDATE OR DELETE ON public.audit_logs
+FOR EACH ROW EXECUTE FUNCTION public.prevent_append_only_modification();
+
+-- Enforce Superadmin Immutability Trigger
+CREATE OR REPLACE FUNCTION public.protect_superadmin_immutability()
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF LOWER(OLD.email) = 'marzhendogalangs@gmail.com' THEN
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'CRITICAL SECURITY: Akun Superadmin utama (%) bersifat IMMUTABLE dan DILARANG dihapus dari sistem Pemira HMIF.', OLD.email;
+        END IF;
+
+        IF TG_OP = 'UPDATE' THEN
+            IF NEW.is_active = FALSE THEN
+                RAISE EXCEPTION 'CRITICAL SECURITY: Akun Superadmin utama (%) tidak boleh dinonaktifkan.', OLD.email;
+            END IF;
+
+            IF NEW.role <> 'super_admin' THEN
+                RAISE EXCEPTION 'CRITICAL SECURITY: Peran akun Superadmin utama (%) tidak boleh diubah atau diturunkan.', OLD.email;
+            END IF;
+
+            IF LOWER(NEW.email) <> LOWER(OLD.email) THEN
+                RAISE EXCEPTION 'CRITICAL SECURITY: Alamat email akun Superadmin utama (%) tidak boleh diubah.', OLD.email;
+            END IF;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_superadmin_admin_users ON public.admin_users;
+CREATE TRIGGER trg_protect_superadmin_admin_users
+BEFORE UPDATE OR DELETE ON public.admin_users
+FOR EACH ROW EXECUTE FUNCTION public.protect_superadmin_immutability();
+
+DROP TRIGGER IF EXISTS trg_protect_superadmin_voters ON public.voters_whitelist;
+CREATE TRIGGER trg_protect_superadmin_voters
+BEFORE DELETE ON public.voters_whitelist
+FOR EACH ROW
+WHEN (LOWER(OLD.email) = 'marzhendogalangs@gmail.com')
+EXECUTE FUNCTION public.protect_superadmin_immutability();
 
 -- ==============================================================================
 -- 9. STORED PROCEDURE: ATOMIC VOTE SUBMISSION (cast_ballot_secure)
@@ -419,6 +502,22 @@ BEGIN
     IF v_voter.otp_hash <> p_pin_hash THEN
         v_next_attempts := COALESCE(v_voter.otp_attempts, 0) + 1;
 
+        -- Jika mencapai batas percobaan 3x, SEGERA HANCURKAN HASH PIN
+        IF v_next_attempts >= 3 THEN
+            UPDATE public.voters_whitelist
+            SET otp_attempts = v_next_attempts,
+                otp_hash = NULL,
+                otp_expires_at = NULL
+            WHERE id = v_voter.id;
+
+            RETURN jsonb_build_object(
+                'success', false,
+                'code', 'MAX_ATTEMPTS_EXCEEDED',
+                'remainingAttempts', 0,
+                'message', 'Batas percobaan (3x) telah habis. Kode PIN telah dibatalkan demi keamanan. Silakan minta kode baru.'
+            );
+        END IF;
+
         UPDATE public.voters_whitelist
         SET otp_attempts = v_next_attempts
         WHERE id = v_voter.id;
@@ -510,9 +609,10 @@ VALUES
     ('kpradmin@student.telkomuniversity.ac.id', 'kpr_admin', TRUE, 'INITIAL_SETUP')
 ON CONFLICT (email) DO NOTHING;
 
--- 4. Sample DPT untuk Pengujian Awal
+-- 4. Sample DPT untuk Pengujian Awal & Akun Administrator
 INSERT INTO public.voters_whitelist (nim, email, name, generation, has_voted)
 VALUES
+    ('999999999999', 'marzhendogalangs@gmail.com', 'Marzhendo Galang (Superadmin)', 2024, FALSE),
     ('103012300001', 'voter1@student.telkomuniversity.ac.id', 'Ahmad Rizky Pratama', 2023, FALSE),
     ('103012400099', 'marzhendo03@gmail.com', 'Marzhendo (Tester)', 2024, FALSE),
     ('103112400102', 'marzhendogalang@student.telkomuniversity.ac.id', 'Penguji Sistem KPR (Galang)', 2024, FALSE)

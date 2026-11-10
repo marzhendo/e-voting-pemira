@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { authenticateDummyUser, isDummyAuthAllowed, DUMMY_ACCOUNTS } from '@/lib/auth/dummy';
-import { createSessionToken, setSessionCookie, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/auth/session';
+import {
+  createSessionToken,
+  setSessionCookie,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  isSecureCookieEnvironment,
+} from '@/lib/auth/session';
 import { resetVoterVoteStatus, markVoterAsVoted } from '@/lib/dpt/store';
 
 const dummyLoginSchema = z.object({
@@ -65,9 +71,7 @@ export async function POST(request: NextRequest) {
     const sessionToken = await createSessionToken(authResult.user);
     setSessionCookie(sessionToken);
 
-    const isProductionHttps =
-      process.env.APP_ENV === 'production' &&
-      !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
+    const isSecure = isSecureCookieEnvironment();
 
     const response = NextResponse.json({
       success: true,
@@ -78,8 +82,8 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
       httpOnly: true,
-      secure: isProductionHttps,
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: 'strict',
       maxAge: SESSION_MAX_AGE_SECONDS,
       path: '/',
     });
