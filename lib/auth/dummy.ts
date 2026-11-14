@@ -125,11 +125,12 @@ export async function authenticateDummyUser(accountId: string): Promise<Identity
 
   if (isSupabaseConfigured) {
     try {
+      const hexObjectId = Buffer.from(account.id).toString('hex').slice(0, 12).padStart(12, '0');
       const dbResult = await resolveUserIdentity({
         email: account.email,
         name: account.name,
         entraTenantId: '00000000-0000-0000-0000-000000000001',
-        entraObjectId: `00000000-0000-0000-0000-${account.id.padEnd(12, '0')}`,
+        entraObjectId: `00000000-0000-0000-0000-${hexObjectId}`,
       });
 
       if (dbResult.success || dbResult.code === 'ALREADY_VOTED' || dbResult.code === 'NOT_FOUND') {

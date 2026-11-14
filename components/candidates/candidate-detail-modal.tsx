@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Portal } from '@/components/ui/portal';
 import {
   ArrowLeft,
@@ -84,29 +85,41 @@ export function CandidateDetailModal({
 
   return (
     <Portal>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="candidate-detail-title"
-        className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            onClose();
-          }
-        }}
-      >
-        <div className="flex min-h-full items-center justify-center p-3 sm:p-6 text-left">
-          <div
-            ref={modalRef}
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col min-h-0 bg-surface-container rounded-2xl sm:rounded-3xl border border-outline-variant/40 shadow-2xl overflow-hidden my-auto animate-modal-enter"
+      <AnimatePresence>
+        {isOpen && candidate && (
+          <motion.div
+            key="detail-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="candidate-detail-title"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                onClose();
+              }
+            }}
           >
+            <div className="flex min-h-full items-center justify-center p-3 sm:p-6 text-left">
+              <motion.div
+                key="detail-card"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ type: 'tween', ease: 'easeOut', duration: 0.18 }}
+                ref={modalRef}
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col min-h-0 bg-surface-container rounded-2xl sm:rounded-3xl border border-outline-variant/40 overflow-hidden my-auto"
+              >
             {/* TOP NAVBAR / HEADER */}
             <div className="shrink-0 px-4 sm:px-8 py-3.5 sm:py-4 bg-surface-container/95 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between gap-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center gap-2 text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container-highest min-h-[44px] px-3.5 py-2 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest min-h-[44px] px-3.5 py-2 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Kembali ke Bilik Suara</span>
@@ -120,7 +133,7 @@ export function CandidateDetailModal({
                   type="button"
                   onClick={onClose}
                   aria-label="Tutup Detail"
-                  className="w-11 h-11 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-outline hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  className="w-11 h-11 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -138,10 +151,10 @@ export function CandidateDetailModal({
                 <img
                   src={candidate.photo_url}
                   alt={`Paslon ${numberStr}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-top"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center gap-2 text-outline p-4 text-center">
+                <div className="flex flex-col items-center justify-center gap-2 text-on-surface-variant p-4 text-center">
                   <Users className="w-12 h-12 text-primary/70" />
                   <span className="text-xs font-medium">Foto Paslon {numberStr}</span>
                 </div>
@@ -172,11 +185,11 @@ export function CandidateDetailModal({
           {/* DUAL PROFILE CARDS & SEPARATE CV DOWNLOAD BUTTONS */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-outline flex items-center gap-2">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" />
                 <span>Profil Kandidat &amp; CV</span>
               </h2>
-              <span className="text-[11px] text-outline hidden sm:inline">
+              <span className="text-[11px] text-on-surface-variant hidden sm:inline">
                 Klik tombol masing-masing untuk mengunduh dokumen CV
               </span>
             </div>
@@ -189,7 +202,7 @@ export function CandidateDetailModal({
                     <span className="px-2.5 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 text-[11px] font-extrabold tracking-wider uppercase">
                       Calon Chairman
                     </span>
-                    <span className="text-xs text-outline font-mono">Informatika</span>
+                    <span className="text-xs text-on-surface-variant font-mono">Informatika</span>
                   </div>
 
                   <div>
@@ -224,7 +237,7 @@ export function CandidateDetailModal({
                     <span className="px-2.5 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 text-[11px] font-extrabold tracking-wider uppercase">
                       Calon Vice Chairman
                     </span>
-                    <span className="text-xs text-outline font-mono">Informatika</span>
+                    <span className="text-xs text-on-surface-variant font-mono">Informatika</span>
                   </div>
 
                   <div>
@@ -295,36 +308,42 @@ export function CandidateDetailModal({
 
         {/* BOTTOM ACTION BAR */}
         <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-outline">
+          <div className="flex items-center gap-2 text-xs text-on-surface-variant font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span>Suara dijamin rahasia dan tidak ditautkan ke NIM.</span>
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               Tutup
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
               type="button"
               onClick={() => {
                 onSelectCandidate(candidate);
                 onClose();
               }}
-              className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary-fixed text-xs font-bold uppercase tracking-wider transition-all duration-150 flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               <Vote className="w-4 h-4" />
               <span>{isSelected ? 'Kembali ke Surat Suara' : `Pilih Paslon ${numberStr}`}</span>
-            </button>
+            </motion.button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
-  </div>
-  </Portal>
+  </motion.div>
+)}
+</AnimatePresence>
+</Portal>
   );
 }

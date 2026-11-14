@@ -9,6 +9,7 @@ import {
   isSecureCookieEnvironment,
 } from '@/lib/auth/session';
 import { resetVoterVoteStatus, markVoterAsVoted } from '@/lib/dpt/store';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 
 const dummyLoginSchema = z.object({
   accountId: z.string().min(1, 'Account ID is required'),
@@ -53,8 +54,28 @@ export async function POST(request: NextRequest) {
     if (process.env.APP_ENV !== 'production') {
       if (accountId === 'voter1') {
         resetVoterVoteStatus('103012300001');
+        if (isSupabaseConfigured()) {
+          try {
+            await createAdminClient()
+              .from('voters_whitelist')
+              .update({ has_voted: false })
+              .eq('nim', '103012300001');
+          } catch (e) {
+            console.warn('[DummyLogin] Failed to sync Supabase voter1:', e);
+          }
+        }
       } else if (accountId === 'voter2') {
         markVoterAsVoted('103012300002');
+        if (isSupabaseConfigured()) {
+          try {
+            await createAdminClient()
+              .from('voters_whitelist')
+              .update({ has_voted: true })
+              .eq('nim', '103012300002');
+          } catch (e) {
+            console.warn('[DummyLogin] Failed to sync Supabase voter2:', e);
+          }
+        }
       }
     }
 

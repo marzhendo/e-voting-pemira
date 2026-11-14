@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
-import { queryVoters, deleteSingleVoter, deleteVotersBatch, resetAllVoters } from '@/lib/dpt/store';
+import { queryVoters, deleteSingleVoter, deleteVotersBatch, resetAllVoters, getAllVoters } from '@/lib/dpt/store';
 import { recordAuditLog } from '@/lib/audit/store';
 import { getClientIp } from '@/lib/auth/client-ip';
+import { getRootSuperadminEmail, isRootSuperadminEmail } from '@/lib/auth/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ const DeleteDptSchema = z.object({
   id: z.string().optional(),
   nim: z.string().optional(),
   ids: z.array(z.string()).optional(),
+  nims: z.array(z.string()).optional(),
   mode: z.enum(['reset_to_default', 'clear_all', 'reset_vote_status']).optional(),
 });
 
@@ -34,14 +36,18 @@ export async function GET(req: NextRequest) {
       const search = searchParams.get('q') || '';
       const generation = searchParams.get('generation');
       const status = searchParams.get('status'); // 'voted' | 'not_voted' | null
-      const limit = Math.min(Number(searchParams.get('limit') || '50'), 100);
-      const offset = Number(searchParams.get('offset') || '0');
+      const requestedLimit = Number(searchParams.get('limit') || '50');
+      const limit = Math.min(Math.max(requestedLimit, 10), 100);
+      const requestedPage = Number(searchParams.get('page') || '0');
+      const offset = requestedPage > 0
+        ? (requestedPage - 1) * limit
+        : Math.max(Number(searchParams.get('offset') || '0'), 0);
 
       const adminSupabase = createAdminClient();
 
       let query = adminSupabase
         .from('voters_whitelist')
-        .select('id, nim, name, email, generation, has_voted, updated_at', { count: 'exact' });
+        .select('id, nim, name, email, generation, has_voted, created_at', { count: 'exact' });
 
       if (search.trim()) {
         query = query.or(`nim.ilike.%${search.trim()}%,name.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`);
@@ -61,13 +67,26 @@ export async function GET(req: NextRequest) {
 
       const { data: voters, error, count } = await query;
 
+      if (error) {
+        console.error('[AdminDptRoute] Supabase query error:', error);
+      }
+
       if (!error && voters) {
+        const total = count || 0;
+        const currentPage = Math.floor(offset / limit) + 1;
+        const totalPages = Math.ceil(total / limit) || 1;
+
         return NextResponse.json({
           success: true,
-          voters: voters || [],
-          total: count || 0,
+          voters: voters.map((v) => ({
+            ...v,
+            updated_at: v.created_at || new Date().toISOString(),
+          })),
+          total,
           limit,
           offset,
+          page: currentPage,
+          totalPages,
         });
       }
     } catch (err) {
@@ -81,8 +100,12 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('q') || '';
     const generation = searchParams.get('generation');
     const status = searchParams.get('status') as 'voted' | 'not_voted' | 'all' | null;
-    const limit = Math.min(Number(searchParams.get('limit') || '50'), 100);
-    const offset = Number(searchParams.get('offset') || '0');
+    const requestedLimit = Number(searchParams.get('limit') || '50');
+    const limit = Math.min(Math.max(requestedLimit, 10), 100);
+    const requestedPage = Number(searchParams.get('page') || '0');
+    const offset = requestedPage > 0
+      ? (requestedPage - 1) * limit
+      : Math.max(Number(searchParams.get('offset') || '0'), 0);
 
     const result = queryVoters({
       search,
@@ -92,12 +115,18 @@ export async function GET(req: NextRequest) {
       offset,
     });
 
+    const total = result.total;
+    const currentPage = Math.floor(offset / limit) + 1;
+    const totalPages = Math.ceil(total / limit) || 1;
+
     return NextResponse.json({
       success: true,
       voters: result.voters,
-      total: result.total,
+      total,
       limit,
       offset,
+      page: currentPage,
+      totalPages,
     });
   }
 
@@ -134,8 +163,11 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const { action, id, nim, ids, mode } = parsed.data;
+    const { action, id, nim, ids, nims, mode } = parsed.data;
     const clientIp = getClientIp(req);
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuid = (val?: string) => Boolean(val && UUID_REGEX.test(val));
 
     // 1. DELETE SINGLE
     if (action === 'delete_single') {
@@ -146,44 +178,61 @@ export async function DELETE(req: NextRequest) {
 
       if (isSupabaseConfigured()) {
         const adminSupabase = createAdminClient();
-        const { data: voter } = await adminSupabase
+        let query = adminSupabase
           .from('voters_whitelist')
-          .select('id, nim, name, email, has_voted')
-          .or(`id.eq.${targetIdentifier},nim.eq.${targetIdentifier}`)
-          .maybeSingle();
+          .select('id, nim, name, email, has_voted');
 
-        if (!voter) {
-          return NextResponse.json({ error: 'Pemilih tidak ditemukan.' }, { status: 404 });
+        if (id && isUuid(id)) {
+          query = query.eq('id', id);
+        } else if (nim) {
+          query = query.eq('nim', nim);
+        } else if (isUuid(targetIdentifier)) {
+          query = query.eq('id', targetIdentifier);
+        } else {
+          query = query.eq('nim', targetIdentifier);
         }
 
-        if (voter.email?.toLowerCase() === 'marzhendogalangs@gmail.com') {
-          return NextResponse.json({ error: 'Akun Superadmin utama tidak dapat dihapus.' }, { status: 400 });
+        const { data: voter, error: fetchErr } = await query.maybeSingle();
+
+        if (fetchErr) {
+          console.warn('[AdminDptRoute] Supabase fetch error on delete_single:', fetchErr);
         }
 
-        const { error: delError } = await adminSupabase
-          .from('voters_whitelist')
-          .delete()
-          .eq('id', voter.id);
+        if (voter) {
+          if (isRootSuperadminEmail(voter.email)) {
+            return NextResponse.json({ error: 'Akun Superadmin utama tidak dapat dihapus.' }, { status: 400 });
+          }
 
-        if (delError) {
-          return NextResponse.json({ error: 'Gagal menghapus pemilih dari database.' }, { status: 500 });
+          const { error: delError } = await adminSupabase
+            .from('voters_whitelist')
+            .delete()
+            .eq('id', voter.id);
+
+          if (delError) {
+            console.error('[AdminDptRoute] Supabase delete error:', delError);
+            return NextResponse.json({ error: 'Gagal menghapus pemilih dari database.' }, { status: 500 });
+          }
+
+          // Sinkronisasi hapus dari dev store juga jika ada
+          deleteSingleVoter(voter.nim);
+          deleteSingleVoter(voter.id);
+
+          recordAuditLog({
+            actorEmail: session.email,
+            actorName: session.name,
+            actorRole: session.role,
+            action: 'DPT_DELETE',
+            description: `Menghapus pemilih DPT: ${voter.name} (NIM: ${voter.nim})${voter.has_voted ? ' [PERINGATAN: Pemilih sudah memilih]' : ''}.`,
+            ipAddress: clientIp,
+            details: { target: 'voters_whitelist', voterId: voter.id, nim: voter.nim },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: `Pemilih ${voter.name} (NIM: ${voter.nim}) berhasil dihapus dari DPT.`,
+            voter,
+          });
         }
-
-        recordAuditLog({
-          actorEmail: session.email,
-          actorName: session.name,
-          actorRole: session.role,
-          action: 'DPT_DELETE',
-          description: `Menghapus pemilih DPT: ${voter.name} (NIM: ${voter.nim})${voter.has_voted ? ' [PERINGATAN: Pemilih sudah memilih]' : ''}.`,
-          ipAddress: clientIp,
-          details: { target: 'voters_whitelist', voterId: voter.id, nim: voter.nim },
-        });
-
-        return NextResponse.json({
-          success: true,
-          message: `Pemilih ${voter.name} (NIM: ${voter.nim}) berhasil dihapus dari DPT.`,
-          voter,
-        });
       }
 
       // Dev store fallback
@@ -211,54 +260,94 @@ export async function DELETE(req: NextRequest) {
 
     // 2. DELETE BATCH (SELECTIVE)
     if (action === 'delete_batch') {
-      if (!ids || ids.length === 0) {
-        return NextResponse.json({ error: 'Daftar ID pemilih yang akan dihapus tidak boleh kosong.' }, { status: 400 });
+      const targetIds = ids || [];
+      const targetNims = nims || [];
+
+      if (targetIds.length === 0 && targetNims.length === 0) {
+        return NextResponse.json({ error: 'Daftar ID atau NIM pemilih yang akan dihapus tidak boleh kosong.' }, { status: 400 });
       }
+
+      const validUuidIds = targetIds.filter(isUuid);
+      const nonUuidIds = targetIds.filter((tid) => !isUuid(tid));
+
+      // Resolusi NIM dari dev store jika ID yang dikirim berasal dari format dev (contoh: 'voter-1')
+      const devVoters = getAllVoters();
+      const nimsFromDevStore = nonUuidIds
+        .map((targetId) => {
+          const match = devVoters.find(
+            (v) => v.id.toLowerCase() === targetId.toLowerCase() || v.nim.toLowerCase() === targetId.toLowerCase()
+          );
+          return match?.nim;
+        })
+        .filter((resolvedNim): resolvedNim is string => Boolean(resolvedNim));
+
+      // Kumpulkan seluruh NIM yang ditargetkan
+      const allTargetNims = Array.from(
+        new Set([
+          ...targetNims,
+          ...nonUuidIds.filter((tid) => /^\d+$/.test(tid)),
+          ...nimsFromDevStore,
+        ])
+      );
+
+      let totalDeletedFromDb = 0;
 
       if (isSupabaseConfigured()) {
-        const adminSupabase = createAdminClient();
-        const { error: delBatchError, count } = await adminSupabase
-          .from('voters_whitelist')
-          .delete({ count: 'exact' })
-          .in('id', ids)
-          .neq('email', 'marzhendogalangs@gmail.com');
+        try {
+          const adminSupabase = createAdminClient();
 
-        if (delBatchError) {
-          return NextResponse.json({ error: 'Gagal menghapus pemilih terpilih.' }, { status: 500 });
+          // 1. Hapus berdasarkan UUID yang valid (mencegah error PostgreSQL 22P02)
+          if (validUuidIds.length > 0) {
+            const { error: uuidDelErr, count: uuidCount } = await adminSupabase
+              .from('voters_whitelist')
+              .delete({ count: 'exact' })
+              .in('id', validUuidIds)
+              .neq('email', getRootSuperadminEmail());
+
+            if (!uuidDelErr && uuidCount) {
+              totalDeletedFromDb += uuidCount;
+            } else if (uuidDelErr) {
+              console.warn('[AdminDptRoute] Supabase error deleting by UUIDs:', uuidDelErr);
+            }
+          }
+
+          // 2. Hapus berdasarkan NIM (menangani voter yang diimpor, record non-UUID, atau seleksi NIM)
+          if (allTargetNims.length > 0) {
+            const { error: nimDelErr, count: nimCount } = await adminSupabase
+              .from('voters_whitelist')
+              .delete({ count: 'exact' })
+              .in('nim', allTargetNims)
+              .neq('email', getRootSuperadminEmail());
+
+            if (!nimDelErr && nimCount) {
+              totalDeletedFromDb += nimCount;
+            } else if (nimDelErr) {
+              console.warn('[AdminDptRoute] Supabase error deleting by NIMs:', nimDelErr);
+            }
+          }
+        } catch (dbErr) {
+          console.warn('[AdminDptRoute] Database error during batch delete:', dbErr);
         }
-
-        recordAuditLog({
-          actorEmail: session.email,
-          actorName: session.name,
-          actorRole: session.role,
-          action: 'DPT_BATCH_DELETE',
-          description: `Menghapus massal secara selektif sejumlah ${count || ids.length} data pemilih DPT.`,
-          ipAddress: clientIp,
-          details: { target: 'voters_whitelist', deletedCount: count || ids.length },
-        });
-
-        return NextResponse.json({
-          success: true,
-          deletedCount: count || ids.length,
-          message: `${count || ids.length} pemilih berhasil dihapus dari DPT.`,
-        });
       }
 
-      const batchResult = deleteVotersBatch(ids);
+      // Sinkronisasi hapus dari dev store juga
+      const batchResult = deleteVotersBatch([...targetIds, ...allTargetNims]);
+      const finalCount = Math.max(totalDeletedFromDb, batchResult.deletedCount, targetIds.length);
+
       recordAuditLog({
         actorEmail: session.email,
         actorName: session.name,
         actorRole: session.role,
         action: 'DPT_BATCH_DELETE',
-        description: `Menghapus massal secara selektif sejumlah ${batchResult.deletedCount} data pemilih DPT (Dev Mode).`,
+        description: `Menghapus massal secara selektif sejumlah ${finalCount} data pemilih DPT.`,
         ipAddress: clientIp,
-        details: { target: 'voters_whitelist', deletedCount: batchResult.deletedCount },
+        details: { target: 'voters_whitelist', deletedCount: finalCount },
       });
 
       return NextResponse.json({
         success: true,
-        deletedCount: batchResult.deletedCount,
-        message: `${batchResult.deletedCount} pemilih berhasil dihapus dari DPT.`,
+        deletedCount: finalCount,
+        message: `${finalCount} pemilih berhasil dihapus dari DPT.`,
       });
     }
 
@@ -310,6 +399,43 @@ export async function DELETE(req: NextRequest) {
           return NextResponse.json({
             success: true,
             message: 'Seluruh data pemilih mahasiswa berhasil dikosongkan.',
+          });
+        }
+
+        if (selectedMode === 'reset_to_default') {
+          await adminSupabase
+            .from('voters_whitelist')
+            .delete()
+            .neq('email', getRootSuperadminEmail());
+
+          const defaultVoters = [
+            { nim: '103012300001', name: 'Ahmad Rizky Pratama', email: 'voter1@student.telkomuniversity.ac.id', generation: 2023, has_voted: false },
+            { nim: '103012300002', name: 'Budi Santoso', email: 'voter2@student.telkomuniversity.ac.id', generation: 2023, has_voted: false },
+            { nim: '103012400003', name: 'Citra Dewi Lestari', email: 'voter3@student.telkomuniversity.ac.id', generation: 2024, has_voted: false },
+            { nim: '103012400004', name: 'Dimas Wicaksono', email: 'dimasw@student.telkomuniversity.ac.id', generation: 2024, has_voted: false },
+            { nim: '103012500005', name: 'Fadhil Muhammad', email: 'fadhilm@student.telkomuniversity.ac.id', generation: 2025, has_voted: false },
+            { nim: '103012600006', name: 'Siti Nurhaliza', email: 'sitinur@student.telkomuniversity.ac.id', generation: 2026, has_voted: false },
+            { nim: '103012400099', name: 'Marzhendo', email: 'marzhendo03@gmail.com', generation: 2024, has_voted: false },
+            { nim: '103112400102', name: 'Penguji Sistem KPR (Galang)', email: 'marzhendogalang@student.telkomuniversity.ac.id', generation: 2024, has_voted: false },
+          ];
+
+          await adminSupabase
+            .from('voters_whitelist')
+            .upsert(defaultVoters, { onConflict: 'email' });
+
+          recordAuditLog({
+            actorEmail: session.email,
+            actorName: session.name,
+            actorRole: session.role,
+            action: 'DPT_RESET',
+            description: 'Mereset data DPT dan memulihkan data pemilih standar ke basis data.',
+            ipAddress: clientIp,
+            details: { mode: selectedMode },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: 'Data DPT berhasil dikembalikan ke pengaturan default sistem.',
           });
         }
       }

@@ -19,9 +19,12 @@ test.describe('Admin Candidate Management & Adaptive Layout E2E Tests', () => {
     // 3. Open Add Candidate Modal
     const addCandidateButton = page.locator('button', { hasText: 'Tambah Paslon Baru' });
     await expect(addCandidateButton).toBeVisible();
+    await page.waitForTimeout(600);
     await addCandidateButton.click();
 
     // Fill form
+    const numInput = page.locator('input[type="number"]');
+    await numInput.fill('2');
     await page.locator('input[placeholder*="Muhammad Farhan"]').fill('Fajar Ramadhan');
     await page.locator('input[placeholder*="Siti Aisyah"]').fill('Nabila Putri');
     await page.locator('textarea[placeholder*="Visi kepemimpinan"]').fill('Mewujudkan HMIF berkarakter global dan inovatif.');

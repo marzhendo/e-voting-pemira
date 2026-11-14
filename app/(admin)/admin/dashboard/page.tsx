@@ -49,6 +49,8 @@ import {
   ToggleRight,
   KeyRound,
   Activity,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface TallyItem {
@@ -87,6 +89,7 @@ interface CandidateItem {
   photo_url: string | null;
   chairman_cv_url?: string | null;
   vice_chairman_cv_url?: string | null;
+  is_active?: boolean;
 }
 
 interface AuditLogItem {
@@ -157,6 +160,7 @@ export default function AdminDashboardPage() {
   const [candidateFormMission, setCandidateFormMission] = useState('');
   const [candidateFormChairmanCvUrl, setCandidateFormChairmanCvUrl] = useState<string | null>(null);
   const [candidateFormViceChairmanCvUrl, setCandidateFormViceChairmanCvUrl] = useState<string | null>(null);
+  const [candidateFormIsActive, setCandidateFormIsActive] = useState<boolean>(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingChairmanCv, setUploadingChairmanCv] = useState(false);
   const [uploadingViceChairmanCv, setUploadingViceChairmanCv] = useState(false);
@@ -183,14 +187,26 @@ export default function AdminDashboardPage() {
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [emergencyReason, setEmergencyReason] = useState('Jeda Teknis Terjadwal');
 
+  // Sakelar Bilik Suara & Maintenance Confirmation Modal
+  interface ToggleModalConfig {
+    type: 'voting_open' | 'maintenance_mode';
+    targetValue: boolean;
+    title: string;
+    description: string;
+    defaultReason: string;
+    isDanger: boolean;
+  }
+  const [toggleModalConfig, setToggleModalConfig] = useState<ToggleModalConfig | null>(null);
+  const [toggleReason, setToggleReason] = useState<string>('');
+
   // Broadcast Email State
   const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted'>('not_voted');
   const [broadcastGeneration, setBroadcastGeneration] = useState('all');
   const [broadcastTemplate, setBroadcastTemplate] = useState<'invitation' | 'reminder' | 'custom'>('reminder');
-  const [broadcastSubject, setBroadcastSubject] = useState('[PENTING] Sisa Waktu Pemira HMIF - Segera Gunakan Hak Suara Anda!');
-  const [broadcastHeadline, setBroadcastHeadline] = useState('Peringatan: Waktu Pemungutan Suara Segera Berakhir');
+  const [broadcastSubject, setBroadcastSubject] = useState('[Pengingat] Waktu pemungutan suara Pemira HMIF akan segera berakhir');
+  const [broadcastHeadline, setBroadcastHeadline] = useState('Gunakan Hak Suaramu Sebelum Ditutup');
   const [broadcastBody, setBroadcastBody] = useState(
-    'Berdasarkan data sistem, Anda tercatat belum menggunakan hak suara pada Pemira HMIF 2026/2027.\n\nBilik suara digital akan ditutup tepat sesuai jadwal resmi. Jangan lewatkan kesempatan Anda untuk menentukan Chairman & Vice Chairman HMIF berikutnya.\n\nProses voting hanya memerlukan waktu 2 menit menggunakan NIM dan kode PIN verifikasi Outlook.'
+    'Waktu pemungutan suara Pemira HMIF 2026/2027 akan segera berakhir sesuai jadwal yang telah ditentukan panitia.\n\nBerdasarkan data DPT, kamu tercatat belum menggunakan hak suara. Pemilihan hanya memerlukan waktu 1 sampai 2 menit secara online.\n\nYuk luangkan waktu sebentar untuk memberikan suaramu sebelum bilik suara digital resmi ditutup.'
   );
   const [broadcastCtaText, setBroadcastCtaText] = useState('Beri Suara Sekarang');
   const [broadcastCtaUrl, setBroadcastCtaUrl] = useState('/login');
@@ -208,6 +224,9 @@ export default function AdminDashboardPage() {
   const [selectedGeneration, setSelectedGeneration] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [voterTotalCount, setVoterTotalCount] = useState(0);
+  const [dptPage, setDptPage] = useState(1);
+  const [dptPageSize, setDptPageSize] = useState(50);
+  const [dptTotalPages, setDptTotalPages] = useState(1);
 
   // DPT Import Staging
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -218,6 +237,8 @@ export default function AdminDashboardPage() {
     duplicateCount: number;
     invalidCount: number;
     validRows: Array<{ nim: string; name: string; email: string; generation: number }>;
+    sampleErrors?: Array<unknown>;
+    databaseConflictsSample?: Array<unknown>;
   } | null>(null);
   const [isAnalyzingFile, setIsAnalyzingFile] = useState(false);
   const [isCommittingImport, setIsCommittingImport] = useState(false);
@@ -291,6 +312,7 @@ export default function AdminDashboardPage() {
     const shouldLock =
       candidateModalOpen ||
       isEmergencyModalOpen ||
+      Boolean(toggleModalConfig) ||
       isConfirmBroadcastOpen ||
       isSidebarOpen ||
       isQuickAddModalOpen ||
@@ -307,6 +329,7 @@ export default function AdminDashboardPage() {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           if (isConfirmBroadcastOpen && !isBroadcasting) setIsConfirmBroadcastOpen(false);
+          else if (toggleModalConfig && !settingsSaving) setToggleModalConfig(null);
           else if (isEmergencyModalOpen && !settingsSaving) setIsEmergencyModalOpen(false);
           else if (candidateModalOpen && !savingCandidate && !uploadingPhoto && !uploadingChairmanCv && !uploadingViceChairmanCv) setCandidateModalOpen(false);
           else if (isQuickAddModalOpen && !quickAddLoading) setIsQuickAddModalOpen(false);
@@ -328,6 +351,7 @@ export default function AdminDashboardPage() {
   }, [
     candidateModalOpen,
     isEmergencyModalOpen,
+    toggleModalConfig,
     isConfirmBroadcastOpen,
     isSidebarOpen,
     isQuickAddModalOpen,
@@ -449,13 +473,14 @@ export default function AdminDashboardPage() {
   }, [activeTab, fetchCandidates]);
 
   // 4. Muat data pemilih DPT
-  const fetchVoters = useCallback(() => {
+  const fetchVoters = useCallback((page = dptPage, limit = dptPageSize) => {
     setLoadingVoters(true);
     const params = new URLSearchParams();
     if (searchQuery) params.set('q', searchQuery);
     if (selectedGeneration !== 'all') params.set('generation', selectedGeneration);
     if (selectedStatus !== 'all') params.set('status', selectedStatus);
-    params.set('limit', '50');
+    params.set('page', String(page));
+    params.set('limit', String(limit));
 
     fetch(`/api/admin/dpt?${params.toString()}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -463,11 +488,12 @@ export default function AdminDashboardPage() {
         if (data?.success) {
           setVoters(data.voters || []);
           setVoterTotalCount(data.total || 0);
+          setDptTotalPages(data.totalPages || 1);
         }
       })
       .catch(() => {})
       .finally(() => setLoadingVoters(false));
-  }, [searchQuery, selectedGeneration, selectedStatus]);
+  }, [searchQuery, selectedGeneration, selectedStatus, dptPage, dptPageSize]);
 
   useEffect(() => {
     if (activeTab === 'dpt') {
@@ -701,6 +727,7 @@ export default function AdminDashboardPage() {
     setCandidateFormPhotoUrl('');
     setCandidateFormChairmanCvUrl(null);
     setCandidateFormViceChairmanCvUrl(null);
+    setCandidateFormIsActive(true);
     setUploadError(null);
     setCandidateFormVision('');
     setCandidateFormMission('');
@@ -716,6 +743,7 @@ export default function AdminDashboardPage() {
     setCandidateFormPhotoUrl(candidate.photo_url || '');
     setCandidateFormChairmanCvUrl(candidate.chairman_cv_url || null);
     setCandidateFormViceChairmanCvUrl(candidate.vice_chairman_cv_url || null);
+    setCandidateFormIsActive(candidate.is_active !== false);
     setUploadError(null);
     setCandidateFormVision(candidate.vision || '');
     setCandidateFormMission(Array.isArray(candidate.mission) ? candidate.mission.join('\n') : '');
@@ -805,6 +833,7 @@ export default function AdminDashboardPage() {
       photo_url: candidateFormPhotoUrl.trim() || null,
       chairman_cv_url: candidateFormChairmanCvUrl || null,
       vice_chairman_cv_url: candidateFormViceChairmanCvUrl || null,
+      is_active: candidateFormIsActive,
     };
 
     try {
@@ -842,6 +871,50 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Toggle Candidate Active / Inactive
+  const handleToggleCandidateActive = async (candidate: CandidateItem) => {
+    const nextState = candidate.is_active === false;
+    const actionLabel = nextState ? 'mengaktifkan' : 'menonaktifkan';
+    if (
+      !confirm(
+        `Apakah Anda yakin ingin ${actionLabel} Paslon ${candidate.candidate_number} (${candidate.leader_name})?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/candidates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: candidate.id,
+          candidate_number: candidate.candidate_number,
+          leader_name: candidate.leader_name,
+          vice_leader_name: candidate.vice_leader_name,
+          vision: candidate.vision,
+          mission: candidate.mission,
+          photo_url: candidate.photo_url,
+          chairman_cv_url: candidate.chairman_cv_url,
+          vice_chairman_cv_url: candidate.vice_chairman_cv_url,
+          is_active: nextState,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || `Gagal ${actionLabel} calon.`);
+      } else {
+        setCandidateActionMessage(
+          `✓ Paslon ${candidate.candidate_number} berhasil di-${nextState ? 'aktifkan' : 'nonaktifkan'}.`
+        );
+        fetchCandidates();
+      }
+    } catch {
+      alert(`Terjadi kesalahan jaringan saat ${actionLabel} calon.`);
+    }
+  };
+
   // Delete Candidate
   const handleDeleteCandidate = async (candidate: CandidateItem) => {
     if (
@@ -858,7 +931,13 @@ export default function AdminDashboardPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        alert(data.error || 'Gagal menghapus calon.');
+        if (data.code === 'CANDIDATE_HAS_BALLOTS') {
+          alert(
+            `Kandidat Paslon ${candidate.candidate_number} tidak dapat dihapus permanen karena sudah memiliki surat suara sah yang tercatat di bilik suara.\n\nDemi menjaga integritas dan transparansi audit pemilihan, silakan nonaktifkan status kandidat melalui tombol "Nonaktifkan" untuk mengarsipkan paslon.`
+          );
+        } else {
+          alert(data.error || 'Gagal menghapus calon.');
+        }
       } else {
         setCandidateActionMessage('✓ Pasangan calon berhasil dihapus.');
         fetchCandidates();
@@ -895,6 +974,7 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (!res.ok) {
         setSettingsMessage(`❌ ${data.error || 'Gagal menyimpan pengaturan.'}`);
+        return { success: false, error: data.error };
       } else {
         setIsVotingOpen(data.settings.is_voting_open);
         setMaintenanceMode(data.settings.maintenance_mode);
@@ -902,11 +982,63 @@ export default function AdminDashboardPage() {
         if (data.settings.end_time) setEndTime(formatDateTimeLocal(data.settings.end_time));
         setSettingsMessage('✓ Pengaturan jadwal dan bilik suara berhasil diperbarui.');
         setIsEmergencyModalOpen(false);
+        fetchTally(true);
+        return { success: true, settings: data.settings };
       }
     } catch {
       setSettingsMessage('❌ Terjadi kesalahan jaringan saat memperbarui pengaturan.');
+      return { success: false, error: 'Terjadi kesalahan jaringan.' };
     } finally {
       setSettingsSaving(false);
+    }
+  };
+
+  const handleOpenVotingToggleModal = () => {
+    const target = !isVotingOpen;
+    const defaultReason = target
+      ? 'Pembukaan resmi bilik suara digital oleh Administrator'
+      : 'Penutupan sementara bilik suara digital oleh Administrator';
+    setToggleModalConfig({
+      type: 'voting_open',
+      targetValue: target,
+      title: target ? 'Buka Pemungutan Suara' : 'Tutup Pemungutan Suara',
+      description: target
+        ? 'Membuka bilik suara digital akan mengizinkan pemilih terdaftar (DPT) untuk memberikan suaranya sesuai jadwal pemilihan.'
+        : 'Menutup bilik suara digital akan menghentikan proses pengiriman suara bagi seluruh pemilih hingga bilik dibuka kembali.',
+      defaultReason,
+      isDanger: !target,
+    });
+    setToggleReason(defaultReason);
+  };
+
+  const handleOpenMaintenanceToggleModal = () => {
+    const target = !maintenanceMode;
+    const defaultReason = target
+      ? 'Pemeliharaan darurat teknis sistem oleh Superadmin'
+      : 'Pemeliharaan teknis darurat selesai, operasional sistem dipulihkan';
+    setToggleModalConfig({
+      type: 'maintenance_mode',
+      targetValue: target,
+      title: target ? 'Aktifkan Mode Pemeliharaan Darurat' : 'Nonaktifkan Mode Pemeliharaan Darurat',
+      description: target
+        ? 'Mengaktifkan mode pemeliharaan darurat akan menghentikan akses bilik suara seketika untuk perbaikan teknis sistem.'
+        : 'Menonaktifkan mode pemeliharaan darurat akan memulihkan operasional bilik suara ke kondisi normal.',
+      defaultReason,
+      isDanger: target,
+    });
+    setToggleReason(defaultReason);
+  };
+
+  const handleConfirmToggle = async () => {
+    if (!toggleModalConfig) return;
+    const reasonToUse = toggleReason.trim() || toggleModalConfig.defaultReason;
+
+    const newVotingOpen = toggleModalConfig.type === 'voting_open' ? toggleModalConfig.targetValue : isVotingOpen;
+    const newMaintenance = toggleModalConfig.type === 'maintenance_mode' ? toggleModalConfig.targetValue : maintenanceMode;
+
+    const result = await handleSaveSettings(newVotingOpen, newMaintenance, startTime, endTime, reasonToUse);
+    if (result?.success) {
+      setToggleModalConfig(null);
     }
   };
 
@@ -918,25 +1050,25 @@ export default function AdminDashboardPage() {
 
     if (templateKey === 'invitation') {
       setBroadcastTargetGroup('all');
-      setBroadcastSubject('[PEMIRA HMIF 2026/2027] Bilik Suara Telah Dibuka - Gunakan Hak Suara Anda!');
+      setBroadcastSubject('[Pemira HMIF 2026/2027] Bilik Suara Telah Dibuka, Gunakan Hak Pilihmu');
       setBroadcastHeadline('Bilik Suara Pemira HMIF Resmi Dibuka');
       setBroadcastBody(
-        'Pemilihan Raya (PEMIRA) Chairman & Vice Chairman HMIF Periode 2026/2027 telah resmi dibuka.\n\nSebagai mahasiswa aktif Informatika Telkom University Purwokerto, hak suara Anda menentukan arah dan masa depan himpunan kita.\n\nSilakan akses bilik suara menggunakan NIM Anda untuk menerima kode PIN verifikasi di email Outlook kampus.'
+        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 telah dibuka.\n\nSebagai mahasiswa aktif Informatika Telkom University Purwokerto, kamu memiliki hak suara untuk menentukan kepemimpinan himpunan kita selama satu periode ke depan.\n\nSilakan masuk ke bilik suara menggunakan NIM, lalu verifikasi dengan kode PIN 6 digit yang dikirimkan ke email kampusmu.'
       );
-      setBroadcastCtaText('Masuk ke Bilik Suara Digital');
+      setBroadcastCtaText('Masuk ke Bilik Suara');
     } else if (templateKey === 'reminder') {
       setBroadcastTargetGroup('not_voted');
-      setBroadcastSubject('[PENTING] Sisa Waktu Pemira HMIF - Segera Gunakan Hak Suara Anda!');
-      setBroadcastHeadline('Peringatan: Waktu Pemungutan Suara Segera Berakhir');
+      setBroadcastSubject('[Pengingat] Waktu pemungutan suara Pemira HMIF akan segera berakhir');
+      setBroadcastHeadline('Gunakan Hak Suaramu Sebelum Ditutup');
       setBroadcastBody(
-        'Berdasarkan data sistem, Anda tercatat belum menggunakan hak suara pada Pemira HMIF 2026/2027.\n\nBilik suara digital akan ditutup tepat sesuai jadwal resmi. Jangan lewatkan kesempatan Anda untuk menentukan Chairman & Vice Chairman HMIF berikutnya.\n\nProses voting hanya memerlukan waktu 2 menit menggunakan NIM dan kode PIN verifikasi Outlook.'
+        'Waktu pemungutan suara Pemira HMIF 2026/2027 akan segera berakhir sesuai jadwal yang telah ditentukan panitia.\n\nBerdasarkan data DPT, kamu tercatat belum menggunakan hak suara. Pemilihan hanya memerlukan waktu 1 sampai 2 menit secara online.\n\nYuk luangkan waktu sebentar untuk memberikan suaramu sebelum bilik suara digital resmi ditutup.'
       );
       setBroadcastCtaText('Beri Suara Sekarang');
     } else {
-      setBroadcastSubject('[PENGUMUMAN] Pemilihan Raya HMIF 2026/2027');
-      setBroadcastHeadline('Pengumuman Panitia KPR HMIF');
+      setBroadcastSubject('[Pengumuman Resmi] Pemira HMIF 2026/2027');
+      setBroadcastHeadline('Informasi dari Panitia Pemira HMIF');
       setBroadcastBody('Tuliskan isi pengumuman atau instruksi resmi Panitia KPR di sini...');
-      setBroadcastCtaText('Buka Platform Pemira');
+      setBroadcastCtaText('Buka Bilik Suara');
     }
   };
 
@@ -993,7 +1125,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Handle File Import DPT
+  // Handle File Import DPT (.csv, .txt, .xlsx, .xls)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1002,39 +1134,116 @@ export default function AdminDashboardPage() {
     setIsAnalyzingFile(true);
     setImportSuccessMessage(null);
 
+    const fileName = file.name.toLowerCase();
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
     const reader = new FileReader();
+
     reader.onload = async (event) => {
       try {
-        const text = event.target?.result as string;
-        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        let rawRows: Array<{ nim: string; name: string; email: string; generation: number }> = [];
 
-        if (lines.length <= 1) {
-          alert('Berkas kosong atau hanya berisi baris header.');
+        if (isExcel) {
+          const XLSX = await import('xlsx');
+          const buffer = event.target?.result as ArrayBuffer;
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+
+          if (!firstSheetName) {
+            alert('Berkas Excel tidak memiliki sheet yang dapat dibaca.');
+            setIsAnalyzingFile(false);
+            return;
+          }
+
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawJson = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+
+          if (rawJson.length === 0) {
+            alert('Berkas Excel kosong atau tidak memiliki baris data.');
+            setIsAnalyzingFile(false);
+            return;
+          }
+
+          rawRows = rawJson.map((row) => {
+            const keys = Object.keys(row);
+            const findVal = (col: string) => {
+              const matchKey = keys.find((k) => k.trim().toLowerCase() === col);
+              return matchKey ? String(row[matchKey]).trim() : '';
+            };
+
+            return {
+              nim: findVal('nim'),
+              name: findVal('name') || findVal('nama'),
+              email: findVal('email'),
+              generation: Number(findVal('generation') || findVal('angkatan')) || 0,
+            };
+          });
+        } else {
+          const text = event.target?.result as string;
+          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+
+          if (lines.length <= 1) {
+            alert('Berkas CSV kosong atau hanya berisi baris header.');
+            setIsAnalyzingFile(false);
+            return;
+          }
+
+          try {
+            const XLSX = await import('xlsx');
+            const wb = XLSX.read(text, { type: 'string' });
+            const firstSheet = wb.Sheets[wb.SheetNames[0]];
+            const rawJson = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
+
+            if (rawJson.length > 0) {
+              rawRows = rawJson.map((row) => {
+                const keys = Object.keys(row);
+                const findVal = (col: string) => {
+                  const matchKey = keys.find((k) => k.trim().toLowerCase() === col);
+                  return matchKey ? String(row[matchKey]).trim() : '';
+                };
+
+                return {
+                  nim: findVal('nim'),
+                  name: findVal('name') || findVal('nama'),
+                  email: findVal('email'),
+                  generation: Number(findVal('generation') || findVal('angkatan')) || 0,
+                };
+              });
+            }
+          } catch {
+            // Fallback split manual jika format non-standar
+          }
+
+          if (rawRows.length === 0) {
+            const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+            const nimIdx = headers.indexOf('nim');
+            const nameIdx = headers.indexOf('name') !== -1 ? headers.indexOf('name') : headers.indexOf('nama');
+            const emailIdx = headers.indexOf('email');
+            const genIdx = headers.indexOf('generation') !== -1 ? headers.indexOf('generation') : headers.indexOf('angkatan');
+
+            if (nimIdx === -1 || nameIdx === -1 || emailIdx === -1 || genIdx === -1) {
+              alert('Header kolom berkas wajib memuat: nim, name, email, generation.');
+              setIsAnalyzingFile(false);
+              return;
+            }
+
+            rawRows = lines.slice(1).map((line) => {
+              const cols = line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+              return {
+                nim: cols[nimIdx] || '',
+                name: cols[nameIdx] || '',
+                email: cols[emailIdx] || '',
+                generation: Number(cols[genIdx]) || 0,
+              };
+            });
+          }
+        }
+
+        if (rawRows.length === 0) {
+          alert('Tidak ada baris data valid yang terbaca dari berkas.');
           setIsAnalyzingFile(false);
           return;
         }
-
-        const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-        const nimIdx = headers.indexOf('nim');
-        const nameIdx = headers.indexOf('name');
-        const emailIdx = headers.indexOf('email');
-        const genIdx = headers.indexOf('generation');
-
-        if (nimIdx === -1 || nameIdx === -1 || emailIdx === -1 || genIdx === -1) {
-          alert('Header kolom CSV wajib memuat: nim, name, email, generation.');
-          setIsAnalyzingFile(false);
-          return;
-        }
-
-        const rawRows = lines.slice(1).map((line) => {
-          const cols = line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
-          return {
-            nim: cols[nimIdx] || '',
-            name: cols[nameIdx] || '',
-            email: cols[emailIdx] || '',
-            generation: Number(cols[genIdx]) || 0,
-          };
-        });
 
         const res = await fetch('/api/admin/dpt/preview', {
           method: 'POST',
@@ -1045,23 +1254,30 @@ export default function AdminDashboardPage() {
         const previewData = await res.json();
         if (previewData.success) {
           setImportPreview({
-            totalRows: previewData.summary.totalRows,
-            validCount: previewData.summary.validCount,
-            duplicateCount: previewData.summary.duplicateCount,
-            invalidCount: previewData.summary.invalidCount,
-            validRows: previewData.validRows,
+            totalRows: previewData.summary.totalRows ?? previewData.summary.totalRowsRead ?? rawRows.length,
+            validCount: previewData.summary.validCount ?? previewData.summary.validRowsCount ?? 0,
+            duplicateCount: previewData.summary.duplicateCount ?? previewData.summary.databaseConflictsCount ?? 0,
+            invalidCount: previewData.summary.invalidCount ?? previewData.summary.invalidRowsCount ?? 0,
+            validRows: previewData.validRows || [],
+            sampleErrors: previewData.sampleErrors || [],
+            databaseConflictsSample: previewData.databaseConflictsSample || [],
           });
         } else {
           alert(previewData.error || 'Gagal memproses validasi berkas DPT.');
         }
-      } catch {
-        alert('Terjadi kesalahan saat membaca berkas CSV.');
+      } catch (parseErr) {
+        console.error('[FileImport] Parse error:', parseErr);
+        alert('Terjadi kesalahan saat membaca berkas data DPT.');
       } finally {
         setIsAnalyzingFile(false);
       }
     };
 
-    reader.readAsText(file);
+    if (isExcel) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file);
+    }
   };
 
   const handleCommitImport = async () => {
@@ -1206,6 +1422,9 @@ export default function AdminDashboardPage() {
     setDptActionMessage(null);
     setDptErrorMessage(null);
 
+    const selectedVoters = voters.filter((v) => selectedVoterIds.includes(v.id));
+    const selectedNims = selectedVoters.map((v) => v.nim);
+
     try {
       const res = await fetch('/api/admin/dpt', {
         method: 'DELETE',
@@ -1213,6 +1432,7 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({
           action: 'delete_batch',
           ids: selectedVoterIds,
+          nims: selectedNims,
         }),
       });
 
@@ -1285,8 +1505,9 @@ export default function AdminDashboardPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setBallotActionMessage('✓ Seluruh surat suara simulasi berhasil direset ke 0.');
+        setBallotActionMessage(data.message || '✓ Seluruh surat suara simulasi berhasil direset ke 0.');
         fetchTally();
+        fetchVoters();
       } else {
         alert(data.error || 'Gagal mereset surat suara.');
       }
@@ -1583,7 +1804,7 @@ export default function AdminDashboardPage() {
 
       {/* SIDEBAR NAVIGATION */}
       <aside
-        className={`fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between py-6 border-r border-outline-variant/30 shadow-lg lg:shadow-sm transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between py-6 border-r border-outline-variant/30 transition-transform duration-150 ease-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -1605,7 +1826,7 @@ export default function AdminDashboardPage() {
                 <span className="font-bold text-sm text-on-surface tracking-tight leading-tight">
                   PEMIRA HMIF
                 </span>
-                <span className="text-[11px] text-outline font-medium">
+                <span className="text-[11px] text-on-surface-variant font-medium">
                   Panel Panitia KPR
                 </span>
               </div>
@@ -1613,7 +1834,7 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              className="lg:hidden p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+              className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               onClick={() => setIsSidebarOpen(false)}
               aria-label="Tutup navigasi"
             >
@@ -1624,7 +1845,7 @@ export default function AdminDashboardPage() {
           {/* User Role Badge */}
           <div className="px-6">
             <div className="px-3 py-1.5 rounded-lg bg-surface-container flex items-center justify-between border border-outline-variant/20">
-              <span className="text-[11px] text-outline uppercase font-medium">
+              <span className="text-[11px] text-on-surface-variant uppercase font-medium">
                 Role
               </span>
               <span className="text-xs text-primary font-bold uppercase">
@@ -1643,7 +1864,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'overview'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1659,7 +1880,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'candidates'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1675,7 +1896,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'dpt'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1691,7 +1912,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'tally'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1707,7 +1928,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'settings'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1723,7 +1944,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'emails'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1739,7 +1960,7 @@ export default function AdminDashboardPage() {
               }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'audit'
-                  ? 'bg-primary text-on-primary shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
               }`}
             >
@@ -1756,7 +1977,7 @@ export default function AdminDashboardPage() {
                 }}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   activeTab === 'admins'
-                    ? 'bg-primary text-on-primary shadow-sm'
+                    ? 'bg-primary text-on-primary'
                     : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
                 }`}
               >
@@ -1772,16 +1993,16 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => fetchTally()}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-outline hover:text-on-surface transition-colors"
+            className="flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-4 h-4 text-primary" />
             <span>Segarkan Data</span>
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-error hover:bg-error/10 transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-error hover:bg-error/10 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-error focus-visible:outline-none"
           >
             <LogOut className="w-4 h-4" />
             <span>Keluar Sesi</span>
@@ -1796,7 +2017,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="lg:hidden p-2 rounded-lg text-on-surface hover:bg-surface-container transition-colors -ml-1 cursor-pointer"
+              className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-on-surface hover:bg-surface-container transition-colors -ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               aria-label="Buka menu navigasi"
             >
@@ -1821,7 +2042,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex flex-col text-right">
               <span className="text-xs font-bold text-on-surface">{userName}</span>
-              <span className="text-[11px] text-outline uppercase">
+              <span className="text-[11px] text-on-surface-variant uppercase font-medium">
                 {userRole.replace('_', ' ')}
               </span>
             </div>
@@ -1847,13 +2068,13 @@ export default function AdminDashboardPage() {
                           Bilik Suara Digital Pemira HMIF
                         </h1>
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
                           <span>Live Real-time</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-outline mt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-on-surface-variant mt-0.5">
                         <Clock className="w-3.5 h-3.5 text-primary" />
-                        <span>Jadwal Resmi: 08.00 – 16.00 WIB</span>
+                        <span>Jadwal Resmi: 08.00 - 16.00 WIB</span>
                         <span>•</span>
                         <span>Tata letak bilik suara aktif: <strong className="text-on-surface font-semibold">
                           {regularCount === 1 ? 'Head-to-Head' : `${regularCount} Paslon Grid`}
@@ -1887,34 +2108,34 @@ export default function AdminDashboardPage() {
                 {/* KPI Cards */}
                 <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-xs text-outline font-medium">TOTAL DPT</span>
+                    <span className="text-xs text-on-surface-variant font-medium">TOTAL DPT</span>
                     <div className="my-3 flex items-baseline gap-1.5">
                       <span className="font-bebas text-4xl text-primary leading-none">
                         {totalDpt.toLocaleString('id-ID')}
                       </span>
-                      <span className="text-xs text-outline">Pemilih</span>
+                      <span className="text-xs text-on-surface-variant">Pemilih</span>
                     </div>
-                    <span className="text-xs text-outline">Mahasiswa Aktif Terdaftar</span>
+                    <span className="text-xs text-on-surface-variant">Mahasiswa Aktif Terdaftar</span>
                   </div>
 
                   <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-xs text-outline font-medium">SUARA MASUK</span>
+                    <span className="text-xs text-on-surface-variant font-medium">SUARA MASUK</span>
                     <div className="my-3 flex items-baseline gap-1.5">
                       <span className="font-bebas text-4xl text-on-surface leading-none">
                         {totalVotes.toLocaleString('id-ID')}
                       </span>
                       <span className="text-xs text-secondary">Suara Sah</span>
                     </div>
-                    <span className="text-xs text-outline">Tercatat di Basis Data</span>
+                    <span className="text-xs text-on-surface-variant">Tercatat di Basis Data</span>
                   </div>
 
                   <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-xs text-outline font-medium">TINGKAT PARTISIPASI</span>
+                    <span className="text-xs text-on-surface-variant font-medium">TINGKAT PARTISIPASI</span>
                     <div className="my-3 flex items-baseline gap-1.5">
                       <span className="font-bebas text-4xl text-primary leading-none">
                         {turnoutPercentage}%
                       </span>
-                      <span className="text-xs text-outline">Tercapai</span>
+                      <span className="text-xs text-on-surface-variant">Tercapai</span>
                     </div>
                     <span className={`text-xs font-medium ${turnoutPercentage >= 65 ? 'text-secondary' : 'text-hmif-yellow'}`}>
                       {turnoutPercentage >= 65 ? 'Memenuhi Kuorum (65%)' : 'Target Kuorum 65%'}
@@ -1927,33 +2148,33 @@ export default function AdminDashboardPage() {
                   <div className="lg:col-span-7 bg-surface-container rounded-2xl p-6 border border-outline-variant/30">
                     <div className="flex items-center justify-between pb-3 mb-4 border-b border-outline-variant/20">
                       <h2 className="text-sm font-bold text-on-surface">
-                        Partisipasi per Angkatan
-                      </h2>
-                      <span className="text-xs text-outline">Agregat Realtime</span>
-                    </div>
+                    Partisipasi per Angkatan
+                  </h2>
+                  <span className="text-xs text-on-surface-variant">Agregat Realtime</span>
+                </div>
 
-                    <div className="space-y-4">
-                      {generationData.length > 0 ? (
-                        generationData.map((gen) => (
-                          <div key={gen.generation} className="flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-on-surface">
-                                Angkatan {gen.generation}
-                              </span>
-                              <span className="text-outline">
-                                {gen.votedCount} / {gen.totalVoters} Pemilih ({gen.turnoutPercentage}%)
-                              </span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-primary transition-all duration-500"
-                                style={{ width: `${Math.min(gen.turnoutPercentage, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-outline py-4 text-center">
+                <div className="space-y-4">
+                  {generationData.length > 0 ? (
+                    generationData.map((gen) => (
+                      <div key={gen.generation} className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-on-surface">
+                            Angkatan {gen.generation}
+                          </span>
+                          <span className="text-on-surface-variant">
+                            {gen.votedCount} / {gen.totalVoters} Pemilih ({gen.turnoutPercentage}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-500"
+                            style={{ width: `${Math.min(gen.turnoutPercentage, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                        <div className="text-xs text-on-surface-variant py-4 text-center">
                           Memuat data partisipasi angkatan...
                         </div>
                       )}
@@ -1975,7 +2196,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       {isTallyLocked ? (
-                        <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs text-outline leading-relaxed flex flex-col gap-2">
+                        <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs text-on-surface-variant leading-relaxed flex flex-col gap-2">
                           <p>
                             Hasil suara ditutup selama pemilihan aktif untuk menjaga objektivitas dan netralitas.
                           </p>
@@ -2000,7 +2221,7 @@ export default function AdminDashboardPage() {
                                       ? 'Kotak Kosong'
                                       : `${cand.leaderName} & ${cand.viceLeaderName}`}
                                   </span>
-                                  <span className="text-[11px] text-outline">
+                                  <span className="text-[11px] text-on-surface-variant">
                                     {cand.voteCount} Suara
                                   </span>
                                 </div>
@@ -2014,7 +2235,7 @@ export default function AdminDashboardPage() {
                       )}
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-outline-variant/20 text-xs text-outline text-center">
+                    <div className="mt-4 pt-3 border-t border-outline-variant/20 text-xs text-on-surface-variant text-center">
                       Ballot Secrecy: Data pemilih dan surat suara terpisah murni.
                     </div>
                   </div>
@@ -2030,7 +2251,7 @@ export default function AdminDashboardPage() {
                     <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
                       Kelola Pasangan Calon (Kandidat)
                     </h1>
-                    <p className="text-xs text-outline mt-0.5">
+                    <p className="text-xs text-on-surface-variant mt-0.5">
                       Atur daftar calon Chairman &amp; Vice Chairman HMIF. Tata letak bilik suara menyesuaikan otomatis.
                     </p>
                   </div>
@@ -2038,7 +2259,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={handleOpenAddCandidate}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all shadow-sm self-start sm:self-auto"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary hover:bg-secondary-fixed font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer self-start sm:self-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>Tambah Paslon Baru</span>
@@ -2066,7 +2287,7 @@ export default function AdminDashboardPage() {
                       <LayoutGrid className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="text-[11px] text-outline uppercase tracking-wider block font-medium">
+                      <span className="text-[11px] text-on-surface-variant uppercase tracking-wider block font-medium">
                         Adaptasi Tata Letak Bilik Suara
                       </span>
                       <h3 className="text-sm font-bold text-on-surface">
@@ -2093,12 +2314,15 @@ export default function AdminDashboardPage() {
                           <span className="text-[11px] font-bold text-on-surface block leading-tight">
                             Opsi Kotak Kosong
                           </span>
-                          <span className="text-[11px] text-outline">
+                          <span className="text-[11px] text-on-surface-variant">
                             {allowKotakKosongMulti ? 'Diikutsertakan' : 'Dinonaktifkan'}
                           </span>
                         </div>
                         <button
                           type="button"
+                          role="switch"
+                          aria-checked={allowKotakKosongMulti}
+                          aria-label="Opsi Kotak Kosong Multi-Paslon"
                           title={
                             allowKotakKosongMulti
                               ? 'Klik untuk mematikan opsi Kotak Kosong'
@@ -2106,7 +2330,7 @@ export default function AdminDashboardPage() {
                           }
                           disabled={togglingKotakKosong}
                           onClick={handleToggleKotakKosong}
-                          className={`w-11 h-6 rounded-full transition-colors relative p-1 cursor-pointer ${
+                          className={`w-11 h-6 rounded-full transition-colors relative p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                             allowKotakKosongMulti
                               ? 'bg-primary'
                               : 'bg-surface-container-highest border border-outline/30'
@@ -2125,13 +2349,13 @@ export default function AdminDashboardPage() {
 
                 {/* Candidates List Cards */}
                 {loadingCandidates ? (
-                  <div className="py-16 text-center text-xs text-outline flex flex-col items-center gap-2">
+                  <div className="py-16 text-center text-xs text-on-surface-variant flex flex-col items-center gap-2">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                     <span>Memuat data calon...</span>
                   </div>
                 ) : regularCandidates.length === 0 ? (
-                  <div className="py-16 text-center text-xs text-outline bg-surface-container rounded-2xl border border-outline-variant/30 p-8">
-                    <Users className="w-10 h-10 text-outline mx-auto mb-2 opacity-50" />
+                  <div className="py-16 text-center text-xs text-on-surface-variant bg-surface-container rounded-2xl border border-outline-variant/30 p-8">
+                    <Users className="w-10 h-10 text-on-surface-variant mx-auto mb-2 opacity-60" />
                     <h3 className="text-sm font-bold text-on-surface">Belum ada pasangan calon</h3>
                     <p className="mt-1">Klik tombol &ldquo;Tambah Paslon Baru&rdquo; untuk mendaftarkan kandidat pertama.</p>
                   </div>
@@ -2152,13 +2376,22 @@ export default function AdminDashboardPage() {
                               <span className="text-xs font-bold text-on-surface">
                                 Paslon {cand.candidate_number.toString().padStart(2, '0')}
                               </span>
+                              {cand.is_active === false ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                  Nonaktif
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                  Aktif
+                                </span>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditCandidate(cand)}
-                                className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors"
+                                className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
                                 title="Edit Paslon"
                               >
                                 <Edit3 className="w-4 h-4" />
@@ -2166,7 +2399,7 @@ export default function AdminDashboardPage() {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteCandidate(cand)}
-                                className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-surface-container-high transition-colors"
+                                className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors"
                                 title="Hapus Paslon"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -2204,7 +2437,7 @@ export default function AdminDashboardPage() {
                               className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                                 cand.chairman_cv_url
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
-                                  : 'bg-surface-container-high text-outline border-outline-variant/30'
+                                  : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'
                               }`}
                             >
                               <FileText className="w-3 h-3" />
@@ -2214,7 +2447,7 @@ export default function AdminDashboardPage() {
                               className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                                 cand.vice_chairman_cv_url
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
-                                  : 'bg-surface-container-high text-outline border-outline-variant/30'
+                                  : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'
                               }`}
                             >
                               <FileText className="w-3 h-3" />
@@ -2224,7 +2457,7 @@ export default function AdminDashboardPage() {
 
                           {/* Vision preview */}
                           <div className="p-3 rounded-xl bg-surface-container-low text-xs text-on-surface-variant border border-outline-variant/20">
-                            <span className="text-[11px] text-outline uppercase font-semibold block mb-0.5">
+                            <span className="text-[11px] text-on-surface-variant uppercase font-semibold block mb-0.5">
                               Visi:
                             </span>
                             <p className="line-clamp-2 leading-relaxed">
@@ -2233,15 +2466,26 @@ export default function AdminDashboardPage() {
                           </div>
 
                           {/* Missions summary */}
-                          <div className="text-xs text-outline">
+                          <div className="text-xs text-on-surface-variant">
                             <span>{Array.isArray(cand.mission) ? cand.mission.length : 0} butir misi</span>
                           </div>
                         </div>
 
                         {/* Card Footer Status */}
-                        <div className="pt-2 border-t border-outline-variant/20 flex items-center justify-between text-[11px] text-outline">
-                          <span>Status: Terdaftar Resmi</span>
-                          <span className="text-primary font-medium">Bilik Suara Aktif</span>
+                        <div className="pt-2 border-t border-outline-variant/20 flex items-center justify-between text-[11px] text-on-surface-variant">
+                          <span>Status: {cand.is_active === false ? 'Diarsipkan' : 'Terdaftar Resmi'}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCandidateActive(cand)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 border transition-colors cursor-pointer ${
+                              cand.is_active === false
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                            }`}
+                            title={cand.is_active === false ? 'Aktifkan Paslon di Bilik Suara' : 'Nonaktifkan Paslon dari Bilik Suara'}
+                          >
+                            <span>{cand.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}</span>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -2258,7 +2502,7 @@ export default function AdminDashboardPage() {
                     <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
                       Manajemen Daftar Pemilih Tetap (DPT)
                     </h1>
-                    <p className="text-xs text-outline mt-0.5">
+                    <p className="text-xs text-on-surface-variant mt-0.5">
                       Kelola hak pilih mahasiswa aktif Informatika Telkom University Purwokerto.
                     </p>
                   </div>
@@ -2285,6 +2529,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
+                      title="Unggah berkas DPT format CSV atau Excel (.xlsx, .xls)"
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all shadow-sm cursor-pointer"
                     >
                       <UploadCloud className="w-4 h-4" />
@@ -2309,7 +2554,7 @@ export default function AdminDashboardPage() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".csv,.txt"
+                      accept=".csv,.txt,.xlsx,.xls"
                       className="hidden"
                       onChange={handleFileChange}
                     />
@@ -2354,14 +2599,14 @@ export default function AdminDashboardPage() {
 
                 {/* Staging / Pre-commit Preview Area */}
                 {importPreview && (
-                  <div className="rounded-2xl bg-surface-container p-6 border border-primary/40 shadow-lg flex flex-col gap-4">
+                  <div className="rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col gap-4">
                     <div className="flex items-center justify-between pb-3 border-b border-outline-variant/30">
                       <div>
                         <h3 className="text-sm font-bold text-on-surface flex items-center gap-2">
                           <FileText className="w-4 h-4 text-primary" />
                           <span>Pratinjau Berkas: {stagedFile?.name}</span>
                         </h3>
-                        <span className="text-xs text-outline">
+                        <span className="text-xs text-on-surface-variant">
                           Sistem memvalidasi kelengkapan data sebelum disimpan ke database.
                         </span>
                       </div>
@@ -2372,19 +2617,19 @@ export default function AdminDashboardPage() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                       <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-outline text-[11px] block">Total Baris:</span>
+                        <span className="text-on-surface-variant text-[11px] block">Total Baris:</span>
                         <span className="font-bebas text-2xl text-on-surface">{importPreview.totalRows}</span>
                       </div>
                       <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-outline text-[11px] block">Valid:</span>
+                        <span className="text-on-surface-variant text-[11px] block">Valid:</span>
                         <span className="font-bebas text-2xl text-secondary">{importPreview.validCount}</span>
                       </div>
                       <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-outline text-[11px] block">Duplikat:</span>
+                        <span className="text-on-surface-variant text-[11px] block">Duplikat:</span>
                         <span className="font-bebas text-2xl text-hmif-yellow">{importPreview.duplicateCount}</span>
                       </div>
                       <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-outline text-[11px] block">Format Invalid:</span>
+                        <span className="text-on-surface-variant text-[11px] block">Format Invalid:</span>
                         <span className="font-bebas text-2xl text-error">{importPreview.invalidCount}</span>
                       </div>
                     </div>
@@ -2396,7 +2641,7 @@ export default function AdminDashboardPage() {
                           setStagedFile(null);
                           setImportPreview(null);
                         }}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors"
+                        className="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                       >
                         Batal
                       </button>
@@ -2425,23 +2670,33 @@ export default function AdminDashboardPage() {
                 {/* Voter Search & Filters */}
                 <div className="rounded-2xl bg-surface-container p-4 border border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="relative w-full sm:w-80">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-outline" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                     <input
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setDptPage(1);
+                      }}
                       placeholder="Cari NIM, Nama, atau Email..."
-                      className="w-full bg-surface-container-lowest text-xs rounded-xl pl-9 pr-3 py-2 border border-outline-variant/30 focus:outline-none focus:border-primary text-on-surface"
+                      className="w-full bg-surface-container-lowest text-xs rounded-xl pl-9 pr-3 py-2.5 min-h-[44px] border border-outline-variant/30 focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary text-on-surface placeholder:text-on-surface-variant/60"
                     />
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <select
                       value={selectedGeneration}
-                      onChange={(e) => setSelectedGeneration(e.target.value)}
-                      className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      onChange={(e) => {
+                        setSelectedGeneration(e.target.value);
+                        setDptPage(1);
+                      }}
+                      className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     >
                       <option value="all">Semua Angkatan</option>
+                      <option value="2019">Angkatan 2019</option>
+                      <option value="2020">Angkatan 2020</option>
+                      <option value="2021">Angkatan 2021</option>
+                      <option value="2022">Angkatan 2022</option>
                       <option value="2023">Angkatan 2023</option>
                       <option value="2024">Angkatan 2024</option>
                       <option value="2025">Angkatan 2025</option>
@@ -2450,8 +2705,11 @@ export default function AdminDashboardPage() {
 
                     <select
                       value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      onChange={(e) => {
+                        setSelectedStatus(e.target.value);
+                        setDptPage(1);
+                      }}
+                      className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     >
                       <option value="all">Semua Status</option>
                       <option value="voted">Sudah Memilih</option>
@@ -2464,11 +2722,11 @@ export default function AdminDashboardPage() {
                 {selectedVoterIds.length > 0 && (
                   <div className="rounded-2xl bg-primary/10 border border-primary/30 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
                     <div className="flex items-center gap-2.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary" />
                       <span className="text-xs font-bold text-on-surface">
                         {selectedVoterIds.length} pemilih dipilih
                       </span>
-                      <span className="text-[11px] text-outline hidden sm:inline">
+                      <span className="text-[11px] text-on-surface-variant hidden sm:inline">
                         (dari {voters.length} pemilih yang ditampilkan)
                       </span>
                     </div>
@@ -2476,7 +2734,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedVoterIds([])}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
                       >
                         Batal
                       </button>
@@ -2499,7 +2757,7 @@ export default function AdminDashboardPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
-                        <tr className="bg-surface-container-high/60 border-b border-outline-variant/30 text-outline uppercase tracking-wider font-semibold">
+                        <tr className="bg-surface-container-high/60 border-b border-outline-variant/30 text-on-surface-variant uppercase tracking-wider font-semibold">
                           {userRole === 'super_admin' && (
                             <th className="py-3 px-4 w-10 text-center">
                               <input
@@ -2524,13 +2782,13 @@ export default function AdminDashboardPage() {
                       <tbody className="divide-y divide-outline-variant/20">
                         {loadingVoters ? (
                           <tr>
-                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-outline">
+                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-on-surface-variant">
                               Memuat data pemilih...
                             </td>
                           </tr>
                         ) : voters.length === 0 ? (
                           <tr>
-                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-outline">
+                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-on-surface-variant">
                               Tidak ada data yang cocok dengan pencarian.
                             </td>
                           </tr>
@@ -2549,7 +2807,7 @@ export default function AdminDashboardPage() {
                               )}
                               <td className="py-3 px-5 font-mono font-semibold text-primary">{v.nim}</td>
                               <td className="py-3 px-5 font-medium text-on-surface">{v.name}</td>
-                              <td className="py-3 px-5 font-mono text-[11px] text-outline">{v.email}</td>
+                              <td className="py-3 px-5 font-mono text-[11px] text-on-surface-variant">{v.email}</td>
                               <td className="py-3 px-5">
                                 <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[11px]">
                                   {v.generation}
@@ -2562,8 +2820,8 @@ export default function AdminDashboardPage() {
                                     Sudah Memilih
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-outline text-[11px]">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-outline" />
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[11px]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-outline-variant" />
                                     Belum Memilih
                                   </span>
                                 )}
@@ -2578,7 +2836,7 @@ export default function AdminDashboardPage() {
                                     <button
                                       type="button"
                                       onClick={() => setVoterToDelete(v)}
-                                      className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
                                       title={`Hapus ${v.name} (${v.nim}) dari DPT`}
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -2593,8 +2851,63 @@ export default function AdminDashboardPage() {
                     </table>
                   </div>
 
-                  <div className="p-4 border-t border-outline-variant/20 flex items-center justify-between text-xs text-outline">
-                    <span>Menampilkan {voters.length} dari {voterTotalCount} pemilih terdaftar</span>
+                  {/* Pagination Controls */}
+                  <div className="p-4 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span>
+                        Menampilkan{' '}
+                        <strong className="text-on-surface">
+                          {voterTotalCount > 0 ? (dptPage - 1) * dptPageSize + 1 : 0} -{' '}
+                          {Math.min(dptPage * dptPageSize, voterTotalCount)}
+                        </strong>{' '}
+                        dari <strong className="text-on-surface">{voterTotalCount}</strong> pemilih terdaftar
+                      </span>
+
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <span className="text-[11px] text-on-surface-variant/70">Baris:</span>
+                        <select
+                          value={dptPageSize}
+                          onChange={(e) => {
+                            const newSize = Number(e.target.value);
+                            setDptPageSize(newSize);
+                            setDptPage(1);
+                          }}
+                          className="bg-surface-container-lowest text-xs rounded-lg px-2.5 py-1 min-h-[32px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary cursor-pointer font-medium"
+                        >
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDptPage((p) => Math.max(p - 1, 1))}
+                        disabled={dptPage <= 1 || loadingVoters}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[36px] rounded-xl border border-outline-variant/30 text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        title="Halaman Sebelumnya"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Sebelumnya</span>
+                      </button>
+
+                      <div className="px-3 py-1.5 min-h-[36px] flex items-center font-mono text-xs text-on-surface font-semibold bg-surface-container-high rounded-xl border border-outline-variant/30">
+                        <span>Halaman {dptPage} / {dptTotalPages}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setDptPage((p) => Math.min(p + 1, dptTotalPages))}
+                        disabled={dptPage >= dptTotalPages || loadingVoters}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[36px] rounded-xl border border-outline-variant/30 text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        title="Halaman Berikutnya"
+                      >
+                        <span>Berikutnya</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2610,11 +2923,11 @@ export default function AdminDashboardPage() {
                         Rekapitulasi Suara
                       </h1>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         <span>Live Real-time</span>
                       </span>
                     </div>
-                    <p className="text-xs text-outline mt-0.5">
+                    <p className="text-xs text-on-surface-variant mt-0.5">
                       Hasil agregasi surat suara yang sah tanpa keterkaitan identitas pemilih.
                     </p>
                   </div>
@@ -2624,7 +2937,7 @@ export default function AdminDashboardPage() {
                       type="button"
                       onClick={() => fetchTally()}
                       disabled={loadingTally}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-outline hover:text-on-surface border border-outline-variant/30 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface-variant hover:text-on-surface border border-outline-variant/30 transition-colors cursor-pointer"
                       title="Segarkan Perolehan Suara"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${loadingTally ? 'animate-spin text-primary' : ''}`} />
@@ -2671,7 +2984,7 @@ export default function AdminDashboardPage() {
                     <h3 className="text-sm font-bold text-on-surface">
                       Hasil Rekapitulasi Suara Terkunci
                     </h3>
-                    <p className="text-xs text-outline leading-relaxed">
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
                       Sesuai keputusan KPR HMIF, hasil perolehan suara ditutup selama pemilihan berlangsung aktif untuk menjaga kerahasiaan dan integritas proses.
                     </p>
                   </div>
@@ -2693,7 +3006,7 @@ export default function AdminDashboardPage() {
                                   ? 'Kotak Kosong'
                                   : `${cand.leaderName} & ${cand.viceLeaderName}`}
                               </h3>
-                              <span className="text-xs text-outline">
+                              <span className="text-xs text-on-surface-variant">
                                 {cand.candidateNumber === 0 ? 'Opsi Abstain Sah' : 'Pasangan Calon'}
                               </span>
                             </div>
@@ -2711,7 +3024,7 @@ export default function AdminDashboardPage() {
                           />
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-outline pt-2 border-t border-outline-variant/20">
+                        <div className="flex items-center justify-between text-xs text-on-surface-variant pt-2 border-t border-outline-variant/20">
                           <span>Suara Masuk:</span>
                           <span className="font-bold text-on-surface font-mono">{cand.voteCount} Suara</span>
                         </div>
@@ -2729,7 +3042,7 @@ export default function AdminDashboardPage() {
                   <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
                     Pengaturan Pemilihan & Jadwal Pemira
                   </h1>
-                  <p className="text-xs text-outline mt-0.5">
+                  <p className="text-xs text-on-surface-variant mt-0.5">
                     Atur jadwal resmi pelaksanaan, kendali pembukaan bilik suara, dan sakelar darurat teknis.
                   </p>
                 </div>
@@ -2749,7 +3062,7 @@ export default function AdminDashboardPage() {
                         <h3 className="text-sm font-bold text-on-surface">
                           Jadwal Operasional Pemira
                         </h3>
-                        <p className="text-xs text-outline">
+                        <p className="text-xs text-on-surface-variant">
                           Rentang waktu resmi pembukaan bilik suara digital (WIB / UTC+7).
                         </p>
                       </div>
@@ -2763,7 +3076,7 @@ export default function AdminDashboardPage() {
                       if (now >= start && now <= end) {
                         return (
                           <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
                             Sedang Berlangsung
                           </span>
                         );
@@ -2787,7 +3100,7 @@ export default function AdminDashboardPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold uppercase text-outline flex items-center gap-1.5">
+                      <label className="text-xs font-semibold uppercase text-on-surface-variant flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-primary" />
                         <span>Waktu Mulai Pemilihan:</span>
                       </label>
@@ -2795,12 +3108,12 @@ export default function AdminDashboardPage() {
                         type="datetime-local"
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
-                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono min-h-[44px] focus-visible:ring-2 focus-visible:ring-primary"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold uppercase text-outline flex items-center gap-1.5">
+                      <label className="text-xs font-semibold uppercase text-on-surface-variant flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-primary" />
                         <span>Waktu Penutupan Pemilihan:</span>
                       </label>
@@ -2808,12 +3121,12 @@ export default function AdminDashboardPage() {
                         type="datetime-local"
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
-                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono min-h-[44px] focus-visible:ring-2 focus-visible:ring-primary"
                       />
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-outline leading-relaxed bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
                     ℹ️ Sistem akan mengizinkan pengiriman suara hanya ketika waktu saat ini berada di antara waktu mulai dan penutupan. Di luar rentang waktu tersebut, bilik suara otomatis terkunci secara aman.
                   </p>
                 </div>
@@ -2829,14 +3142,17 @@ export default function AdminDashboardPage() {
                       <h4 className="text-sm font-bold text-on-surface">
                         Buka Pemungutan Suara
                       </h4>
-                      <p className="text-xs text-outline mt-0.5">
+                      <p className="text-xs text-on-surface-variant mt-0.5">
                         Sakelar utama izin pengiriman suara pemilih di bilik suara digital.
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setIsVotingOpen(!isVotingOpen)}
-                      className={`w-12 h-6 rounded-full transition-colors relative p-1 ${
+                      role="switch"
+                      aria-checked={isVotingOpen}
+                      aria-label="Buka Pemungutan Suara"
+                      onClick={handleOpenVotingToggleModal}
+                      className={`w-12 h-6 rounded-full transition-colors relative p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                         isVotingOpen ? 'bg-primary' : 'bg-surface-container-high'
                       }`}
                     >
@@ -2854,14 +3170,17 @@ export default function AdminDashboardPage() {
                         <AlertTriangle className="w-4 h-4 text-hmif-red" />
                         Mode Pemeliharaan Darurat
                       </h4>
-                      <p className="text-xs text-outline mt-0.5">
-                        Nonaktifkan sementara pengiriman suara — bisa diaktifkan kembali kapan saja.
+                      <p className="text-xs text-on-surface-variant mt-0.5">
+                        Nonaktifkan sementara pengiriman suara, bisa diaktifkan kembali kapan saja.
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setMaintenanceMode(!maintenanceMode)}
-                      className={`w-12 h-6 rounded-full transition-colors relative p-1 ${
+                      role="switch"
+                      aria-checked={maintenanceMode}
+                      aria-label="Mode Pemeliharaan Darurat"
+                      onClick={handleOpenMaintenanceToggleModal}
+                      className={`w-12 h-6 rounded-full transition-colors relative p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                         maintenanceMode ? 'bg-hmif-red' : 'bg-surface-container-high'
                       }`}
                     >
@@ -2874,7 +3193,7 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5 pt-4 border-t border-outline-variant/20">
-                    <label className="text-xs font-semibold uppercase text-outline">
+                    <label className="text-xs font-semibold uppercase text-on-surface-variant">
                       Alasan Perubahan:
                     </label>
                     <textarea
@@ -2882,7 +3201,7 @@ export default function AdminDashboardPage() {
                       onChange={(e) => setSettingsReason(e.target.value)}
                       placeholder="Contoh: Jeda teknis sebelum penghitungan suara"
                       rows={2}
-                      className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                     />
                   </div>
 
@@ -2914,7 +3233,7 @@ export default function AdminDashboardPage() {
                       <Mail className="w-6 h-6 text-primary" />
                       <span>Broadcast Email Pemira HMIF</span>
                     </h1>
-                    <p className="text-xs text-outline mt-0.5">
+                    <p className="text-xs text-on-surface-variant mt-0.5">
                       Kirim email pengumuman resmi dan pengingat hak suara ke mahasiswa Telkom University.
                     </p>
                   </div>
@@ -2922,9 +3241,9 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={fetchBroadcastCount}
-                    className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-container border border-outline-variant/30 text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-semibold bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
+                    <RefreshCw className="w-3.5 h-3.5 text-primary" />
                     <span>Segarkan Kuota</span>
                   </button>
                 </div>
@@ -2932,16 +3251,16 @@ export default function AdminDashboardPage() {
                 {/* Metrics Summary Strip */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-                    <span className="text-[11px] font-semibold uppercase text-outline block">Total DPT Resmi</span>
-                    <span className="text-xl font-bold text-on-surface font-mono">{totalDpt || 1240} Mahasiswa</span>
+                    <span className="text-[11px] font-semibold uppercase text-on-surface-variant block">Total DPT Resmi</span>
+                    <span className="text-xl font-bold text-on-surface font-mono">{totalDpt} Mahasiswa</span>
                   </div>
                   <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
                     <span className="text-[11px] font-semibold uppercase text-emerald-400 block">Sudah Menggunakan Hak Suara</span>
-                    <span className="text-xl font-bold text-emerald-400 font-mono">{totalVotes || 892} Mahasiswa</span>
+                    <span className="text-xl font-bold text-emerald-400 font-mono">{totalVotes} Mahasiswa</span>
                   </div>
                   <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
                     <span className="text-[11px] font-semibold uppercase text-amber-400 block">Belum Menggunakan Hak Suara</span>
-                    <span className="text-xl font-bold text-amber-400 font-mono">{(totalDpt - totalVotes) > 0 ? (totalDpt - totalVotes) : 348} Mahasiswa</span>
+                    <span className="text-xl font-bold text-amber-400 font-mono">{Math.max(0, totalDpt - totalVotes)} Mahasiswa</span>
                   </div>
                 </div>
 
@@ -2974,7 +3293,7 @@ export default function AdminDashboardPage() {
                   <div className="lg:col-span-7 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-5">
                     {/* Template Picker */}
                     <div>
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline block mb-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-2">
                         Pilih Template Pesan:
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -3022,7 +3341,7 @@ export default function AdminDashboardPage() {
                     {/* Filter Target Penerima */}
                     <div className="pt-4 border-t border-outline-variant/20 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-outline">
+                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
                           Target Kelompok Pemilih:
                         </label>
                         <select
@@ -3037,7 +3356,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-outline">
+                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
                           Filter Angkatan:
                         </label>
                         <select
@@ -3056,7 +3375,7 @@ export default function AdminDashboardPage() {
 
                     {/* Target Counter Badge */}
                     <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/20 flex items-center justify-between text-xs">
-                      <span className="text-outline">Jumlah Penerima Sasaran:</span>
+                      <span className="text-on-surface-variant">Jumlah Penerima Sasaran:</span>
                       <span className="font-bold text-primary font-mono text-sm">
                         {loadingBroadcastCount ? (
                           <Loader2 className="w-4 h-4 animate-spin inline" />
@@ -3069,7 +3388,7 @@ export default function AdminDashboardPage() {
                     {/* Form Fields */}
                     <div className="space-y-4 pt-2">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-outline">
+                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
                           Subjek Email:
                         </label>
                         <input
@@ -3081,7 +3400,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-outline">
+                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
                           Judul Pengumuman:
                         </label>
                         <input
@@ -3093,7 +3412,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-outline">
+                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
                           Isi Pesan Pengumuman:
                         </label>
                         <textarea
@@ -3106,7 +3425,7 @@ export default function AdminDashboardPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-semibold uppercase text-outline">
+                          <label className="text-xs font-semibold uppercase text-on-surface-variant">
                             Teks Tombol Aksi (CTA):
                           </label>
                           <input
@@ -3118,7 +3437,7 @@ export default function AdminDashboardPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-xs font-semibold uppercase text-outline">
+                          <label className="text-xs font-semibold uppercase text-on-surface-variant">
                             Tautan Tombol Aksi:
                           </label>
                           <input
@@ -3128,7 +3447,7 @@ export default function AdminDashboardPage() {
                             onChange={(e) => setBroadcastCtaUrl(e.target.value)}
                             className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
                           />
-                          <span className="text-[11px] text-outline block">
+                          <span className="text-[11px] text-on-surface-variant block">
                             Tautan relatif (contoh: /login) akan otomatis dikonversi sistem ke alamat domain resmi Pemira.
                           </span>
                         </div>
@@ -3150,10 +3469,10 @@ export default function AdminDashboardPage() {
                   {/* Right Column: Live Email Preview */}
                   <div className="hidden lg:block lg:col-span-5 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
-                      <span className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                         Pratinjau Email Mahasiswa
                       </span>
-                      <span className="text-[11px] text-outline font-mono">
+                      <span className="text-[11px] text-on-surface-variant font-mono">
                         Outlook Preview
                       </span>
                     </div>
@@ -3182,7 +3501,7 @@ export default function AdminDashboardPage() {
                         </div>
 
                         <p className="text-neutral-300 leading-relaxed text-[11px]">
-                          Halo <strong>Ahmad Rizky Pratama</strong> (<span className="text-hmif-gold font-mono">103012300001</span>),
+                          Halo <strong>Ahmad Rizky Pratama</strong>,
                         </p>
 
                         <div className="text-neutral-300 leading-relaxed text-[11px] whitespace-pre-line space-y-2">
@@ -3191,12 +3510,12 @@ export default function AdminDashboardPage() {
 
                         <div className="pt-2 text-center">
                           <span className="inline-block px-5 py-2.5 rounded-lg bg-hmif-blue text-white text-[11px] font-bold shadow-md">
-                            {broadcastCtaText} &rarr;
+                            {broadcastCtaText}
                           </span>
                         </div>
 
                         <div className="p-2.5 rounded bg-neutral-900 border-l-2 border-hmif-gold text-[11px] text-neutral-400 leading-normal">
-                          🛡️ Kerahasiaan suara dijamin penuh berasaskan LUBER JURDIL (*Ballot Secrecy*).
+                          Pilihan suaramu bersifat rahasia dan disimpan secara anonim tanpa mencatat identitas pemilih pada surat suara.
                         </div>
                       </div>
                     </div>
@@ -3218,7 +3537,7 @@ export default function AdminDashboardPage() {
                       <h2 className="text-lg sm:text-xl font-bold text-on-surface flex items-center gap-2">
                         Audit Trail &amp; Rekam Jejak Sistem
                       </h2>
-                      <p className="text-xs text-outline mt-0.5">
+                      <p className="text-xs text-on-surface-variant mt-0.5">
                         Transparansi penuh seluruh aktivitas konfigurasi, perubahan paslon, DPT, dan aksi administratif panitia.
                       </p>
                     </div>
@@ -3250,37 +3569,37 @@ export default function AdminDashboardPage() {
                 {/* Audit Statistics Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Total Log</span>
+                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Total Log</span>
                     <span className="text-xl sm:text-2xl font-bold text-on-surface mt-2 font-mono">
                       {auditStats?.total || auditLogs.length}
                     </span>
                   </div>
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Konfigurasi</span>
+                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Konfigurasi</span>
                     <span className="text-xl sm:text-2xl font-bold text-blue-400 mt-2 font-mono">
                       {auditStats?.settingsCount || 0}
                     </span>
                   </div>
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Paslon</span>
+                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Paslon</span>
                     <span className="text-xl sm:text-2xl font-bold text-emerald-400 mt-2 font-mono">
                       {auditStats?.candidatesCount || 0}
                     </span>
                   </div>
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">DPT &amp; Pemilih</span>
+                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">DPT &amp; Pemilih</span>
                     <span className="text-xl sm:text-2xl font-bold text-amber-400 mt-2 font-mono">
                       {auditStats?.dptCount || 0}
                     </span>
                   </div>
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Broadcast</span>
+                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Broadcast</span>
                     <span className="text-xl sm:text-2xl font-bold text-purple-400 mt-2 font-mono">
                       {auditStats?.broadcastCount || 0}
                     </span>
                   </div>
                   <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-outline uppercase tracking-wider">Administrator</span>
+                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Administrator</span>
                     <span className="text-xl sm:text-2xl font-bold text-primary mt-2 font-mono">
                       {auditStats?.adminCount || 0}
                     </span>
@@ -3290,7 +3609,7 @@ export default function AdminDashboardPage() {
                 {/* Filter & Search Bar */}
                 <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-outline" />
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                     <input
                       type="text"
                       placeholder="Cari pelaksana, email, atau rincian aksi..."
@@ -3299,19 +3618,19 @@ export default function AdminDashboardPage() {
                         setAuditSearchQuery(e.target.value);
                         fetchAuditLogs(auditFilterAction, e.target.value);
                       }}
-                      className="w-full pl-10 pr-4 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary placeholder:text-outline/60"
+                      className="w-full pl-10 pr-4 py-2.5 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
                     />
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Filter className="w-3.5 h-3.5 text-outline shrink-0 ml-1" />
+                    <Filter className="w-3.5 h-3.5 text-primary shrink-0 ml-1" />
                     <select
                       value={auditFilterAction}
                       onChange={(e) => {
                         setAuditFilterAction(e.target.value);
                         fetchAuditLogs(e.target.value, auditSearchQuery);
                       }}
-                      className="px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer"
+                      className="px-3 py-2.5 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     >
                       <option value="all">Semua Kategori Aktivitas</option>
                       <option value="ELECTION_SETTINGS_UPDATE">Pengaturan Jadwal &amp; Jam</option>
@@ -3337,7 +3656,7 @@ export default function AdminDashboardPage() {
                           setAuditSearchQuery('');
                           fetchAuditLogs('all', '');
                         }}
-                        className="px-3 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-outline hover:text-on-surface text-xs font-semibold transition-colors cursor-pointer"
+                        className="px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface text-xs font-semibold transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                       >
                         Reset
                       </button>
@@ -3349,7 +3668,7 @@ export default function AdminDashboardPage() {
                 <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-surface-container-highest/60 text-outline uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
+                      <thead className="bg-surface-container-highest/60 text-on-surface-variant uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
                         <tr>
                           <th className="py-3 px-4">Waktu</th>
                           <th className="py-3 px-4">Pelaksana / Admin</th>
@@ -3361,17 +3680,17 @@ export default function AdminDashboardPage() {
                       <tbody className="divide-y divide-outline-variant/10 text-on-surface">
                         {loadingAuditLogs ? (
                           <tr>
-                            <td colSpan={5} className="py-12 text-center text-outline">
+                            <td colSpan={5} className="py-12 text-center text-on-surface-variant">
                               <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                               <span>Memuat rekam jejak audit...</span>
                             </td>
                           </tr>
                         ) : auditLogs.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-12 text-center text-outline">
-                              <ShieldAlert className="w-8 h-8 mx-auto mb-2 text-outline/40" />
+                            <td colSpan={5} className="py-12 text-center text-on-surface-variant">
+                              <ShieldAlert className="w-8 h-8 mx-auto mb-2 text-on-surface-variant/40" />
                               <p className="font-semibold text-sm text-on-surface">Tidak ada log audit yang cocok</p>
-                              <p className="text-xs text-outline mt-1">Coba sesuaikan kata kunci pencarian atau kategori filter.</p>
+                              <p className="text-xs text-on-surface-variant mt-1">Coba sesuaikan kata kunci pencarian atau kategori filter.</p>
                             </td>
                           </tr>
                         ) : (
@@ -3389,7 +3708,7 @@ export default function AdminDashboardPage() {
                               : log.timestamp;
 
                             // Badge style per action type
-                            let badgeBg = 'bg-surface-container-highest text-outline border-outline-variant/30';
+                            let badgeBg = 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30';
                             let categoryLabel = log.action;
                             if (log.action.startsWith('ELECTION_') || log.action.startsWith('MAINTENANCE_')) {
                               badgeBg = 'bg-blue-500/10 text-blue-400 border-blue-500/30';
@@ -3413,13 +3732,13 @@ export default function AdminDashboardPage() {
 
                             return (
                               <tr key={log.id} className="hover:bg-surface-container-high/40 transition-colors">
-                                <td className="py-3.5 px-4 font-mono text-[11px] whitespace-nowrap text-outline">
+                                <td className="py-3.5 px-4 font-mono text-[11px] whitespace-nowrap text-on-surface-variant">
                                   {formattedTime}
                                 </td>
                                 <td className="py-3.5 px-4">
                                   <div className="font-semibold text-on-surface">{log.actor_name}</div>
-                                  <div className="text-[11px] text-outline font-mono">{log.actor_email}</div>
-                                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container-highest text-outline">
+                                  <div className="text-[11px] text-on-surface-variant font-mono">{log.actor_email}</div>
+                                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container-highest text-on-surface-variant">
                                     {log.actor_role.replace('_', ' ')}
                                   </span>
                                 </td>
@@ -3427,7 +3746,7 @@ export default function AdminDashboardPage() {
                                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold border ${badgeBg}`}>
                                     {categoryLabel}
                                   </span>
-                                  <span className="block text-[10px] text-outline font-mono mt-1">
+                                  <span className="block text-[10px] text-on-surface-variant font-mono mt-1">
                                     {log.action}
                                   </span>
                                 </td>
@@ -3436,7 +3755,7 @@ export default function AdminDashboardPage() {
                                     {log.description}
                                   </div>
                                   {log.details && Object.keys(log.details).length > 0 && (
-                                    <details className="mt-1.5 text-[11px] text-outline cursor-pointer">
+                                    <details className="mt-1.5 text-[11px] text-on-surface-variant cursor-pointer">
                                       <summary className="hover:text-primary transition-colors select-none font-semibold">
                                         Rincian Parameter
                                       </summary>
@@ -3446,9 +3765,9 @@ export default function AdminDashboardPage() {
                                     </details>
                                   )}
                                 </td>
-                                <td className="py-3.5 px-4 text-right font-mono text-[11px] text-outline whitespace-nowrap">
+                                <td className="py-3.5 px-4 text-right font-mono text-[11px] text-on-surface-variant whitespace-nowrap">
                                   <span className="inline-flex items-center gap-1">
-                                    <Shield className="w-3 h-3 text-outline/60" />
+                                    <Shield className="w-3 h-3 text-on-surface-variant/60" />
                                     <span>{log.ip_address}</span>
                                   </span>
                                 </td>
@@ -3470,7 +3789,7 @@ export default function AdminDashboardPage() {
                   <div className="p-8 rounded-2xl bg-surface-container border border-error/30 text-center max-w-xl mx-auto space-y-3">
                     <ShieldAlert className="w-12 h-12 text-error mx-auto" />
                     <h3 className="text-base font-bold text-on-surface">Akses Dibatasi Khusus Superadmin</h3>
-                    <p className="text-xs text-outline leading-relaxed">
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
                       Wewenang penambahan panitia dan pembagian peran hanya dapat dikelola langsung oleh akun Superadmin utama (<span className="text-primary font-mono">marzhendogalangs@gmail.com</span>).
                     </p>
                   </div>
@@ -3486,7 +3805,7 @@ export default function AdminDashboardPage() {
                           <h2 className="text-lg sm:text-xl font-bold text-on-surface flex items-center gap-2">
                             Manajemen Administrator &amp; Panitia
                           </h2>
-                          <p className="text-xs text-outline mt-0.5">
+                          <p className="text-xs text-on-surface-variant mt-0.5">
                             Kontrol otorisasi peran panitia Komisi Pemilihan Raya (KPR), Auditor Independen (DPM), dan Superadmin.
                           </p>
                         </div>
@@ -3524,25 +3843,25 @@ export default function AdminDashboardPage() {
                     {/* Statistics Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Total Pengelola</span>
+                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Total Pengelola</span>
                         <span className="text-2xl font-bold text-on-surface mt-2 block font-mono">
                           {adminStats?.total || adminUsers.length}
                         </span>
                       </div>
                       <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Superadmin</span>
+                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Superadmin</span>
                         <span className="text-2xl font-bold text-primary mt-2 block font-mono">
                           {adminStats?.superAdminCount || 0}
                         </span>
                       </div>
                       <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Panitia KPR</span>
+                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Panitia KPR</span>
                         <span className="text-2xl font-bold text-blue-400 mt-2 block font-mono">
                           {adminStats?.kprAdminCount || 0}
                         </span>
                       </div>
                       <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-outline uppercase tracking-wider block">Auditor Independen</span>
+                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Auditor Independen</span>
                         <span className="text-2xl font-bold text-purple-400 mt-2 block font-mono">
                           {adminStats?.auditorCount || 0}
                         </span>
@@ -3553,7 +3872,7 @@ export default function AdminDashboardPage() {
                     <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
-                          <thead className="bg-surface-container-highest/60 text-outline uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
+                          <thead className="bg-surface-container-highest/60 text-on-surface-variant uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
                             <tr>
                               <th className="py-3 px-4">Nama Lengkap &amp; NIM</th>
                               <th className="py-3 px-4">Email SSO / Akun</th>
@@ -3565,14 +3884,14 @@ export default function AdminDashboardPage() {
                           <tbody className="divide-y divide-outline-variant/10 text-on-surface">
                             {loadingAdmins ? (
                               <tr>
-                                <td colSpan={5} className="py-12 text-center text-outline">
+                                <td colSpan={5} className="py-12 text-center text-on-surface-variant">
                                   <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                                   <span>Memuat daftar administrator...</span>
                                 </td>
                               </tr>
                             ) : adminUsers.length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="py-8 text-center text-outline">
+                                <td colSpan={5} className="py-8 text-center text-on-surface-variant">
                                   Belum ada administrator terdaftar.
                                 </td>
                               </tr>
@@ -3592,7 +3911,7 @@ export default function AdminDashboardPage() {
                                         )}
                                       </div>
                                       {admin.nim && (
-                                        <div className="text-[11px] text-outline font-mono mt-0.5">
+                                        <div className="text-[11px] text-on-surface-variant font-mono mt-0.5">
                                           NIM: {admin.nim}
                                         </div>
                                       )}
@@ -3630,10 +3949,10 @@ export default function AdminDashboardPage() {
                                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
                                           admin.is_active
                                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
-                                            : 'bg-outline/10 text-outline border border-outline/30 hover:bg-outline/20'
+                                            : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high'
                                         } ${isPrimarySuperadmin ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                                       >
-                                        <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-emerald-400' : 'bg-outline'}`} />
+                                        <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-emerald-400' : 'bg-on-surface-variant'}`} />
                                         <span>{admin.is_active ? 'Aktif' : 'Nonaktif'}</span>
                                       </button>
                                     </td>
@@ -3642,7 +3961,7 @@ export default function AdminDashboardPage() {
                                         <button
                                           type="button"
                                           onClick={() => handleDeleteAdminUser(admin)}
-                                          className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
                                           title="Cabut Akses Administrator"
                                         >
                                           <Trash2 className="w-4 h-4" />
@@ -3681,14 +4000,14 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 max-h-[calc(100dvh-2rem)] min-h-0 overflow-y-auto my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 max-h-[calc(100dvh-2rem)] min-h-0 overflow-y-auto my-auto animate-in zoom-in-95 duration-150"
               >
             <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
               <div>
                 <h3 className="text-base font-bold text-on-surface">
                   {editingCandidate ? 'Edit Pasangan Calon' : 'Tambah Pasangan Calon Baru'}
                 </h3>
-                <p className="text-xs text-outline">
+                <p className="text-xs text-on-surface-variant">
                   Isi detail data pasangan calon peserta Pemira.
                 </p>
               </div>
@@ -3697,7 +4016,7 @@ export default function AdminDashboardPage() {
                 type="button"
                 onClick={() => setCandidateModalOpen(false)}
                 aria-label="Tutup formulir paslon"
-                className="w-11 h-11 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3705,7 +4024,7 @@ export default function AdminDashboardPage() {
 
             <form onSubmit={handleSaveCandidate} className="flex flex-col gap-3.5 text-xs">
               <div>
-                <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
                   Nomor Urut Paslon
                 </label>
                 <input
@@ -3714,12 +4033,12 @@ export default function AdminDashboardPage() {
                   required
                   value={candidateFormNumber}
                   onChange={(e) => setCandidateFormNumber(Number(e.target.value))}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
                   Nama Calon Chairman
                 </label>
                 <input
@@ -3728,12 +4047,12 @@ export default function AdminDashboardPage() {
                   placeholder="Contoh: Muhammad Farhan"
                   value={candidateFormLeader}
                   onChange={(e) => setCandidateFormLeader(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
                   Nama Calon Vice Chairman
                 </label>
                 <input
@@ -3742,7 +4061,7 @@ export default function AdminDashboardPage() {
                   placeholder="Contoh: Siti Aisyah"
                   value={candidateFormViceLeader}
                   onChange={(e) => setCandidateFormViceLeader(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
                 />
               </div>
 
@@ -3767,11 +4086,11 @@ export default function AdminDashboardPage() {
               {/* FOTO PASLON DENGAN FITUR UNGGAH & HAPUS FOTO */}
               <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-outline uppercase flex items-center gap-1.5">
+                  <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
                     <ImageIcon className="w-3.5 h-3.5 text-primary" />
                     <span>Foto Pasangan Calon</span>
                   </label>
-                  <span className="text-[11px] text-outline">Maks. 5 MB (.png, .jpg, .webp)</span>
+                  <span className="text-[11px] text-on-surface-variant">Maks. 5 MB (.png, .jpg, .webp)</span>
                 </div>
 
                 <input
@@ -3799,7 +4118,7 @@ export default function AdminDashboardPage() {
                       <span className="text-xs font-semibold text-on-surface block truncate">
                         Foto Paslon Terpasang
                       </span>
-                      <span className="text-[11px] text-outline block truncate font-mono mt-0.5">
+                      <span className="text-[11px] text-on-surface-variant block truncate font-mono mt-0.5">
                         {candidateFormPhotoUrl}
                       </span>
                       <div className="flex items-center gap-2 mt-1.5">
@@ -3821,7 +4140,7 @@ export default function AdminDashboardPage() {
                             </>
                           )}
                         </button>
-                        <span className="text-outline text-[11px]">•</span>
+                        <span className="text-on-surface-variant text-[11px]">•</span>
                         <button
                           type="button"
                           onClick={() => setCandidateFormPhotoUrl('')}
@@ -3852,7 +4171,7 @@ export default function AdminDashboardPage() {
                             <UploadCloud className="w-4 h-4 text-primary" />
                             <span>Pilih / Unggah Berkas Foto Paslon</span>
                           </div>
-                          <span className="text-[11px] text-outline">
+                          <span className="text-[11px] text-on-surface-variant">
                             Foto akan otomatis ditampilkan di bilik suara pemilih
                           </span>
                         </>
@@ -3865,11 +4184,11 @@ export default function AdminDashboardPage() {
               {/* BERKAS CV TERPISAH: CHAIRMAN & VICE CHAIRMAN (PDF) */}
               <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-3">
                 <div className="flex items-center justify-between pb-1 border-b border-outline-variant/20">
-                  <label className="text-[11px] font-bold text-outline uppercase flex items-center gap-1.5">
+                  <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-primary" />
                     <span>Berkas CV Pasangan Calon (PDF)</span>
                   </label>
-                  <span className="text-[11px] text-outline">Maks. 10 MB per berkas</span>
+                  <span className="text-[11px] text-on-surface-variant">Maks. 10 MB per berkas</span>
                 </div>
 
                 {/* CV Chairman */}
@@ -3893,7 +4212,7 @@ export default function AdminDashboardPage() {
                         ✓ Terunggah: {candidateFormChairmanCvUrl.split('/').pop()}
                       </span>
                     ) : (
-                      <span className="text-[11px] text-outline block">
+                      <span className="text-[11px] text-on-surface-variant block">
                         Belum ada berkas PDF CV Chairman
                       </span>
                     )}
@@ -3964,7 +4283,7 @@ export default function AdminDashboardPage() {
                         ✓ Terunggah: {candidateFormViceChairmanCvUrl.split('/').pop()}
                       </span>
                     ) : (
-                      <span className="text-[11px] text-outline block">
+                      <span className="text-[11px] text-on-surface-variant block">
                         Belum ada berkas PDF CV Vice Chairman
                       </span>
                     )}
@@ -4016,7 +4335,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
                   Visi
                 </label>
                 <textarea
@@ -4025,12 +4344,12 @@ export default function AdminDashboardPage() {
                   placeholder="Visi kepemimpinan pasangan calon..."
                   value={candidateFormVision}
                   onChange={(e) => setCandidateFormVision(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                  className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-outline uppercase block mb-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
                   Misi (Satu butir per baris)
                 </label>
                 <textarea
@@ -4039,22 +4358,36 @@ export default function AdminDashboardPage() {
                   placeholder="Misi 1&#10;Misi 2&#10;Misi 3"
                   value={candidateFormMission}
                   onChange={(e) => setCandidateFormMission(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-sans"
+                  className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60 font-sans"
                 />
+              </div>
+
+              {/* Status Aktif Paslon */}
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30">
+                <input
+                  type="checkbox"
+                  id="candidate-is-active"
+                  checked={candidateFormIsActive}
+                  onChange={(e) => setCandidateFormIsActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
+                />
+                <label htmlFor="candidate-is-active" className="text-xs font-semibold text-on-surface cursor-pointer select-none">
+                  Status Aktif (Pasangan calon dapat dipilih di bilik suara)
+                </label>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
                 <button
                   type="button"
                   onClick={() => setCandidateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors"
+                  className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={savingCandidate}
-                  className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                  className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                 >
                   {savingCandidate ? (
                     <>
@@ -4079,6 +4412,7 @@ export default function AdminDashboardPage() {
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby="emergency-modal-title"
             className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
             onClick={(e) => {
               if (e.target === e.currentTarget && !settingsSaving) {
@@ -4089,7 +4423,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 text-error">
@@ -4097,10 +4431,10 @@ export default function AdminDashboardPage() {
                   <AlertTriangle className="w-5 h-5 text-error" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-on-surface">
+                  <h3 id="emergency-modal-title" className="text-sm font-bold text-on-surface">
                     Kunci Darurat Bilik Suara
                   </h3>
-                  <span className="text-[11px] text-outline uppercase tracking-wider">
+                  <span className="text-[11px] text-on-surface-variant uppercase tracking-wider">
                     Tindakan Darurat
                   </span>
                 </div>
@@ -4110,24 +4444,24 @@ export default function AdminDashboardPage() {
                 type="button"
                 onClick={() => setIsEmergencyModalOpen(false)}
                 aria-label="Tutup kunci darurat"
-                className="w-11 h-11 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-outline leading-relaxed">
+            <p className="text-xs text-on-surface-variant leading-relaxed">
               Mengaktifkan kunci darurat akan menghentikan pengiriman suara sementara bagi seluruh pemilih.
             </p>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase text-outline font-semibold">
+              <label className="text-[11px] uppercase text-on-surface-variant font-semibold">
                 Alasan Penguncian:
               </label>
               <select
                 value={emergencyReason}
                 onChange={(e) => setEmergencyReason(e.target.value)}
-                className="w-full rounded-xl bg-surface-container-lowest px-3 py-2 text-xs text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+                className="w-full rounded-xl bg-surface-container-lowest px-3 py-2.5 min-h-[44px] text-xs text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
               >
                 <option value="Jeda Teknis Terjadwal">Jeda Teknis Terjadwal</option>
                 <option value="Keadaan Kahar Organisasi">Keadaan Kahar Organisasi</option>
@@ -4140,7 +4474,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsEmergencyModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary"
               >
                 Batal
               </button>
@@ -4161,6 +4495,122 @@ export default function AdminDashboardPage() {
     </Portal>
     )}
 
+      {/* MODAL KONFIRMASI SAKELAR BILIK SUARA / MAINTENANCE */}
+      {toggleModalConfig && (
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="toggle-modal-title"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !settingsSaving) {
+                setToggleModalConfig(null);
+              }
+            }}
+          >
+            <div className="flex min-h-full items-center justify-center p-4 text-left">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150 shadow-2xl"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        toggleModalConfig.isDanger
+                          ? 'bg-hmif-red/10 text-hmif-red border border-hmif-red/20'
+                          : 'bg-primary/10 text-primary border border-primary/20'
+                      }`}
+                    >
+                      {toggleModalConfig.type === 'maintenance_mode' ? (
+                        <AlertTriangle className="w-5 h-5" />
+                      ) : toggleModalConfig.targetValue ? (
+                        <CheckCircle2 className="w-5 h-5" />
+                      ) : (
+                        <Lock className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 id="toggle-modal-title" className="text-sm font-bold text-on-surface">
+                        {toggleModalConfig.title}
+                      </h3>
+                      <span className="text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
+                        Konfirmasi Eksekutif
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={settingsSaving}
+                    onClick={() => setToggleModalConfig(null)}
+                    aria-label="Tutup modal konfirmasi"
+                    className="w-9 h-9 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  {toggleModalConfig.description}
+                </p>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase text-on-surface-variant font-semibold">
+                    Alasan Operasional / Catatan Audit:
+                  </label>
+                  <textarea
+                    value={toggleReason}
+                    onChange={(e) => setToggleReason(e.target.value)}
+                    placeholder={toggleModalConfig.defaultReason}
+                    rows={2}
+                    className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                  <span className="text-[10px] text-on-surface-variant">
+                    Catatan ini akan direkam dalam Audit Log Pemira HMIF secara permanen.
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    disabled={settingsSaving}
+                    onClick={() => setToggleModalConfig(null)}
+                    className="px-4 py-2 min-h-[40px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={settingsSaving}
+                    onClick={handleConfirmToggle}
+                    className={`px-5 py-2 min-h-[40px] rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                      toggleModalConfig.isDanger
+                        ? 'bg-hmif-red text-white hover:bg-red-700'
+                        : 'bg-primary text-on-primary hover:bg-secondary-fixed'
+                    }`}
+                  >
+                    {settingsSaving ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Konfirmasi & Simpan</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
       {/* MODAL KONFIRMASI BROADCAST EMAIL */}
       {isConfirmBroadcastOpen && (
         <Portal>
@@ -4177,7 +4627,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
@@ -4187,7 +4637,7 @@ export default function AdminDashboardPage() {
                 <h3 className="text-base font-bold text-on-surface">
                   Konfirmasi Broadcast Email
                 </h3>
-                <p className="text-xs text-outline mt-0.5">
+                <p className="text-xs text-on-surface-variant mt-0.5">
                   Tinjau sebelum pesan dikirimkan ke server email kampus.
                 </p>
               </div>
@@ -4195,23 +4645,23 @@ export default function AdminDashboardPage() {
 
             <div className="bg-surface-container-high rounded-xl p-3.5 border border-outline-variant/20 text-xs space-y-2">
               <div className="flex justify-between">
-                <span className="text-outline">Jumlah Penerima:</span>
+                <span className="text-on-surface-variant">Jumlah Penerima:</span>
                 <span className="font-bold text-primary font-mono">{broadcastTargetCount ?? '...'} Mahasiswa</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-outline">Kelompok Sasaran:</span>
+                <span className="text-on-surface-variant">Kelompok Sasaran:</span>
                 <span className="font-semibold text-on-surface">
                   {broadcastTargetGroup === 'not_voted' ? 'Khusus yang Belum Memilih' : broadcastTargetGroup === 'all' ? 'Seluruh DPT' : 'Khusus yang Sudah Memilih'}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-outline">Filter Angkatan:</span>
+                <span className="text-on-surface-variant">Filter Angkatan:</span>
                 <span className="font-semibold text-on-surface">
                   {broadcastGeneration === 'all' ? 'Semua (2023 - 2026)' : `Angkatan ${broadcastGeneration}`}
                 </span>
               </div>
               <div className="pt-2 border-t border-outline-variant/20">
-                <span className="text-outline block mb-1">Subjek:</span>
+                <span className="text-on-surface-variant block mb-1">Subjek:</span>
                 <span className="font-medium text-on-surface truncate block">{broadcastSubject}</span>
               </div>
             </div>
@@ -4267,7 +4717,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
                 <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
                   <div className="flex items-center gap-2.5">
@@ -4278,7 +4728,7 @@ export default function AdminDashboardPage() {
                       <h3 className="text-sm font-bold text-on-surface">
                         Tambah Pemilih Uji Coba
                       </h3>
-                      <p className="text-[11px] text-outline">
+                      <p className="text-[11px] text-on-surface-variant">
                         Gunakan email aktif sendiri untuk menguji pengiriman OTP &amp; Broadcast.
                       </p>
                     </div>
@@ -4286,7 +4736,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setIsQuickAddModalOpen(false)}
-                    className="w-8 h-8 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors"
+                    className="w-8 h-8 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -4300,7 +4750,7 @@ export default function AdminDashboardPage() {
 
                 <form onSubmit={handleQuickAddVoter} className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       NIM Mahasiswa <span className="text-error">*</span>
                     </label>
                     <input
@@ -4309,12 +4759,12 @@ export default function AdminDashboardPage() {
                       value={quickAddNim}
                       onChange={(e) => setQuickAddNim(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       Nama Mahasiswa <span className="text-error">*</span>
                     </label>
                     <input
@@ -4323,12 +4773,12 @@ export default function AdminDashboardPage() {
                       value={quickAddName}
                       onChange={(e) => setQuickAddName(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       Email Tujuan (Email Pengujian Anda) <span className="text-error">*</span>
                     </label>
                     <input
@@ -4337,21 +4787,21 @@ export default function AdminDashboardPage() {
                       value={quickAddEmail}
                       onChange={(e) => setQuickAddEmail(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
                     />
-                    <span className="text-[10px] text-outline mt-1 block">
+                    <span className="text-[10px] text-on-surface-variant mt-1 block">
                       Masukkan email riil yang bisa Anda buka di inbox untuk memverifikasi penerimaan surat.
                     </span>
                   </div>
 
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       Angkatan
                     </label>
                     <select
                       value={quickAddGeneration}
                       onChange={(e) => setQuickAddGeneration(Number(e.target.value))}
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <option value="2023">2023</option>
                       <option value="2024">2024</option>
@@ -4365,14 +4815,14 @@ export default function AdminDashboardPage() {
                       type="button"
                       disabled={quickAddLoading}
                       onClick={() => setIsQuickAddModalOpen(false)}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                      className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                     >
                       Batal
                     </button>
                     <button
                       type="submit"
                       disabled={quickAddLoading}
-                      className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                      className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                     >
                       {quickAddLoading ? (
                         <>
@@ -4407,7 +4857,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
                 <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
                   <div className="flex items-center gap-3">
@@ -4416,13 +4866,13 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-on-surface">Tambah Administrator Baru</h3>
-                      <p className="text-xs text-outline mt-0.5">Berikan hak akses panitia atau auditor Pemira.</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5">Berikan hak akses panitia atau auditor Pemira.</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setAdminModalOpen(false)}
-                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -4437,7 +4887,7 @@ export default function AdminDashboardPage() {
 
                 <form onSubmit={handleSaveAdminUser} className="space-y-4 text-xs">
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       Nama Lengkap Administrator <span className="text-error">*</span>
                     </label>
                     <input
@@ -4446,12 +4896,12 @@ export default function AdminDashboardPage() {
                       value={adminFormName}
                       onChange={(e) => setAdminFormName(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       Email SSO Kampus / Akun <span className="text-error">*</span>
                     </label>
                     <input
@@ -4460,15 +4910,15 @@ export default function AdminDashboardPage() {
                       value={adminFormEmail}
                       onChange={(e) => setAdminFormEmail(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
                     />
-                    <span className="text-[10px] text-outline mt-1 block">
+                    <span className="text-[10px] text-on-surface-variant mt-1 block">
                       Email ini digunakan untuk login SSO / OTP ke bilik dan dashboard.
                     </span>
                   </div>
 
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       NIM (Opsional)
                     </label>
                     <input
@@ -4476,18 +4926,18 @@ export default function AdminDashboardPage() {
                       placeholder="Contoh: 103012300088"
                       value={adminFormNim}
                       onChange={(e) => setAdminFormNim(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-outline font-semibold mb-1">
+                    <label className="block text-on-surface-variant font-semibold mb-1">
                       Wewenang &amp; Peran (Role) <span className="text-error">*</span>
                     </label>
                     <select
                       value={adminFormRole}
                       onChange={(e) => setAdminFormRole(e.target.value as 'kpr_admin' | 'auditor' | 'super_admin')}
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     >
                       <option value="kpr_admin">Panitia KPR (Hak operasional penuh, paslon, DPT &amp; broadcast)</option>
                       <option value="auditor">Auditor Independen (Pengawas read-only &amp; rekapitulasi pasca pemilihan)</option>
@@ -4500,14 +4950,14 @@ export default function AdminDashboardPage() {
                       type="button"
                       disabled={adminSaving}
                       onClick={() => setAdminModalOpen(false)}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                      className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                     >
                       Batal
                     </button>
                     <button
                       type="submit"
                       disabled={adminSaving}
-                      className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                      className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                     >
                       {adminSaving ? (
                         <>
@@ -4600,7 +5050,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
                 <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
                   <div className="flex items-center gap-3">
@@ -4609,14 +5059,14 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-on-surface">Konfirmasi Hapus Pemilih</h3>
-                      <p className="text-xs text-outline mt-0.5">Penghapusan data pemilih dari Daftar Pemilih Tetap.</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5">Penghapusan data pemilih dari Daftar Pemilih Tetap.</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     disabled={isDeletingSingleVoter}
                     onClick={() => setVoterToDelete(null)}
-                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -4625,28 +5075,28 @@ export default function AdminDashboardPage() {
                 <div className="space-y-3 text-xs">
                   <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-1.5">
                     <div className="flex justify-between">
-                      <span className="text-outline">Nama Mahasiswa:</span>
+                      <span className="text-on-surface-variant">Nama Mahasiswa:</span>
                       <span className="font-semibold text-on-surface">{voterToDelete.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-outline">NIM:</span>
+                      <span className="text-on-surface-variant">NIM:</span>
                       <span className="font-mono font-semibold text-primary">{voterToDelete.nim}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-outline">Email SSO:</span>
-                      <span className="font-mono text-outline">{voterToDelete.email}</span>
+                      <span className="text-on-surface-variant">Email SSO:</span>
+                      <span className="font-mono text-on-surface-variant">{voterToDelete.email}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-outline">Angkatan:</span>
+                      <span className="text-on-surface-variant">Angkatan:</span>
                       <span className="text-on-surface">{voterToDelete.generation}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-outline">Status Hak Suara:</span>
+                      <span className="text-on-surface-variant">Status Hak Suara:</span>
                       <span>
                         {voterToDelete.has_voted ? (
                           <span className="text-emerald-400 font-semibold">Sudah Memilih</span>
                         ) : (
-                          <span className="text-outline">Belum Memilih</span>
+                          <span className="text-on-surface-variant">Belum Memilih</span>
                         )}
                       </span>
                     </div>
@@ -4663,7 +5113,7 @@ export default function AdminDashboardPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-outline leading-relaxed text-[11px]">
+                    <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant leading-relaxed text-[11px]">
                       Mahasiswa ini belum menggunakan hak suara. Penghapusan akan mencabut hak pilih akun ini secara permanen dari sistem.
                     </div>
                   )}
@@ -4674,7 +5124,7 @@ export default function AdminDashboardPage() {
                     type="button"
                     disabled={isDeletingSingleVoter}
                     onClick={() => setVoterToDelete(null)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                   >
                     Batal
                   </button>
@@ -4682,7 +5132,7 @@ export default function AdminDashboardPage() {
                     type="button"
                     disabled={isDeletingSingleVoter}
                     onClick={handleConfirmDeleteSingle}
-                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                    className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     {isDeletingSingleVoter ? (
                       <>
@@ -4719,7 +5169,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
                 <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
                   <div className="flex items-center gap-3">
@@ -4728,14 +5178,14 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-on-surface">Hapus Selektif ({selectedVoterIds.length} Pemilih)</h3>
-                      <p className="text-xs text-outline mt-0.5">Penghapusan massal pemilih DPT yang dipilih.</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5">Penghapusan massal pemilih DPT yang dipilih.</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     disabled={isDeletingBatchVoters}
                     onClick={() => setIsBatchDeleteModalOpen(false)}
-                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -4762,7 +5212,7 @@ export default function AdminDashboardPage() {
                     type="button"
                     disabled={isDeletingBatchVoters}
                     onClick={() => setIsBatchDeleteModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                   >
                     Batal
                   </button>
@@ -4770,7 +5220,7 @@ export default function AdminDashboardPage() {
                     type="button"
                     disabled={isDeletingBatchVoters}
                     onClick={handleConfirmDeleteBatch}
-                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                    className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     {isDeletingBatchVoters ? (
                       <>
@@ -4807,7 +5257,7 @@ export default function AdminDashboardPage() {
             <div className="flex min-h-full items-center justify-center p-4 text-left">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
               >
                 <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
                   <div className="flex items-center gap-3">
@@ -4816,14 +5266,14 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-on-surface">Reset &amp; Kosongkan DPT</h3>
-                      <p className="text-xs text-outline mt-0.5">Operasi tingkat tinggi untuk mengelola database pemilih.</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5">Operasi tingkat tinggi untuk mengelola database pemilih.</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     disabled={isResettingDpt}
                     onClick={() => setIsResetDptModalOpen(false)}
-                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -4831,7 +5281,7 @@ export default function AdminDashboardPage() {
 
                 <div className="space-y-4 text-xs">
                   <div className="space-y-2">
-                    <label className="block text-outline font-semibold">Pilih Mode Reset:</label>
+                    <label className="block text-on-surface-variant font-semibold">Pilih Mode Reset:</label>
                     
                     <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_to_default' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
                       <input
@@ -4844,7 +5294,7 @@ export default function AdminDashboardPage() {
                       />
                       <div>
                         <span className="font-bold text-on-surface block">Kembalikan ke Default Sistem</span>
-                        <span className="text-outline text-[11px] block mt-0.5">
+                        <span className="text-on-surface-variant text-[11px] block mt-0.5">
                           Menghapus data pemilih baru yang diimpor dan mengembalikan daftar ke pemilih inisial sistem.
                         </span>
                       </div>
@@ -4861,7 +5311,7 @@ export default function AdminDashboardPage() {
                       />
                       <div>
                         <span className="font-bold text-error block">Kosongkan Seluruh Pemilih Mahasiswa (0 Pemilih)</span>
-                        <span className="text-outline text-[11px] block mt-0.5">
+                        <span className="text-on-surface-variant text-[11px] block mt-0.5">
                           Menghapus semua data mahasiswa dari DPT agar panitia dapat mengunggah berkas CSV resmi yang baru. Akun Superadmin tetap dipertahankan.
                         </span>
                       </div>
@@ -4878,7 +5328,7 @@ export default function AdminDashboardPage() {
                       />
                       <div>
                         <span className="font-bold text-on-surface block">Reset Status Voting Saja (Simulasi)</span>
-                        <span className="text-outline text-[11px] block mt-0.5">
+                        <span className="text-on-surface-variant text-[11px] block mt-0.5">
                           Mengubah seluruh status pemilih menjadi Belum Memilih tanpa menghapus data pemilih. Cocok untuk mengulang gladi bersih.
                         </span>
                       </div>
@@ -4895,7 +5345,7 @@ export default function AdminDashboardPage() {
                       placeholder="RESET DPT"
                       value={resetDptConfirmText}
                       onChange={(e) => setResetDptConfirmText(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-error/40 text-on-surface focus:outline-none focus:border-error font-mono text-center uppercase tracking-widest font-bold"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-error/40 text-on-surface focus:outline-none focus:border-error focus-visible:ring-2 focus-visible:ring-error font-mono text-center uppercase tracking-widest font-bold"
                     />
                   </div>
                 </div>
@@ -4905,7 +5355,7 @@ export default function AdminDashboardPage() {
                     type="button"
                     disabled={isResettingDpt}
                     onClick={() => setIsResetDptModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                   >
                     Batal
                   </button>
@@ -4913,7 +5363,7 @@ export default function AdminDashboardPage() {
                     type="button"
                     disabled={isResettingDpt || resetDptConfirmText.trim().toUpperCase() !== 'RESET DPT'}
                     onClick={handleConfirmResetDpt}
-                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-40 cursor-pointer"
+                    className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-40 cursor-pointer"
                   >
                     {isResettingDpt ? (
                       <>

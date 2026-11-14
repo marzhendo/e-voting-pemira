@@ -9,8 +9,29 @@
   }
   body {
     overscroll-behavior: none;
-    background-color: #131313;
-    color: #e5e2e1;
+    background-color: #121212;
+    color: #ffffff;
+  }
+
+  /* Interaction Affordances (Hard Gate R-39 & WCAG 2.2): Cursor pointer untuk semua kontrol aktif */
+  button,
+  a[href],
+  summary,
+  select,
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  input[type='checkbox'],
+  input[type='radio'],
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
   }
 }
 
@@ -30,9 +51,9 @@
   background-image: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0,
-    rgba(235, 189, 28, 0.08) 20%,
-    rgba(255, 255, 255, 0.05) 60%,
-    rgba(255, 255, 255, 0)
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0) 100%
   );
   animation: shimmer 1.8s infinite;
   content: '';
@@ -47,8 +68,28 @@
   }
 }
 
+/* Custom Scrollbar Aksesibel (Pengganti display:none demi Usability & Orientasi Konten) */
 ::-webkit-scrollbar {
-  display: none;
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #161616;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2E2E2E;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #707070;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2E2E2E #161616;
 }
 
 /* Aksesibilitas Gerakan (Hard Gate R-39): Hormati preferensi reduced-motion */

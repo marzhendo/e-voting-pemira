@@ -8,10 +8,13 @@ import { recordAuditLog } from '@/lib/audit/store';
 import { importVotersBatch } from '@/lib/dpt/store';
 
 const dptImportRowSchema = z.object({
-  nim: z.string().min(5).max(15).regex(/^[a-zA-Z0-9]+$/),
-  email: z.string().email().refine((val) => val.toLowerCase().endsWith('telkomuniversity.ac.id')),
+  nim: z.string().min(4).max(20).regex(/^[a-zA-Z0-9]+$/),
+  email: z.string().email().refine((val) => {
+    const lower = val.toLowerCase();
+    return lower.endsWith('telkomuniversity.ac.id') || lower.endsWith('@gmail.com');
+  }),
   name: z.string().min(2).max(150),
-  generation: z.number().int().min(2020).max(2027),
+  generation: z.coerce.number().int().min(2018).max(2030),
 });
 
 export async function POST(request: NextRequest) {
@@ -114,6 +117,13 @@ export async function POST(request: NextRequest) {
         }
 
         const insertedCount = insertedData ? insertedData.length : validatedRecords.length;
+
+        // Sinkronisasi data ke dev store agar dev fallback tetap mutakhir
+        try {
+          importVotersBatch(validatedRecords);
+        } catch (devSyncErr) {
+          console.warn('[DptImportRoute] Failed to sync dev store:', devSyncErr);
+        }
 
         // 3. Catat ke Audit Log
         await recordAuditLog({

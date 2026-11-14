@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import type { AdminRole } from '@/lib/supabase/types';
+import { isRootSuperadminEmail } from '../auth/constants.ts';
 
 export interface AdminUserRecord {
   id: string;
@@ -222,7 +223,7 @@ export function deleteAdminUser(id: string): { success: boolean; error?: string 
   }
 
   // Lindungi Superadmin utama agar tidak terhapus
-  if (target.email === 'marzhendogalangs@gmail.com') {
+  if (isRootSuperadminEmail(target.email)) {
     return { success: false, error: 'Akun Superadmin utama tidak dapat dihapus.' };
   }
 

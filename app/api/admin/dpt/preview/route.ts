@@ -6,12 +6,15 @@ import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getAllVoters } from '@/lib/dpt/store';
 
 const dptRowSchema = z.object({
-  nim: z.string().min(5).max(15).regex(/^[a-zA-Z0-9]+$/, 'NIM hanya boleh berisi karakter alfanumerik'),
-  email: z.string().email().refine((val) => val.toLowerCase().endsWith('telkomuniversity.ac.id'), {
-    message: 'Email harus menggunakan domain resmi @student.telkomuniversity.ac.id',
+  nim: z.string().min(4).max(20).regex(/^[a-zA-Z0-9]+$/, 'NIM hanya boleh berisi karakter alfanumerik'),
+  email: z.string().email('Format email tidak valid').refine((val) => {
+    const lower = val.toLowerCase();
+    return lower.endsWith('telkomuniversity.ac.id') || lower.endsWith('@gmail.com');
+  }, {
+    message: 'Email harus menggunakan domain resmi @student.telkomuniversity.ac.id atau email terverifikasi',
   }),
-  name: z.string().min(2).max(150),
-  generation: z.number().int().min(2020).max(2027),
+  name: z.string().min(2, 'Nama minimal 2 karakter').max(150),
+  generation: z.coerce.number().int().min(2018).max(2030),
 });
 
 export async function POST(request: NextRequest) {
@@ -107,6 +110,8 @@ export async function POST(request: NextRequest) {
     }
 
     const dbConflicts: Array<{ nim: string; email: string; conflictType: 'NIM' | 'EMAIL' | 'BOTH' }> = [];
+    const nonConflictingValidRows: Array<z.infer<typeof dptRowSchema>> = [];
+
     for (const row of validRows) {
       const hasNim = existingNims.has(row.nim);
       const hasEmail = existingEmails.has(row.email);
@@ -117,24 +122,32 @@ export async function POST(request: NextRequest) {
         dbConflicts.push({ nim: row.nim, email: row.email, conflictType: 'NIM' });
       } else if (hasEmail) {
         dbConflicts.push({ nim: row.nim, email: row.email, conflictType: 'EMAIL' });
+      } else {
+        nonConflictingValidRows.push(row);
       }
     }
 
-    const canImport = invalidRows.length === 0 && dbConflicts.length === 0;
+    const totalDuplicates = inFileDataDuplicates.length + dbConflicts.length;
+    const canImport = nonConflictingValidRows.length > 0;
 
     return NextResponse.json({
       success: true,
       summary: {
+        totalRows: rows.length,
         totalRowsRead: rows.length,
-        validRowsCount: validRows.length,
-        invalidRowsCount: invalidRows.length,
+        validCount: nonConflictingValidRows.length,
+        validRowsCount: nonConflictingValidRows.length,
+        duplicateCount: totalDuplicates,
         inFileDataDuplicatesCount: inFileDataDuplicates.length,
         databaseConflictsCount: dbConflicts.length,
+        invalidCount: invalidRows.length,
+        invalidRowsCount: invalidRows.length,
         canImport,
       },
-      invalidRows: invalidRows.slice(0, 50), // Batasi respon untuk preview
+      validRows: nonConflictingValidRows,
+      invalidRows: invalidRows.slice(0, 50),
       dbConflicts: dbConflicts.slice(0, 50),
-      previewSample: validRows.slice(0, 10),
+      previewSample: nonConflictingValidRows.slice(0, 10),
     });
   } catch (error) {
     console.error('[DptPreviewRoute] Error parsing DPT preview:', error);

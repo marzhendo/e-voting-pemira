@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { DummyAccount } from '@/lib/auth/dummy';
 import {
   ShieldCheck,
@@ -95,6 +96,7 @@ export function LoginForm() {
   const [step, setStep] = useState<'nim' | 'pin'>('nim');
   const [identifier, setIdentifier] = useState('');
   const [pin, setPin] = useState('');
+  const [isPinFocused, setIsPinFocused] = useState(false);
   const [maskedEmail, setMaskedEmail] = useState('');
   const [cooldown, setCooldown] = useState(0);
 
@@ -261,159 +263,247 @@ export function LoginForm() {
   return (
     <div className="w-full space-y-4">
       {/* Banner Error / Notifikasi */}
-      {errorDisplay && (
-        <div className="rounded-xl border border-error/40 bg-error-container/20 p-3.5 text-xs text-error flex items-start gap-2.5 animate-slide-fade-in">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-error" />
-          <div className="flex-1">
-            <div className="font-bold">
-              {errorDisplay.title}
-            </div>
-            <div className="mt-0.5 text-on-surface-variant leading-relaxed">
-              {errorDisplay.message}
-            </div>
-            {remainingAttempts !== null && (
-              <div className="mt-1 font-semibold text-on-surface">
-                Sisa kesempatan percobaan: {remainingAttempts} kali.
+      <AnimatePresence>
+        {errorDisplay && (
+          <motion.div
+            key="error-banner"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            className="rounded-xl border border-error/40 bg-error-container/20 p-3.5 text-xs text-error flex items-start gap-2.5"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-error" />
+            <div className="flex-1">
+              <div className="font-bold">
+                {errorDisplay.title}
               </div>
-            )}
-          </div>
-        </div>
-      )}
+              <div className="mt-0.5 text-on-surface-variant leading-relaxed">
+                {errorDisplay.message}
+              </div>
+              {remainingAttempts !== null && (
+                <div className="mt-1 font-semibold text-on-surface">
+                  Sisa kesempatan percobaan: {remainingAttempts} kali.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Banner Sukses Pengiriman */}
-      {successNotice && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-300 flex items-start gap-2.5 animate-in fade-in duration-200">
-          <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" />
-          <span className="flex-1 leading-relaxed">{successNotice}</span>
-        </div>
-      )}
-
-      {/* STEP 1: INPUT NIM */}
-      {step === 'nim' && (
-        <form onSubmit={handleRequestOtp} className="space-y-4 animate-slide-fade-in">
-          <div>
-            <label
-              htmlFor="identifier"
-              className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
-            >
-              NIM
-            </label>
-            <div className="relative">
-              <input
-                id="identifier"
-                type="text"
-                autoComplete="username"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Contoh: 103012300001"
-                disabled={isLoading}
-                className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-outline/60 text-sm font-medium focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-              <Mail className="w-4 h-4 text-outline absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading || !identifier.trim()}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]"
+      <AnimatePresence>
+        {successNotice && (
+          <motion.div
+            key="success-banner"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-300 flex items-start gap-2.5"
           >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
-                <span>Mengirim Kode PIN...</span>
-              </>
-            ) : (
-              <span>Kirim Kode PIN</span>
-            )}
-          </button>
-        </form>
-      )}
+            <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" />
+            <span className="flex-1 leading-relaxed">{successNotice}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* STEP 2: INPUT 6-DIGIT PIN */}
-      {step === 'pin' && (
-        <form onSubmit={handleVerifyOtp} className="space-y-4 animate-slide-fade-in">
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
+      {/* STEP TRANSITIONS: AnimatePresence mode="wait" */}
+      <AnimatePresence mode="wait">
+        {step === 'nim' ? (
+          <motion.form
+            key="step-nim"
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -8 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            onSubmit={handleRequestOtp}
+            className="space-y-4"
+          >
+            <div>
               <label
-                htmlFor="pin"
-                className="block text-xs font-bold uppercase tracking-wider text-on-surface"
+                htmlFor="identifier"
+                className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
               >
-                Kode PIN 6 Digit
+                NIM
               </label>
+              <div className="relative">
+                <input
+                  id="identifier"
+                  type="text"
+                  autoComplete="username"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Contoh: 103012300001"
+                  disabled={isLoading}
+                  className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 text-sm font-medium focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+                <Mail className="w-4 h-4 text-on-surface-variant absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+              type="submit"
+              disabled={isLoading || !identifier.trim()}
+              className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                  <span>Mengirim Kode PIN...</span>
+                </>
+              ) : (
+                <span>Kirim Kode PIN</span>
+              )}
+            </motion.button>
+          </motion.form>
+        ) : (
+          <motion.form
+            key="step-pin"
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -8 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            onSubmit={handleVerifyOtp}
+            className="space-y-4"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="pin"
+                  className="block text-xs font-bold uppercase tracking-wider text-on-surface"
+                >
+                  Kode PIN 6 Digit
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('nim');
+                    setErrorMessage(null);
+                    setSuccessNotice(null);
+                  }}
+                  className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold min-h-[44px] px-3 py-2 rounded-lg hover:bg-surface-container transition-colors -my-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Ganti NIM</span>
+                </button>
+              </div>
+
+              <div className="relative">
+                {/* Input tersembunyi yang tetap terbaca dan fokus secara native untuk aksesibilitas & E2E */}
+                <input
+                  id="pin"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  autoFocus
+                  autoComplete="one-time-code"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onFocus={() => setIsPinFocused(true)}
+                  onBlur={() => setIsPinFocused(false)}
+                  disabled={isLoading}
+                  className="absolute inset-0 w-full h-full text-transparent bg-transparent border-0 outline-none focus:outline-none z-10 cursor-pointer caret-transparent"
+                  aria-label="Kode PIN 6 Digit"
+                />
+
+                {/* Tampilan Visual 6-Box Segmented OTP (Jarak Statis & 100% Konsisten) */}
+                <div
+                  className={`grid grid-cols-6 gap-2 sm:gap-2.5 p-1 rounded-2xl transition-all ${
+                    isPinFocused ? 'ring-2 ring-primary/20' : ''
+                  }`}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((idx) => {
+                    const char = pin[idx];
+                    const isFilled = Boolean(char);
+                    const isCurrent = isPinFocused && pin.length === idx;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`h-14 sm:h-16 rounded-xl flex items-center justify-center transition-all duration-150 ${
+                          isCurrent
+                            ? 'border-2 border-primary bg-surface-container-highest shadow-xs'
+                            : isFilled
+                            ? 'border border-primary/50 bg-surface-container-high'
+                            : 'border border-outline-variant/40 bg-surface-container'
+                        }`}
+                      >
+                        {isFilled ? (
+                          <span className="font-mono text-2xl sm:text-3xl font-bold text-primary">
+                            {char}
+                          </span>
+                        ) : isCurrent ? (
+                          <motion.span
+                            animate={{ opacity: [1, 0, 1] }}
+                            transition={{ repeat: Infinity, duration: 0.9, ease: 'linear' }}
+                            className="w-0.5 h-6 bg-primary rounded-full"
+                          />
+                        ) : (
+                          <span className="w-2.5 h-2.5 rounded-full bg-outline/30" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-3 p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-between gap-3 text-xs">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] text-on-surface-variant block">Email SSO Kampus:</span>
+                  <span className="text-xs font-mono font-semibold text-on-surface truncate block" title={maskedEmail}>
+                    {maskedEmail}
+                  </span>
+                </div>
+                <div className="shrink-0 text-right pl-3 border-l border-outline-variant/30">
+                  <span className="text-[11px] text-on-surface-variant block">Masa Berlaku</span>
+                  <span className="text-xs font-bold text-primary">10 Menit</span>
+                </div>
+              </div>
+            </div>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+              type="submit"
+              disabled={isLoading || pin.length !== 6}
+              className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                  <span>Memverifikasi PIN...</span>
+                </>
+              ) : (
+                <span>Masuk ke Bilik Suara</span>
+              )}
+            </motion.button>
+
+            {/* Tombol Kirim Ulang Kode PIN */}
+            <div className="pt-1 text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setStep('nim');
-                  setErrorMessage(null);
-                  setSuccessNotice(null);
-                }}
-                className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold min-h-[44px] px-3 py-2 rounded-lg hover:bg-surface-container transition-colors -my-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                disabled={cooldown > 0 || isLoading}
+                onClick={() => handleRequestOtp()}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-on-surface-variant hover:text-primary hover:bg-surface-container disabled:text-on-surface-variant/50 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Ganti NIM</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>
+                  {cooldown > 0
+                    ? `Kirim ulang PIN dalam ${cooldown} detik`
+                    : 'Belum menerima email? Kirim ulang PIN'}
+                </span>
               </button>
             </div>
-
-            <div>
-              <input
-                id="pin"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                autoFocus
-                autoComplete="one-time-code"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="• • • • • •"
-                disabled={isLoading}
-                className="w-full h-14 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-outline-variant/40 bg-surface-container text-primary placeholder:text-outline/40 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
-
-            <div className="flex items-center justify-between mt-2 text-xs text-outline">
-              <span>Terkirim ke: <strong className="text-on-surface">{maskedEmail}</strong></span>
-              <span>Berlaku: <strong className="text-on-surface">10 Menit</strong></span>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading || pin.length !== 6}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary-fixed text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
-                <span>Memverifikasi PIN...</span>
-              </>
-            ) : (
-              <span>Masuk ke Bilik Suara</span>
-            )}
-          </button>
-
-          {/* Tombol Kirim Ulang Kode PIN */}
-          <div className="pt-1 text-center">
-            <button
-              type="button"
-              disabled={cooldown > 0 || isLoading}
-              onClick={() => handleRequestOtp()}
-              className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-on-surface-variant hover:text-primary hover:bg-surface-container disabled:text-outline disabled:opacity-80 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>
-                {cooldown > 0
-                  ? `Kirim ulang PIN dalam ${cooldown} detik`
-                  : 'Belum menerima email? Kirim ulang PIN'}
-              </span>
-            </button>
-          </div>
-        </form>
-      )}
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       {/* DPT Verification Note */}
-      <div className="flex items-center gap-2 text-xs text-outline justify-center text-center pt-2">
+      <div className="flex items-center gap-2 text-xs text-on-surface-variant justify-center text-center pt-2 font-medium">
         <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
         <span>Hanya untuk mahasiswa aktif Informatika terdaftar di DPT.</span>
       </div>
@@ -433,15 +523,15 @@ export function LoginForm() {
               </span>
             </div>
             {showDummyAccounts ? (
-              <ChevronUp className="w-4 h-4 text-outline" />
+              <ChevronUp className="w-4 h-4 text-on-surface-variant" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-outline" />
+              <ChevronDown className="w-4 h-4 text-on-surface-variant" />
             )}
           </button>
 
           {showDummyAccounts && (
             <div className="p-3 pt-0 border-t border-outline-variant/20 space-y-2 max-h-56 overflow-y-auto">
-              <p className="text-[11px] text-outline pb-1">
+              <p className="text-[11px] text-on-surface-variant pb-1">
                 Pilih akun simulasi untuk login instan:
               </p>
               {dummyAccounts.map((account) => (
@@ -456,12 +546,12 @@ export function LoginForm() {
                     <span className="text-xs font-semibold text-on-surface block truncate">
                       {account.name}
                     </span>
-                    <span className="text-[11px] text-outline block truncate">
+                    <span className="text-[11px] text-on-surface-variant block truncate">
                       {account.role.toUpperCase()} {account.nim ? `• ${account.nim}` : ''}
                     </span>
                   </div>
                   <span className="text-[11px] text-primary font-semibold shrink-0">
-                    {loadingAccountId === account.id ? 'Masuk...' : 'Pilih →'}
+                    {loadingAccountId === account.id ? 'Masuk...' : 'Pilih'}
                   </span>
                 </button>
               ))}

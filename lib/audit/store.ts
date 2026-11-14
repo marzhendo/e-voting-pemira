@@ -4,6 +4,7 @@ import crypto from 'crypto';
 
 export type AuditActionType =
   | 'ELECTION_SETTINGS_UPDATE'
+  | 'UPDATE_ELECTION_SETTINGS'
   | 'MAINTENANCE_TOGGLE'
   | 'CANDIDATE_CREATE'
   | 'CANDIDATE_UPDATE'

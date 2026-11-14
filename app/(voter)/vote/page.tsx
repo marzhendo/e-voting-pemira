@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
   Vote,
   ArrowRight,
@@ -198,16 +199,15 @@ export default function VotePage() {
               <span className="text-xs sm:text-sm font-bold tracking-tight text-on-surface uppercase block">
                 Pemira HMIF 2026/2027
               </span>
-              <span className="text-xs text-outline hidden sm:block">
+              <span className="text-xs text-on-surface-variant font-medium hidden sm:block">
                 Bilik Suara
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-outline-variant/30 text-xs">
-              <span className="w-2 h-2 rounded-full bg-primary" />
-              <span className="text-outline hidden sm:inline">
+            <div className="flex items-center gap-2 bg-surface-container px-3.5 py-1.5 rounded-full border border-outline-variant/40 text-xs">
+              <span className="text-on-surface-variant font-medium hidden sm:inline">
                 Sisa Waktu:
               </span>
               <span className="font-bebas text-sm sm:text-base text-primary tracking-wider font-bold">
@@ -219,7 +219,7 @@ export default function VotePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-outline hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg hover:bg-surface-container focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg hover:bg-surface-container focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               <HelpCircle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Bantuan</span>
@@ -229,7 +229,12 @@ export default function VotePage() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full pt-20 flex-1 flex flex-col animate-page-enter">
+      <motion.main
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'tween', ease: 'easeOut', duration: 0.18 }}
+        className="w-full pt-20 flex-1 flex flex-col"
+      >
         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-28 sm:pb-32">
           {/* Header Title Section */}
           <div className="mb-6">
@@ -283,9 +288,9 @@ export default function VotePage() {
               <p className="text-xs">Memuat data pasangan calon...</p>
             </div>
           ) : isSingleCandidate ? (
-            /* ADAPTIVE LAYOUT 1: HEAD-TO-HEAD (Calon Tunggal vs Kotak Kosong) */
-            <div className="max-w-4xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            /* REFERENDUM CALON TUNGGAL VS KOTAK KOSONG (HEAD-TO-HEAD LEGA OPSI A) */
+            <div className="max-w-5xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 mb-8">
                 {regularCandidates.map((candidate) => (
                   <CandidateCard
                     key={candidate.id}
@@ -307,12 +312,13 @@ export default function VotePage() {
               </div>
             </div>
           ) : (
-            /* ADAPTIVE LAYOUT 2 & 3: GRID (2 Calon atau 3+ Calon) */
+            /* MULTI-PASLON (2+ Paslon Grid + Opsi Kotak Kosong Horizontal) */
             <>
+              {/* Grid Paslon Terdaftar */}
               <div
                 className={`grid gap-6 mb-8 ${
                   regularCandidates.length === 2
-                    ? 'grid-cols-1 md:grid-cols-2'
+                    ? 'grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto'
                     : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                 }`}
               >
@@ -329,11 +335,11 @@ export default function VotePage() {
 
               {/* Opsi Kotak Kosong Horizontal Bar untuk Multi-Paslon */}
               {kotakKosongCandidate && (
-                <div className="mb-8">
+                <div className={`mb-8 ${regularCandidates.length === 2 ? 'max-w-5xl mx-auto' : ''}`}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-px flex-1 bg-outline-variant/30" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-outline">
-                      Kotak Kosong
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                      Opsi Alternatif Sah
                     </span>
                     <div className="h-px flex-1 bg-outline-variant/30" />
                   </div>
@@ -370,31 +376,35 @@ export default function VotePage() {
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
               {selectedCandidate && (
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
                   type="button"
                   onClick={handleResetSelection}
-                  className="px-4 h-11 min-h-[44px] rounded-xl text-xs font-semibold text-outline hover:text-on-surface hover:bg-surface-container transition-colors active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  className="px-4 h-11 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
                 >
                   Batal
-                </button>
+                </motion.button>
               )}
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
                 type="button"
                 disabled={!selectedCandidate || !votingActive || maintenanceMode || isSessionExpired}
                 onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto px-6 h-11 min-h-[44px] rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary-fixed transition-all duration-150 flex items-center justify-center gap-2 shadow-md active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                className="w-full sm:w-auto px-6 h-11 min-h-[44px] rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary transition-colors flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
               >
                 <span>Konfirmasi Pilihan</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
-      </main>
+      </motion.main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-outline-variant/20 py-4 text-center text-xs text-outline">
+      <footer className="w-full border-t border-outline-variant/20 py-4 text-center text-xs text-on-surface-variant font-medium">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Komisi Pemilihan Raya • HMIF Telkom University Purwokerto</span>
           <span>Periode 2026/2027</span>

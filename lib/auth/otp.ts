@@ -5,6 +5,7 @@ import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/admin';
 import { smtpMailService } from '@/lib/mail/smtp-service';
 import { findVoterByIdentifier } from '@/lib/dpt/store';
 import { findAdminByEmail } from '@/lib/admin/store';
+import { isRootSuperadminEmail } from './constants';
 import type { AdminRole } from '@/lib/supabase/types';
 import type { SessionUser } from './session';
 
@@ -163,7 +164,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
   const now = Date.now();
 
   // 1. Validasi Domain Email Institusi (Kecuali Superadmin Utama)
-  if (isEmail && cleanId !== 'marzhendogalangs@gmail.com' && !cleanId.endsWith('@student.telkomuniversity.ac.id')) {
+  if (isEmail && !isRootSuperadminEmail(cleanId) && !cleanId.endsWith('@student.telkomuniversity.ac.id')) {
     return {
       success: false,
       code: 'NIM_NOT_IN_DPT',
@@ -323,7 +324,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         email: dptVoter.email,
         generation: dptVoter.generation,
         hasVoted: dptVoter.has_voted,
-        role: dptVoter.role || (dptVoter.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter'),
+        role: dptVoter.role || (isRootSuperadminEmail(dptVoter.email) ? 'super_admin' : 'voter'),
         otpHash: null,
         otpExpiresAt: null,
         otpAttempts: 0,
@@ -337,7 +338,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
       voterState.email = dptVoter.email;
       voterState.generation = dptVoter.generation;
       if (dptVoter.role) voterState.role = dptVoter.role;
-      if (dptVoter.email === 'marzhendogalangs@gmail.com') voterState.role = 'super_admin';
+      if (isRootSuperadminEmail(dptVoter.email)) voterState.role = 'super_admin';
     }
   } else {
     for (const v of devMockStore.values()) {
@@ -628,7 +629,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         email: dptVoter.email,
         generation: dptVoter.generation,
         hasVoted: dptVoter.has_voted,
-        role: dptVoter.role || (dptVoter.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter'),
+        role: dptVoter.role || (isRootSuperadminEmail(dptVoter.email) ? 'super_admin' : 'voter'),
         otpHash: null,
         otpExpiresAt: null,
         otpAttempts: 0,
@@ -642,7 +643,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
       voterState.email = dptVoter.email;
       voterState.generation = dptVoter.generation;
       if (dptVoter.role) voterState.role = dptVoter.role;
-      if (dptVoter.email === 'marzhendogalangs@gmail.com') voterState.role = 'super_admin';
+      if (isRootSuperadminEmail(dptVoter.email)) voterState.role = 'super_admin';
     }
   } else {
     for (const v of devMockStore.values()) {
@@ -750,7 +751,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
       email: voterState.email,
       name: voterState.name,
       nim: voterState.nim,
-      role: voterState.role || (voterState.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter'),
+      role: voterState.role || (isRootSuperadminEmail(voterState.email) ? 'super_admin' : 'voter'),
       isDptVerified: true,
       hasVoted: voterState.hasVoted,
       generation: voterState.generation,

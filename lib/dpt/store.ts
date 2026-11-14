@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { AdminRole } from '@/lib/supabase/types';
+import { isRootSuperadminEmail } from '../auth/constants.ts';
 
 export interface VoterRecord {
   id: string;
@@ -384,7 +385,7 @@ export function deleteSingleVoter(idOrNim: string): { success: boolean; error?: 
 
   const target = current[targetIndex];
   // Lindungi akun Superadmin utama dari penghapusan
-  if (target.role === 'super_admin' || target.email.toLowerCase() === 'marzhendogalangs@gmail.com') {
+  if (target.role === 'super_admin' || isRootSuperadminEmail(target.email)) {
     return { success: false, error: 'Akun Superadmin utama tidak dapat dihapus dari sistem.' };
   }
 
@@ -405,7 +406,7 @@ export function deleteVotersBatch(idsOrNims: string[]): { success: boolean; dele
 
   for (const v of current) {
     const isTarget = targetSet.has(v.id.toLowerCase()) || targetSet.has(v.nim.toLowerCase());
-    const isProtected = v.role === 'super_admin' || v.email.toLowerCase() === 'marzhendogalangs@gmail.com';
+    const isProtected = v.role === 'super_admin' || isRootSuperadminEmail(v.email);
 
     if (isTarget && !isProtected) {
       deletedCount++;
@@ -433,7 +434,7 @@ export function resetAllVoters(mode: 'reset_to_default' | 'clear_all' | 'reset_v
   if (mode === 'clear_all') {
     // Sisakan hanya superadmin utama
     const superAdmins = current.filter(
-      (v) => v.role === 'super_admin' || v.email.toLowerCase() === 'marzhendogalangs@gmail.com'
+      (v) => v.role === 'super_admin' || isRootSuperadminEmail(v.email)
     );
     const result = superAdmins.length > 0 ? superAdmins : DEFAULT_VOTERS.filter((v) => v.role === 'super_admin');
     inMemoryVoters = [...result];

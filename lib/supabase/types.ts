@@ -139,6 +139,7 @@ export interface Database {
           start_time: string;
           end_time: string;
           maintenance_mode: boolean;
+          allow_kotak_kosong_multi?: boolean;
           updated_at: string;
         };
         Insert: {
@@ -147,6 +148,7 @@ export interface Database {
           start_time: string;
           end_time: string;
           maintenance_mode?: boolean;
+          allow_kotak_kosong_multi?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -155,6 +157,7 @@ export interface Database {
           start_time?: string;
           end_time?: string;
           maintenance_mode?: boolean;
+          allow_kotak_kosong_multi?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -311,6 +314,14 @@ export interface Database {
             voteCount: number;
             percentage: number;
           }>;
+        };
+      };
+      reset_election_simulation_ballots: {
+        Args: Record<string, never>;
+        Returns: {
+          success: boolean;
+          deletedBallotsCount: number;
+          message: string;
         };
       };
     };

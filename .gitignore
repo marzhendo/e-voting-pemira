@@ -92,3 +92,10 @@ desktop.ini
 # user uploaded files in dev
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# student data, rosters & PII datasets (DPT)
+*.xlsx
+*.xls
+*.csv
+*mahasiswa*
+*Mahasiswa*

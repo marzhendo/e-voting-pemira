@@ -5,6 +5,7 @@ import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
+import type { Database } from '@/lib/supabase/types';
 import {
   type CandidateRecord,
   getDevCandidates,
@@ -44,8 +45,12 @@ export async function GET() {
         .select('*')
         .order('candidate_number', { ascending: true });
 
-      if (!error && candidates && candidates.length > 0) {
+      if (!error && candidates) {
         return NextResponse.json({ success: true, candidates });
+      }
+
+      if (error) {
+        console.warn('[AdminCandidatesRoute] Supabase error in GET:', error.message);
       }
     } catch (err) {
       console.warn('[AdminCandidatesRoute] Database offline, checking dev storage:', err);
@@ -104,7 +109,15 @@ export async function POST(req: NextRequest) {
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          console.error('[AdminCandidatesRoute] Supabase insert error:', error);
+          const errorMsg = error.code === '23505'
+            ? `Nomor urut ${newCandidate.candidate_number} sudah digunakan oleh pasangan calon lain.`
+            : `Gagal menyimpan ke database: ${error.message}`;
+          return NextResponse.json({ error: errorMsg }, { status: 400 });
+        }
+
+        if (data) {
           const ip = getClientIp(req);
           await recordAuditLog({
             actorEmail: session?.email || 'admin@pemira.local',
@@ -193,14 +206,27 @@ export async function PUT(req: NextRequest) {
     if (isSupabaseConfigured()) {
       try {
         const adminSupabase = createAdminClient();
+        const updatePayload: Database['public']['Tables']['candidates']['Update'] = { ...updates };
+        if (updatePayload.photo_url === null || updatePayload.photo_url === undefined) {
+          updatePayload.photo_url = '';
+        }
+
         const { data, error } = await adminSupabase
           .from('candidates')
-          .update(updates)
+          .update(updatePayload)
           .eq('id', id)
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          console.error('[AdminCandidatesRoute] Supabase update error:', error);
+          const errorMsg = error.code === '23505'
+            ? `Nomor urut ${updates.candidate_number || ''} sudah digunakan oleh pasangan calon lain.`
+            : `Gagal memperbarui di database: ${error.message}`;
+          return NextResponse.json({ error: errorMsg }, { status: 400 });
+        }
+
+        if (data) {
           const ip = getClientIp(req);
           const isKotakKosong = updates.candidate_number === 0 || id === 'dev-cand-0';
           await recordAuditLog({
@@ -210,7 +236,7 @@ export async function PUT(req: NextRequest) {
             action: isKotakKosong ? 'KOTAK_KOSONG_TOGGLE' : 'CANDIDATE_UPDATE',
             description: isKotakKosong
               ? `Memperbarui status opsi Kotak Kosong (Aktif: ${updates.is_active}).`
-              : `Memperbarui data Paslon ID ${id} (${updates.leader_name || 'Kandidat'}).`,
+              : `Memperbarui data Paslon ID ${id} (${updates.leader_name || data.leader_name || 'Kandidat'}).`,
             ipAddress: ip,
             details: updates,
           });
@@ -279,24 +305,74 @@ export async function DELETE(req: NextRequest) {
     if (isSupabaseConfigured()) {
       try {
         const adminSupabase = createAdminClient();
-        const { error } = await adminSupabase
+
+        // 1. Ambil info kandidat dari DB untuk verifikasi dan audit log
+        const { data: dbCandidate, error: fetchErr } = await adminSupabase
+          .from('candidates')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (fetchErr) {
+          console.error('[AdminCandidatesRoute] Error fetching candidate before delete:', fetchErr);
+        }
+
+        const candidateToDelete = dbCandidate || target;
+
+        if (candidateToDelete && candidateToDelete.candidate_number === 0) {
+          return NextResponse.json(
+            { error: 'Opsi Kotak Kosong adalah opsi konstitusional dasar dan tidak dapat dihapus.' },
+            { status: 400 }
+          );
+        }
+
+        // 2. Integritas Surat Suara: Cek apakah kandidat sudah memiliki surat suara terkait
+        const { count: ballotCount, error: countErr } = await adminSupabase
+          .from('ballots')
+          .select('*', { count: 'exact', head: true })
+          .eq('candidate_id', id);
+
+        if (!countErr && typeof ballotCount === 'number' && ballotCount > 0) {
+          return NextResponse.json(
+            {
+              error: `Tindakan Ditolak: Pasangan calon ini telah menerima ${ballotCount} suara sah di bilik suara. Untuk menjaga integritas riwayat pemilihan dan asas kerahasiaan suara (*Ballot Secrecy*), pasangan calon tidak dapat dihapus permanen. Silakan gunakan opsi nonaktifkan (arsip).`,
+              code: 'CANDIDATE_HAS_BALLOTS',
+              ballotCount,
+            },
+            { status: 409 }
+          );
+        }
+
+        // 3. Eksekusi penghapusan di Supabase
+        const { error: delError } = await adminSupabase
           .from('candidates')
           .delete()
           .eq('id', id);
 
-        if (!error) {
-          const ip = getClientIp(req);
-          await recordAuditLog({
-            actorEmail: session?.email || 'admin@pemira.local',
-            actorName: session?.name || 'Panitia KPR',
-            actorRole: session?.role || 'kpr_admin',
-            action: 'CANDIDATE_DELETE',
-            description: `Menghapus Paslon ID ${id} (${target?.leader_name || 'Pasangan Calon'}).`,
-            ipAddress: ip,
-            details: { id, leader_name: target?.leader_name, candidate_number: target?.candidate_number },
-          });
-          return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus.' });
+        if (delError) {
+          console.error('[AdminCandidatesRoute] Supabase delete error:', delError);
+          return NextResponse.json(
+            { error: `Gagal menghapus kandidat dari database: ${delError.message}` },
+            { status: 400 }
+          );
         }
+
+        const ip = getClientIp(req);
+        await recordAuditLog({
+          actorEmail: session?.email || 'admin@pemira.local',
+          actorName: session?.name || 'Panitia KPR',
+          actorRole: session?.role || 'kpr_admin',
+          action: 'CANDIDATE_DELETE',
+          description: `Menghapus Paslon ID ${id} (${candidateToDelete?.leader_name || 'Pasangan Calon'}).`,
+          ipAddress: ip,
+          details: {
+            id,
+            leader_name: candidateToDelete?.leader_name,
+            candidate_number: candidateToDelete?.candidate_number,
+          },
+        });
+
+        return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus dari database.' });
       } catch (dbErr) {
         console.warn('[AdminCandidatesRoute] DB offline during delete, using dev memory store:', dbErr);
       }

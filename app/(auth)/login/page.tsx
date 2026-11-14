@@ -7,7 +7,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-between antialiased selection:bg-primary selection:text-on-primary">
       {/* Main Viewport Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12 animate-page-enter">
-        <div className="w-full max-w-4xl bg-surface-container border border-outline-variant/30 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+        <div className="w-full max-w-4xl bg-surface-container border border-outline-variant/30 rounded-3xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
           {/* LEFT COLUMN: Identity & Context */}
           <section className="hidden lg:flex lg:col-span-7 p-8 sm:p-10 flex flex-col justify-center bg-surface-container-low lg:border-r border-outline-variant/20">
             <div>
@@ -27,7 +27,7 @@ export default function LoginPage() {
                   <p className="text-xs font-bold tracking-wider uppercase text-primary">
                     PEMIRA HMIF 2026/2027
                   </p>
-                  <h2 className="text-xs font-medium text-outline">
+                  <h2 className="text-xs font-medium text-on-surface-variant">
                     Telkom University Purwokerto
                   </h2>
                 </div>
@@ -44,7 +44,7 @@ export default function LoginPage() {
               </div>
 
               {/* Civic Security Notice */}
-              <ul className="mt-8 pt-6 border-t border-outline-variant/20 space-y-2.5 text-xs sm:text-sm text-outline max-w-md">
+              <ul className="mt-8 pt-6 border-t border-outline-variant/20 space-y-2.5 text-xs sm:text-sm text-on-surface-variant max-w-md">
                 <li className="flex items-center gap-2.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                   <span className="text-on-surface-variant">Suara tidak ditautkan ke NIM pemilih</span>
@@ -76,7 +76,7 @@ export default function LoginPage() {
                   <p className="text-xs font-bold tracking-wider uppercase text-primary">
                     PEMIRA HMIF 2026/2027
                   </p>
-                  <p className="text-xs font-medium text-outline">
+                  <p className="text-xs font-medium text-on-surface-variant">
                     Telkom University Purwokerto
                   </p>
                 </div>
@@ -93,7 +93,7 @@ export default function LoginPage() {
 
               <Suspense
                 fallback={
-                  <div className="text-xs text-outline py-8 text-center animate-pulse">
+                  <div className="text-xs text-on-surface-variant py-8 text-center animate-pulse">
                     Memuat formulir login...
                   </div>
                 }
@@ -103,7 +103,7 @@ export default function LoginPage() {
             </div>
 
             <div className="pt-6 border-t border-outline-variant/20 text-center mt-6">
-              <p className="text-xs text-outline">
+              <p className="text-xs text-on-surface-variant font-medium">
                 Ada kendala saat login?{' '}
                 <a
                   href="https://wa.me/6281809300406"
@@ -120,7 +120,7 @@ export default function LoginPage() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-outline border-t border-outline-variant/20">
+      <footer className="w-full py-4 text-center text-xs text-on-surface-variant border-t border-outline-variant/20">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1">
           <span>Komisi Pemilihan Raya • HMIF Telkom University Purwokerto</span>
           <span>Periode 2026/2027</span>

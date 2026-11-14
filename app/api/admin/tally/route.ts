@@ -239,7 +239,7 @@ export async function GET() {
 }
 
 /**
- * DELETE: Mereset surat suara pengujian lokal (Khusus mode pengembangan / Non-Production)
+ * DELETE: Mereset surat suara pengujian / simulasi (Khusus Superadmin)
  */
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
@@ -249,21 +249,75 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
 
-  if (process.env.APP_ENV === 'production') {
-    return NextResponse.json({ error: 'Reset surat suara dinonaktifkan di lingkungan produksi.' }, { status: 403 });
+  // Wewenang reset suara dibatasi secara ketat hanya untuk super_admin
+  if (session?.role !== 'super_admin') {
+    return NextResponse.json(
+      { error: 'Akses Ditolak: Fitur reset surat suara hanya dapat dieksekusi oleh Superadmin.' },
+      { status: 403 }
+    );
   }
 
+  const clientIp = getClientIp(request);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const adminSupabase = createAdminClient();
+      const { data: rpcResult, error: rpcError } = await adminSupabase.rpc('reset_election_simulation_ballots');
+
+      if (!rpcError && rpcResult?.success) {
+        // Sinkronkan store memori lokal dev juga
+        resetBallotsStore();
+
+        await recordAuditLog({
+          actorEmail: session?.email || 'admin@pemira.local',
+          actorName: session?.name || 'Superadmin',
+          actorRole: session?.role || 'super_admin',
+          action: 'BALLOTS_RESET',
+          description: `Mereset ${rpcResult.deletedBallotsCount || 0} surat suara simulasi pengujian dan memulihkan status DPT di database Supabase.`,
+          ipAddress: clientIp,
+          details: { deletedBallotsCount: rpcResult.deletedBallotsCount || 0 },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: rpcResult.message || 'Seluruh surat suara simulasi berhasil dikosongkan.',
+          deletedBallotsCount: rpcResult.deletedBallotsCount || 0,
+        });
+      }
+
+      if (rpcError) {
+        console.error('[AdminTallyRoute] Supabase reset_election_simulation_ballots error:', rpcError);
+        return NextResponse.json(
+          {
+            error: `Gagal mereset surat suara di database: ${rpcError.message || 'Fungsi migrasi belum terpasang atau mengalami kendala.'}`,
+            details: rpcError.message,
+          },
+          { status: 500 }
+        );
+      }
+    } catch (err) {
+      console.warn('[AdminTallyRoute] Database error during ballots reset:', err);
+      return NextResponse.json(
+        { error: 'Terjadi kegagalan server saat menghubungi database untuk mereset suara.' },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Dev fallback jika Supabase tidak terkonfigurasi
   resetBallotsStore();
 
-  const clientIp = getClientIp(request);
   await recordAuditLog({
     actorEmail: session?.email || 'admin@pemira.local',
-    actorName: session?.name || 'Panitia KPR',
-    actorRole: session?.role || 'kpr_admin',
+    actorName: session?.name || 'Superadmin',
+    actorRole: session?.role || 'super_admin',
     action: 'BALLOTS_RESET',
     description: 'Mereset surat suara simulasi pengujian lokal dev.',
     ipAddress: clientIp,
   });
 
-  return NextResponse.json({ success: true, message: 'Surat suara simulasi berhasil direset.' });
+  return NextResponse.json({
+    success: true,
+    message: 'Surat suara simulasi (Mode Dev) berhasil direset.',
+  });
 }

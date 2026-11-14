@@ -1,6 +1,7 @@
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { findVoterByIdentifier } from '@/lib/dpt/store';
 import { findAdminByEmail } from '@/lib/admin/store';
+import { isRootSuperadminEmail } from './constants';
 import type { AdminRole } from '@/lib/supabase/types';
 import type { SessionUser } from './session';
 
@@ -49,7 +50,7 @@ export async function resolveUserIdentity(params: {
             email: devVoter.email,
             name: devVoter.name,
             nim: devVoter.nim,
-            role: dynamicAdmin ? dynamicAdmin.role : (devVoter.role || (devVoter.email === 'marzhendogalangs@gmail.com' ? 'super_admin' : 'voter')),
+            role: dynamicAdmin ? dynamicAdmin.role : (devVoter.role || (isRootSuperadminEmail(devVoter.email) ? 'super_admin' : 'voter')),
             isDptVerified: true,
             hasVoted: false,
             generation: devVoter.generation,

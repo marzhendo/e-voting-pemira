@@ -1,6 +1,7 @@
 'use client';
 
-import { Users, Check, FileText } from 'lucide-react';
+import { Users, Check, FileText, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export interface CandidateItem {
   id: string;
@@ -31,11 +32,20 @@ export function CandidateCard({
 
   return (
     <div
+      tabIndex={0}
+      role="region"
+      aria-label={`Pasangan Calon Nomor Urut ${numberStr}: ${candidate.leader_name} dan ${candidate.vice_leader_name}`}
       onClick={() => onSelect(candidate)}
-      className={`group relative rounded-2xl p-6 flex flex-col justify-between transition-all duration-200 cursor-pointer border ${
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+          e.preventDefault();
+          onSelect(candidate);
+        }
+      }}
+      className={`group relative rounded-2xl p-6 flex flex-col justify-between transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
         isSelected
-          ? 'bg-surface-container-high border-primary ring-2 ring-primary shadow-xl shadow-primary/10'
-          : 'bg-surface-container border-outline-variant/30 hover:border-outline-variant hover:bg-surface-container-high'
+          ? 'bg-surface-container-high border-2 border-primary ring-1 ring-primary/30'
+          : 'bg-surface-container border border-outline-variant/30 hover:border-outline hover:bg-surface-container-high'
       }`}
     >
       <div className="flex flex-col gap-4">
@@ -48,7 +58,7 @@ export function CandidateCard({
               </span>
             </div>
             <div>
-              <span className="text-[11px] text-outline uppercase tracking-wider block font-semibold">
+              <span className="text-[11px] text-on-surface-variant uppercase tracking-wider block font-semibold">
                 Pasangan Calon
               </span>
               <h3 className="text-base text-on-surface font-bold">
@@ -58,33 +68,43 @@ export function CandidateCard({
           </div>
 
           <div
-            className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all duration-200 ${
+            className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-150 ${
               isSelected
-                ? 'bg-primary border-primary text-on-primary scale-100 shadow-sm'
-                : 'border-outline/40 bg-surface-container-highest text-transparent scale-90'
+                ? 'bg-primary border-primary text-on-primary'
+                : 'border-outline/40 bg-surface-container-highest text-transparent'
             }`}
           >
-            <Check className={`w-3.5 h-3.5 stroke-[3] transition-transform duration-200 ${isSelected ? 'scale-100' : 'scale-75'}`} />
+            <motion.div
+              animate={{ scale: isSelected ? 1 : 0.7, opacity: isSelected ? 1 : 0 }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            >
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+            </motion.div>
           </div>
         </div>
 
-        {/* Foto Pasangan Calon */}
-        <div className="relative w-full h-48 sm:h-64 md:h-72 rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/20 flex flex-col items-center justify-center text-center p-4 select-none">
+        {/* Foto Pasangan Calon (Rasio Konsisten 4:3, Tanpa Gepeng, Wajah Tidak Terpotong) */}
+        <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center select-none">
           {candidate.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={candidate.photo_url}
               alt={`Foto Pasangan Calon ${numberStr}`}
-              className="w-full h-full object-cover rounded-lg"
+              className="w-full h-full object-cover object-top"
             />
           ) : (
-            <div className="flex flex-col items-center justify-center gap-2 text-outline">
-              <div className="w-14 h-14 rounded-full bg-surface-container flex items-center justify-center text-outline">
-                <Users className="w-7 h-7 text-primary/70" />
+            <div className="flex flex-col items-center justify-center gap-2.5 p-6 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center border border-outline-variant/30 text-primary/80">
+                <Users className="w-7 h-7" />
               </div>
-              <span className="text-xs font-medium text-on-surface-variant">
-                Foto Paslon {numberStr}
-              </span>
+              <div>
+                <span className="text-xs font-semibold text-on-surface block">
+                  Foto Resmi Paslon {numberStr}
+                </span>
+                <span className="text-[11px] text-on-surface-variant mt-0.5 block">
+                  Chairman &amp; Vice Chairman
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -94,13 +114,13 @@ export function CandidateCard({
           <h4 className="text-base sm:text-lg font-bold text-on-surface leading-snug">
             {candidate.leader_name} &amp; {candidate.vice_leader_name}
           </h4>
-          <p className="text-xs text-outline">
+          <p className="text-xs text-on-surface-variant font-medium">
             Calon Chairman &amp; Vice Chairman HMIF
           </p>
         </div>
 
         {/* Visi Utama */}
-        <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/30 text-xs text-on-surface-variant">
+        <div className="bg-surface-container-low rounded-xl p-3 text-xs text-on-surface-variant">
           <span className="text-[11px] font-bold uppercase tracking-wider text-primary block mb-1">
             Visi Utama
           </span>
@@ -110,43 +130,48 @@ export function CandidateCard({
         </div>
 
         {/* Tombol Masuk ke Halaman Detail & Unduh CV */}
-        <button
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onOpenDetail?.(candidate);
           }}
-          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-all duration-150 shadow-sm cursor-pointer active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          aria-label={`Detail Visi Misi & CV Paslon nomor urut ${numberStr}`}
+          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           <span className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
             <span>Detail Visi Misi &amp; CV Paslon</span>
           </span>
-          <span className="text-sm font-bold text-primary">
-            →
-          </span>
-        </button>
+          <ChevronRight className="w-4 h-4 text-primary shrink-0" />
+        </motion.button>
       </div>
 
       {/* Footer Aksi Card */}
       <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
-        <span className="text-xs text-outline font-medium">
+        <span className="text-xs text-on-surface-variant font-medium">
           {isSelected ? '✓ Terpilih' : 'Belum dipilih'}
         </span>
-        <button
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
           type="button"
+          aria-pressed={isSelected}
+          aria-label={isSelected ? `Paslon ${numberStr} terpilih` : `Pilih Paslon ${numberStr}`}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-150 flex items-center justify-center cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
+          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
             isSelected
-              ? 'bg-primary text-on-primary shadow-sm'
+              ? 'bg-primary text-on-primary'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'
           }`}
         >
           {isSelected ? 'Terpilih' : `Pilih Paslon ${numberStr}`}
-        </button>
+        </motion.button>
       </div>
     </div>
   );

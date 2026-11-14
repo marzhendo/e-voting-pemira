@@ -90,20 +90,39 @@ export async function PATCH(request: NextRequest) {
     const allow_kotak_kosong_multi = parsed.data.allow_kotak_kosong_multi ?? parsed.data.allowKotakKosongMulti;
     const reason = parsed.data.reason;
 
-    // Batasan Wewenang Berdasarkan Aturan Operasional:
-    // 1. Superadmin TIDAK BOLEH membuka/menutup pemilu secara sepihak (wewenang KPR)
-    if (session?.role === 'super_admin' && is_voting_open !== undefined) {
-      return NextResponse.json(
-        {
-          error: 'Akses Ditolak: Pembukaan dan penutupan bilik suara merupakan wewenang mutlak Panitia KPR.',
-          code: 'KPR_AUTHORITY_REQUIRED',
-        },
-        { status: 403 }
-      );
+    // Ambil setting aktif saat ini untuk memverifikasi apakah ada mutasi nyata
+    let currentIsVotingOpen = true;
+    let currentMaintenanceMode = false;
+
+    if (isSupabaseConfigured()) {
+      try {
+        const curSupabase = createAdminClient();
+        const { data: cur } = await curSupabase
+          .from('election_settings')
+          .select('is_voting_open, maintenance_mode')
+          .eq('id', 1)
+          .single();
+        if (cur) {
+          currentIsVotingOpen = cur.is_voting_open;
+          currentMaintenanceMode = cur.maintenance_mode;
+        }
+      } catch (curErr) {
+        console.warn('[ElectionSettings] Error reading current settings for auth check:', curErr);
+      }
+    } else {
+      const cur = getDevElectionSettings();
+      currentIsVotingOpen = cur.is_voting_open;
+      currentMaintenanceMode = cur.maintenance_mode;
     }
 
-    // 2. KPR Admin tidak boleh mengubah maintenance mode teknis jika itu ranah Superadmin
-    if (session?.role === 'kpr_admin' && maintenance_mode !== undefined) {
+    // Batasan Wewenang Berdasarkan Aturan Operasional:
+    // 1. Superadmin memiliki wewenang penuh atas konfigurasi sistem, pembukaan/penutupan bilik suara, serta maintenance mode.
+    // 2. KPR Admin tidak boleh mengubah maintenance mode teknis jika itu ranah Superadmin/IT Coordinator.
+    if (
+      session?.role === 'kpr_admin' &&
+      maintenance_mode !== undefined &&
+      maintenance_mode !== currentMaintenanceMode
+    ) {
       return NextResponse.json(
         {
           error: 'Akses Ditolak: Pengaktifan mode pemeliharaan darurat teknis merupakan wewenang Koordinator IT / Superadmin.',
@@ -163,6 +182,7 @@ export async function PATCH(request: NextRequest) {
     if (maintenance_mode !== undefined) updatePayload.maintenance_mode = maintenance_mode;
     if (start_time !== undefined) updatePayload.start_time = start_time;
     if (end_time !== undefined) updatePayload.end_time = end_time;
+    if (allow_kotak_kosong_multi !== undefined) updatePayload.allow_kotak_kosong_multi = allow_kotak_kosong_multi;
 
     // Eksekusi mutasi
     const { data: updatedSettings, error: updateError } = await adminSupabase
@@ -173,8 +193,9 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (updateError) {
+      console.error('[ElectionSettingsRoute] Update error:', updateError);
       return NextResponse.json(
-        { error: 'Gagal memperbarui pengaturan pemilihan di database.' },
+        { error: `Gagal memperbarui pengaturan pemilihan di database: ${updateError.message}` },
         { status: 500 }
       );
     }
@@ -187,6 +208,7 @@ export async function PATCH(request: NextRequest) {
     if (maintenance_mode !== undefined) auditDetails.maintenance_mode = maintenance_mode;
     if (start_time !== undefined) auditDetails.start_time = start_time;
     if (end_time !== undefined) auditDetails.end_time = end_time;
+    if (allow_kotak_kosong_multi !== undefined) auditDetails.allow_kotak_kosong_multi = allow_kotak_kosong_multi;
 
     // Catat ke Audit Log secara terisolasi
     await adminSupabase.from('audit_logs').insert({

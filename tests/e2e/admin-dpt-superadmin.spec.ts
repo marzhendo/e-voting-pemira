@@ -49,6 +49,7 @@ test.describe('Superadmin DPT Management E2E Tests', () => {
     // 5. Test Selective Batch Selection
     // Find row checkboxes in table body
     const voterCheckboxes = page.locator('main table tbody input[type="checkbox"]');
+    await expect(voterCheckboxes.first()).toBeVisible({ timeout: 10000 });
     const count = await voterCheckboxes.count();
     expect(count).toBeGreaterThan(0);
 
@@ -88,5 +89,40 @@ test.describe('Superadmin DPT Management E2E Tests', () => {
 
     // 5. Ensure row checkboxes are NOT present in table body
     await expect(page.locator('main table tbody input[type="checkbox"]')).toHaveCount(0);
+  });
+
+  test('Superadmin can execute batch deletion and see success confirmation message', async ({ page }) => {
+    // 1. Login as Superadmin
+    await page.goto('/login?dev=true');
+    await page.locator('button', { hasText: 'Mode Uji Coba Cepat (Dev)' }).click();
+    await page.locator('button', { hasText: 'Marzhendo Galang (Superadmin)' }).click();
+    await expect(page).toHaveURL(/\/admin\/dashboard/);
+
+    // 2. Switch to "Manajemen DPT" Tab
+    const dptTab = page.getByRole('button', { name: 'Manajemen DPT' });
+    await expect(dptTab).toBeVisible();
+    await dptTab.click();
+
+    // 3. Find first row checkbox (non-superadmin)
+    const voterCheckboxes = page.locator('main table tbody input[type="checkbox"]');
+    await expect(voterCheckboxes.first()).toBeVisible({ timeout: 10000 });
+    await voterCheckboxes.first().click();
+
+    // 4. Click "Hapus Terpilih"
+    const deleteBatchTrigger = page.locator('button', { hasText: 'Hapus Terpilih' });
+    await expect(deleteBatchTrigger).toBeVisible();
+    await deleteBatchTrigger.click();
+
+    // 5. Modal appears
+    const modalHeading = page.locator('h3', { hasText: 'Hapus Selektif' });
+    await expect(modalHeading).toBeVisible();
+
+    // 6. Confirm batch deletion in modal
+    const confirmBtn = page.locator('div[role="dialog"]').locator('button', { hasText: 'HAPUS' });
+    await expect(confirmBtn).toBeVisible();
+    await confirmBtn.click();
+
+    // 7. Verify success message appears (never "Gagal menghapus pemilih terpilih")
+    await expect(page.locator('text=Berhasil menghapus')).toBeVisible({ timeout: 10000 });
   });
 });

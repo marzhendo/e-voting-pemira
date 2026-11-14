@@ -40,6 +40,7 @@ Format direktori:
 ## 5. Automated Verification
 - Sebelum menyatakan fitur selesai, jalankan validasi schema TypeScript (`pnpm tsc --noEmit`).
 - Pastikan test flow autentikasi dan bilik suara diuji via Playwright.
+- **DEV SERVER CACHE INTEGRITY:** DILARANG menjalankan `pnpm build` atau `next build` secara otomatis ketika server pengembangan (`next dev`) sedang aktif berjalan di lingkungan lokal. Menjalankan build produksi akan menimpa folder `.next/` dan merusak runtime Webpack Hot-Reloader (`Error: Cannot find module './<chunk>.js'`). Gunakan `pnpm tsc --noEmit` untuk memverifikasi integritas tipe tanpa merusak cache dev server.
 
 <!-- antislop:start -->
 ## antislop
