@@ -42,7 +42,7 @@ export function KotakKosongCard({
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center border border-outline-variant/30">
                 <span className="font-bebas text-3xl text-on-surface-variant leading-none">
-                  0
+                  00
                 </span>
               </div>
               <div>
@@ -166,7 +166,7 @@ export function KotakKosongCard({
       <div className="flex items-center gap-4 w-full sm:w-auto">
         <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0 border border-outline-variant/20">
           <span className="font-bebas text-2xl text-on-surface-variant leading-none">
-            0
+            00
           </span>
         </div>
 

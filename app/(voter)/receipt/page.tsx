@@ -150,7 +150,7 @@ export default function ReceiptPage() {
                 <span className="text-[11px] text-primary uppercase font-bold tracking-wider">
                   Pemira HMIF Telkom University Purwokerto
                 </span>
-                <h1 className="text-xl sm:text-2xl font-bold text-on-surface mt-0.5">
+                <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface mt-0.5">
                   Suara Tercatat
                 </h1>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">

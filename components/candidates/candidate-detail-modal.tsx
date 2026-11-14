@@ -170,7 +170,7 @@ export function CandidateDetailModal({
 
               <h1
                 id="candidate-detail-title"
-                className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight leading-tight"
+                className="font-bebas text-3xl sm:text-4xl lg:text-5xl tracking-wide uppercase text-on-surface leading-tight"
               >
                 {candidate.leader_name} <br className="hidden sm:inline" />
                 <span className="text-primary">&amp; {candidate.vice_leader_name}</span>

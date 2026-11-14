@@ -206,7 +206,7 @@ export default function VotePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-surface-container px-3.5 py-1.5 rounded-full border border-outline-variant/40 text-xs">
+            <div className="flex items-center gap-2 bg-surface-container/80 px-3.5 py-1.5 rounded-xl border border-outline-variant/30 text-xs">
               <span className="text-on-surface-variant font-medium hidden sm:inline">
                 Sisa Waktu:
               </span>
@@ -219,10 +219,10 @@ export default function VotePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg hover:bg-surface-container focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="text-on-surface-variant hover:text-primary text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Bantuan</span>
+              <HelpCircle className="w-3.5 h-3.5 text-primary" />
+              <span className="hidden sm:inline">Bantuan KPR</span>
             </a>
           </div>
         </div>
@@ -236,38 +236,49 @@ export default function VotePage() {
         className="w-full pt-20 flex-1 flex flex-col"
       >
         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-28 sm:pb-32">
-          {/* Header Title Section */}
-          <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
-              Surat Suara Pemilihan
-            </h1>
-            <p className="text-on-surface-variant text-xs sm:text-sm mt-1">
-              {isSingleCandidate
-                ? 'Pilih pasangan calon atau kotak kosong.'
-                : 'Pilih pasangan calon Chairman & Vice Chairman HMIF 2026/2027.'}
-            </p>
+          {/* Header Title Section & Institutional Schedule */}
+          <div className="mb-6 pb-4 border-b border-outline-variant/20 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <div>
+              <h1 className="font-bebas text-3xl sm:text-4xl lg:text-5xl tracking-wide uppercase text-on-surface">
+                Surat Suara Pemilihan
+              </h1>
+              <p className="text-on-surface-variant text-xs sm:text-sm mt-1">
+                {isSingleCandidate
+                  ? 'Tentukan pilihanmu: pasangan calon atau kotak kosong.'
+                  : 'Gunakan hak pilihmu untuk menentukan Chairman & Vice Chairman HMIF 2026/2027.'}
+              </p>
+            </div>
+
+            {electionSchedule && (
+              <div className="text-xs text-on-surface-variant font-medium sm:text-right shrink-0">
+                <span className="block text-[11px] uppercase tracking-wider text-on-surface-variant/70">Jadwal Pemilihan</span>
+                <span className="text-on-surface font-semibold">
+                  {new Date(electionSchedule.start).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – {new Date(electionSchedule.end).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Maintenance / Closed Notice */}
           {(!votingActive || maintenanceMode) && (
-            <div className="mb-6 rounded-2xl border border-error/30 bg-error-container/20 p-4 text-on-surface flex items-start gap-3">
+            <div className="mb-6 rounded-xl border border-error/40 bg-surface-container p-4 text-on-surface flex items-start gap-3.5">
               <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-bold text-sm text-error">
+                <h4 className="font-bold text-sm text-on-surface">
                   {maintenanceMode
-                    ? 'Bilik Suara Sedang Dalam Pemeliharaan'
+                    ? 'Bilik Suara Sedang Disiapkan Panitia'
                     : 'Pemungutan Suara Sedang Ditutup'}
                 </h4>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   {maintenanceMode
-                    ? 'Sistem sedang dalam pemeliharaan. Coba lagi nanti atau hubungi Panitia KPR.'
+                    ? 'Sistem sedang dalam penyesuaian teknis berkala. Silakan segarkan halaman dalam beberapa saat atau hubungi Panitia KPR.'
                     : electionSchedule
-                    ? `Pemilihan hanya dibuka pada jadwal resmi: ${new Date(
+                    ? `Bilik suara dibuka sesuai jadwal resmi: ${new Date(
                         electionSchedule.start
                       ).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} s/d ${new Date(
                         electionSchedule.end
                       ).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB.`
-                    : 'Pemungutan suara belum dibuka atau telah berakhir sesuai jadwal resmi.'}
+                    : 'Waktu pemungutan suara telah berakhir atau belum dimulai sesuai ketetapan panitia.'}
                 </p>
               </div>
             </div>
@@ -370,7 +381,7 @@ export default function VotePage() {
                   ? selectedCandidate.candidate_number === 0
                     ? 'Pilihan: Kotak Kosong'
                     : `Pilihan: Paslon ${selectedCandidate.candidate_number.toString().padStart(2, '0')}`
-                  : 'Pilih pasangan calon'}
+                  : 'Pilih salah satu kandidat di atas'}
               </span>
             </div>
 
@@ -383,7 +394,7 @@ export default function VotePage() {
                   onClick={handleResetSelection}
                   className="px-4 h-11 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
                 >
-                  Batal
+                  Ganti Pilihan
                 </motion.button>
               )}
 

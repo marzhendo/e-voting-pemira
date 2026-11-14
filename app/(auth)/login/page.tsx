@@ -35,25 +35,23 @@ export default function LoginPage() {
 
               {/* Title & Concise Copy */}
               <div className="space-y-3 max-w-md">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-on-surface leading-tight">
-                  Waktunya memilih.
+                <h1 className="font-bebas text-4xl sm:text-5xl lg:text-6xl tracking-wide uppercase text-on-surface leading-none">
+                  Waktunya Memilih.
                 </h1>
                 <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed">
-                  Pemilihan Chairman & Vice Chairman HMIF Periode 2026/2027.
+                  Pemilihan Chairman &amp; Vice Chairman HMIF Periode 2026/2027.
                 </p>
               </div>
 
-              {/* Civic Security Notice */}
-              <ul className="mt-8 pt-6 border-t border-outline-variant/20 space-y-2.5 text-xs sm:text-sm text-on-surface-variant max-w-md">
-                <li className="flex items-center gap-2.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span className="text-on-surface-variant">Suara tidak ditautkan ke NIM pemilih</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span className="text-on-surface-variant">Durasi bilik suara 15 menit per sesi</span>
-                </li>
-              </ul>
+              {/* Institutional Notice */}
+              <div className="mt-8 pt-6 border-t border-outline-variant/20 max-w-md text-xs text-on-surface-variant leading-relaxed space-y-2">
+                <p>
+                  Asas pemungutan suara berlangsung langsung, bebas, dan rahasia. Identitas NIM hanya dipakai untuk verifikasi hak pilih (DPT) dan tidak pernah dikaitkan dengan surat suara yang kamu berikan.
+                </p>
+                <p className="text-[11px] text-on-surface-variant/80">
+                  Setiap sesi bilik suara dibatasi 15 menit demi keamanan hak pilih.
+                </p>
+              </div>
             </div>
           </section>
 
@@ -82,12 +80,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5 mb-6">
-                <h2 className="text-xl font-bold text-on-surface tracking-tight">
+              <div className="space-y-1 mb-6">
+                <h2 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface">
                   Masuk ke Bilik Suara
                 </h2>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Masukkan NIM untuk menerima kode PIN di email SSO kampus (@student.telkomuniversity.ac.id).
+                  Ketik NIM kamu untuk menerima kode PIN verifikasi di email SSO kampus (@student.telkomuniversity.ac.id).
                 </p>
               </div>
 
@@ -104,7 +102,7 @@ export default function LoginPage() {
 
             <div className="pt-6 border-t border-outline-variant/20 text-center mt-6">
               <p className="text-xs text-on-surface-variant font-medium">
-                Ada kendala saat login?{' '}
+                Butuh bantuan login atau verifikasi DPT?{' '}
                 <a
                   href="https://wa.me/6281809300406"
                   target="_blank"

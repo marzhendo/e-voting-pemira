@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Shield, ArrowRight, Lock, CheckCircle, HelpCircle } from 'lucide-react';
+import { ArrowRight, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function HomePage() {
@@ -37,10 +37,10 @@ export default function HomePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-on-surface-variant hover:text-primary transition-colors min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container border border-outline-variant/30 hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="text-xs text-on-surface-variant hover:text-primary transition-colors min-h-[44px] inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
-              <HelpCircle className="w-3.5 h-3.5 text-primary" />
-              <span>Butuh Bantuan?</span>
+              <HelpCircle className="w-4 h-4 text-primary" />
+              <span>Bantuan KPR</span>
             </a>
           </div>
         </div>
@@ -55,7 +55,7 @@ export default function HomePage() {
       >
         <div className="max-w-2xl mx-auto text-center flex flex-col items-center gap-6 py-10 sm:py-16">
           {/* Heading */}
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-on-surface leading-tight">
+          <h1 className="font-bebas text-4xl sm:text-6xl md:text-7xl tracking-wide uppercase text-on-surface leading-[1.05]">
             Satu Suara, <br />
             <span className="text-primary">Bawa Perubahan untuk Informatika.</span>
           </h1>
@@ -80,22 +80,13 @@ export default function HomePage() {
             </motion.div>
           </div>
 
-          {/* Minimal Trust Strip */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 pt-6 sm:pt-8 w-full text-xs text-on-surface-variant font-medium">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary shrink-0" />
-              <span>Suara Bersifat Rahasia</span>
-            </div>
-            <span className="hidden sm:inline text-outline-variant/60">•</span>
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-primary shrink-0" />
-              <span>Satu Mahasiswa Satu Suara</span>
-            </div>
-            <span className="hidden sm:inline text-outline-variant/60">•</span>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Tanda Terima Terverifikasi</span>
-            </div>
+          {/* Institutional Information */}
+          <div className="w-full pt-8 mt-2 border-t border-outline-variant/20 flex flex-wrap items-center justify-center gap-y-2 gap-x-6 text-xs text-on-surface-variant font-medium">
+            <span>Pemilihan Terbuka Mahasiswa S1 Informatika</span>
+            <span className="hidden sm:inline text-outline-variant/40">•</span>
+            <span>Verifikasi Email SSO Kampus</span>
+            <span className="hidden sm:inline text-outline-variant/40">•</span>
+            <span>Kerahasiaan Suara Terjamin</span>
           </div>
         </div>
       </motion.main>

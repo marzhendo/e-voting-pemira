@@ -1790,6 +1790,71 @@ export default function AdminDashboardPage() {
     );
   };
 
+  // Unified System Status Helper for Consistent Visual Hierarchy & State Alignment
+  const getElectionSystemStatus = () => {
+    if (maintenanceMode) {
+      return {
+        label: 'Mode Pemeliharaan Darurat',
+        shortLabel: 'Pemeliharaan',
+        badgeBg: 'bg-error/15 border-error/30 text-error',
+        icon: ShieldAlert,
+        scheduleCardText: 'Mode Pemeliharaan Aktif',
+        scheduleCardBadge: 'bg-error/15 text-error border-error/30',
+        isOperational: false,
+      };
+    }
+
+    if (!isVotingOpen) {
+      return {
+        label: 'Pemilihan Ditutup Panitia',
+        shortLabel: 'Ditutup Panitia',
+        badgeBg: 'bg-surface-container border-outline-variant/40 text-on-surface-variant',
+        icon: Lock,
+        scheduleCardText: 'Ditutup Manual oleh Panitia',
+        scheduleCardBadge: 'bg-surface-container-high text-on-surface-variant border-outline-variant/40',
+        isOperational: false,
+      };
+    }
+
+    const now = new Date();
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (now < start) {
+      return {
+        label: 'Menunggu Jadwal Pemilihan',
+        shortLabel: 'Belum Dimulai',
+        badgeBg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+        icon: Clock,
+        scheduleCardText: 'Belum Dimulai',
+        scheduleCardBadge: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+        isOperational: false,
+      };
+    }
+
+    if (now > end) {
+      return {
+        label: 'Jadwal Pemilihan Berakhir',
+        shortLabel: 'Telah Berakhir',
+        badgeBg: 'bg-surface-container border-outline-variant/40 text-on-surface-variant',
+        icon: Lock,
+        scheduleCardText: 'Telah Berakhir',
+        scheduleCardBadge: 'bg-surface-container-high text-on-surface-variant border-outline-variant/40',
+        isOperational: false,
+      };
+    }
+
+    return {
+      label: 'Pemilihan Berlangsung Aktif',
+      shortLabel: 'Sedang Berlangsung',
+      badgeBg: 'bg-primary/10 border-primary/30 text-primary',
+      icon: Activity,
+      scheduleCardText: 'Sedang Berlangsung',
+      scheduleCardBadge: 'bg-primary/10 text-primary border-primary/30',
+      isOperational: true,
+    };
+  };
+
   return (
     <>
       <div className="print:hidden bg-surface font-montserrat text-on-surface antialiased min-h-screen flex selection:bg-primary selection:text-on-primary">
@@ -2023,20 +2088,21 @@ export default function AdminDashboardPage() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-container border border-outline-variant/30 text-xs">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isVotingOpen && !maintenanceMode ? 'bg-secondary' : 'bg-error'
-                }`}
-              />
-              <span className="font-semibold text-on-surface">
-                {maintenanceMode
-                  ? 'Mode Pemeliharaan'
-                  : isVotingOpen
-                  ? 'Pemilihan Berlangsung'
-                  : 'Pemilihan Ditutup'}
-              </span>
-            </div>
+            {/* Unified System Status Indicator */}
+            {(() => {
+              const status = getElectionSystemStatus();
+              const StatusIcon = status.icon;
+              return (
+                <div
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold tracking-wide transition-colors ${status.badgeBg}`}
+                  title={`Status Operasional: ${status.label}`}
+                >
+                  <StatusIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{status.label}</span>
+                  <span className="sm:hidden">{status.shortLabel}</span>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="flex items-center gap-3">
@@ -2063,13 +2129,13 @@ export default function AdminDashboardPage() {
                       <Vote className="w-6 h-6" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-3">
-                        <h1 className="text-lg font-bold text-on-surface">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface">
                           Bilik Suara Digital Pemira HMIF
                         </h1>
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                          <span>Live Real-time</span>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-medium text-on-surface-variant">
+                          <Activity className="w-3.5 h-3.5 text-primary" />
+                          <span>Live Telemetri</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-on-surface-variant mt-0.5">
@@ -2330,15 +2396,15 @@ export default function AdminDashboardPage() {
                           }
                           disabled={togglingKotakKosong}
                           onClick={handleToggleKotakKosong}
-                          className={`w-11 h-6 rounded-full transition-colors relative p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
+                          className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] disabled:opacity-50 ${
                             allowKotakKosongMulti
-                              ? 'bg-primary'
-                              : 'bg-surface-container-highest border border-outline/30'
+                              ? 'bg-primary border-primary'
+                              : 'bg-surface-container-highest border-outline-variant/40'
                           }`}
                         >
                           <span
-                            className={`w-4 h-4 rounded-full bg-white block transition-transform ${
-                              allowKotakKosongMulti ? 'translate-x-5' : 'translate-x-0'
+                            className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
+                              allowKotakKosongMulti ? 'translate-x-6' : 'translate-x-0'
                             }`}
                           />
                         </button>
@@ -2918,14 +2984,14 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
                   <div>
-                    <div className="flex items-center gap-2.5">
-                      <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface">
                         Rekapitulasi Suara
                       </h1>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        <span>Live Real-time</span>
-                      </span>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-medium text-on-surface-variant">
+                        <Activity className="w-3.5 h-3.5 text-primary" />
+                        <span>Live Telemetri</span>
+                      </div>
                     </div>
                     <p className="text-xs text-on-surface-variant mt-0.5">
                       Hasil agregasi surat suara yang sah tanpa keterkaitan identitas pemilih.
@@ -3070,31 +3136,14 @@ export default function AdminDashboardPage() {
 
                     {/* Schedule Status Badge */}
                     {(() => {
-                      const now = new Date();
-                      const start = new Date(startTime);
-                      const end = new Date(endTime);
-                      if (now >= start && now <= end) {
-                        return (
-                          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                            Sedang Berlangsung
-                          </span>
-                        );
-                      } else if (now < start) {
-                        return (
-                          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
-                            <Clock className="w-3 h-3" />
-                            Belum Dimulai
-                          </span>
-                        );
-                      } else {
-                        return (
-                          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-hmif-red/10 text-hmif-red border border-hmif-red/30 flex items-center gap-1.5">
-                            <Lock className="w-3 h-3" />
-                            Telah Berakhir
-                          </span>
-                        );
-                      }
+                      const status = getElectionSystemStatus();
+                      const StatusIcon = status.icon;
+                      return (
+                        <span className={`self-start sm:self-auto px-3 py-1 rounded-xl text-[11px] font-bold uppercase tracking-wider border flex items-center gap-1.5 transition-colors ${status.scheduleCardBadge}`}>
+                          <StatusIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span>{status.scheduleCardText}</span>
+                        </span>
+                      );
                     })()}
                   </div>
 
@@ -3152,12 +3201,14 @@ export default function AdminDashboardPage() {
                       aria-checked={isVotingOpen}
                       aria-label="Buka Pemungutan Suara"
                       onClick={handleOpenVotingToggleModal}
-                      className={`w-12 h-6 rounded-full transition-colors relative p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
-                        isVotingOpen ? 'bg-primary' : 'bg-surface-container-high'
+                      className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] ${
+                        isVotingOpen
+                          ? 'bg-primary border-primary'
+                          : 'bg-surface-container-highest border-outline-variant/40'
                       }`}
                     >
                       <span
-                        className={`w-4 h-4 rounded-full bg-white block transition-transform ${
+                        className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
                           isVotingOpen ? 'translate-x-6' : 'translate-x-0'
                         }`}
                       />
@@ -3180,12 +3231,14 @@ export default function AdminDashboardPage() {
                       aria-checked={maintenanceMode}
                       aria-label="Mode Pemeliharaan Darurat"
                       onClick={handleOpenMaintenanceToggleModal}
-                      className={`w-12 h-6 rounded-full transition-colors relative p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
-                        maintenanceMode ? 'bg-hmif-red' : 'bg-surface-container-high'
+                      className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] ${
+                        maintenanceMode
+                          ? 'bg-hmif-red border-hmif-red'
+                          : 'bg-surface-container-highest border-outline-variant/40'
                       }`}
                     >
                       <span
-                        className={`w-4 h-4 rounded-full bg-white block transition-transform ${
+                        className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
                           maintenanceMode ? 'translate-x-6' : 'translate-x-0'
                         }`}
                       />

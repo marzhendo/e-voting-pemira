@@ -1,6 +1,6 @@
 /**
  * PM2 Process Manager Configuration for Pemira HMIF E-Voting
- * Optimized for Debian 12 VPS (2 vCPU, 2 GB RAM)
+ * Optimized for Ubuntu 22.04 LTS VPS (Cloudra S3: 4 Core CPU, 6 GB RAM)
  */
 module.exports = {
   apps: [
@@ -9,12 +9,12 @@ module.exports = {
       // Menjalankan server Next.js standalone hasil tracing
       script: '.next/standalone/server.js',
       cwd: './',
-      // Cluster mode memanfaatkan 2 vCPU secara optimal
-      instances: 2,
+      // Cluster mode memanfaatkan seluruh 4 Core CPU secara optimal
+      instances: 'max',
       exec_mode: 'cluster',
       watch: false,
-      // Batasi memori per worker agar tidak melebihi RAM 2GB
-      max_memory_restart: '450M',
+      // Alokasi memori aman per worker (RAM total 6GB, 4 worker x 1GB = 4GB, sisa 2GB untuk OS & Nginx)
+      max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
         PORT: 3000,

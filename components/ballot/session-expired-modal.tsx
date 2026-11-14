@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Clock, ArrowRight, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Clock, ArrowRight, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Portal } from '@/components/ui/portal';
 
@@ -58,41 +58,26 @@ export function SessionExpiredModal({
                 onClick={(e) => e.stopPropagation()}
                 className="relative w-full max-w-md bg-surface-container-high rounded-3xl p-6 sm:p-8 border border-outline-variant/30 flex flex-col items-center text-center overflow-hidden my-auto"
               >
-                {/* Warning Icon Badge */}
-                <div className="w-14 h-14 rounded-2xl bg-error-container/20 border border-error/30 flex items-center justify-center text-error mb-5">
-                  <Clock className="w-7 h-7" />
+                {/* Warning Icon */}
+                <div className="w-12 h-12 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error mb-4">
+                  <Clock className="w-6 h-6" />
                 </div>
 
                 {/* Title */}
                 <h2
                   id="session-expired-title"
-                  className="text-xl sm:text-2xl font-bold text-on-surface tracking-tight mb-2"
+                  className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface mb-2"
                 >
-                  Sesi Bilik Suara Kedaluwarsa
+                  Waktu Sesi Berakhir
                 </h2>
 
                 {/* Description */}
                 <p
                   id="session-expired-description"
-                  className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-6"
+                  className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-6 max-w-sm"
                 >
-                  Sesi bilik suara 15 menit telah berakhir. Masuk kembali dengan NIM untuk melanjutkan pemilihan.
+                  Bilik suara memiliki batas waktu 15 menit demi keamanan. Hak suaramu belum digunakan, silakan masuk kembali dengan NIM untuk memilih.
                 </p>
-
-                {/* Status Box */}
-                <div className="w-full bg-surface-container rounded-2xl p-4 border border-outline-variant/20 mb-6 text-left space-y-2.5">
-                  <div className="flex items-start gap-2.5">
-                    <ShieldAlert className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    <div className="text-xs">
-                      <span className="font-semibold text-on-surface block">
-                        Hak Suaramu Tetap Aman
-                      </span>
-                      <span className="text-on-surface-variant text-[11px] leading-normal block mt-0.5">
-                        Sesi 15 menit telah habis dan suara belum tercatat. Masuk kembali dengan NIM untuk memilih.
-                      </span>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Primary Action Button */}
                 <motion.button

@@ -45,7 +45,7 @@ export function ConfirmationModal({
 
   const isKotakKosong = selectedCandidate?.candidate_number === 0;
   const numberStr = isKotakKosong
-    ? '0'
+    ? '00'
     : (selectedCandidate?.candidate_number ?? 1).toString().padStart(2, '0');
 
   const title = isKotakKosong
@@ -93,7 +93,7 @@ export function ConfirmationModal({
                       <ShieldCheck className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 id="confirmation-modal-title" className="text-lg font-bold text-on-surface">
+                      <h2 id="confirmation-modal-title" className="font-bebas text-2xl tracking-wide uppercase text-on-surface">
                         Konfirmasi Pilihan
                       </h2>
                       <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">

@@ -65,14 +65,14 @@ function getAuthErrorDisplay(
   if (urlError === 'VOTE_SESSION_REQUIRED' || urlError === 'SESSION_REQUIRED' || urlError === 'AUTH_REQUIRED') {
     return {
       title: 'Sesi Perlu Diperbarui',
-      message: 'Demi keamanan hak pilihmu, silakan masukkan NIM untuk menerima kode PIN baru.',
+      message: 'Waktu sesi bilik suaramu sudah berakhir. Silakan masukkan NIM untuk meminta kode PIN baru.',
     };
   }
 
   if (urlError === 'NOT_REGISTERED') {
     return {
       title: 'NIM Belum Terdaftar di DPT',
-      message: 'NIM kamu belum tercatat di data pemilih tetap. Mahasiswa aktif Informatika dapat konfirmasi ke Panitia KPR.',
+      message: 'NIM kamu belum tercatat di daftar pemilih tetap. Mahasiswa aktif Informatika dapat konfirmasi langsung ke Panitia KPR.',
     };
   }
 
