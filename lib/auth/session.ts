@@ -73,17 +73,18 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
 
 /**
  * Evaluates whether secure cookies must be enforced based on environment and protocol.
+ * Flag `Secure` HANYA diaktifkan jika aplikasi benar-benar diakses lewat HTTPS.
+ * Jika diakses lewat HTTP (misal: http://103.155.224.62 saat testing di VPS),
+ * browser akan menolak menyimpan cookie yang ber-flag Secure.
  */
 export function isSecureCookieEnvironment(): boolean {
-  if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production') {
-    return !process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost');
-  }
-  return process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ?? false;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '';
+  return appUrl.startsWith('https://');
 }
 
 /**
  * Sets the session cookie on the current HTTP response.
- * Enforces highest security standard: HTTPOnly, Secure, SameSite=Strict.
+ * Enforces security standard: HTTPOnly, Secure (saat HTTPS), SameSite=Lax.
  */
 export function setSessionCookie(token: string) {
   const cookieStore = cookies();
@@ -92,7 +93,7 @@ export function setSessionCookie(token: string) {
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: isSecure,
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: '/',
   });
@@ -120,7 +121,7 @@ export function clearSessionCookie() {
   cookieStore.set(SESSION_COOKIE_NAME, '', {
     httpOnly: true,
     secure: isSecure,
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: 0,
     path: '/',
   });
