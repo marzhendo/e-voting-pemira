@@ -22,7 +22,7 @@ upstream nextjs_backend {
 server {
     listen 80;
     listen [::]:80;
-    server_name pemirahmif.org www.pemirahmif.org; # Ganti dengan domain atau IP VPS Anda
+    server_name 103.155.224.62 _ pemirahmif.org www.pemirahmif.org; # IP VPS dan domain Anda
 
     # Security Headers Standar
     add_header X-Content-Type-Options nosniff always;

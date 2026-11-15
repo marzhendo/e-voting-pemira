@@ -20,7 +20,8 @@ export PATH="$PATH:/usr/local/bin:/usr/bin:/bin:$HOME/.local/share/pnpm"
 
 # 1. Tarik pembaruan kode terbaru dari Git
 echo "📥 1. Pulling latest code from Git..."
-git pull origin main
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "master")
+git pull origin "$CURRENT_BRANCH"
 
 # 2. Instalasi dependencies
 echo "📦 2. Installing dependencies..."
