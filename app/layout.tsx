@@ -8,7 +8,7 @@ const bebas = Bebas_Neue({
   subsets: ['latin'],
   variable: '--font-bebas',
   display: 'swap',
-  fallback: ['Impact', 'Arial Black', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
+  fallback: ['Impact', 'sans-serif'],
 });
 
 const montserrat = Montserrat({

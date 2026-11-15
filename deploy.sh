@@ -40,9 +40,9 @@ echo "📋 5. Syncing public and static assets to standalone directory..."
 cp -r public .next/standalone/
 cp -r .next/static .next/standalone/.next/
 
-# Pastikan folder data dan logs memiliki izin yang benar
+# Pastikan seluruh folder aset dan data dapat dibaca oleh Nginx
 mkdir -p logs data
-chmod -R 755 logs data
+chmod -R 755 .next public logs data
 
 # 6. Zero-Downtime Reload via PM2 Cluster (4 Workers)
 echo "🔄 6. Reloading PM2 Cluster (Zero-Downtime)..."

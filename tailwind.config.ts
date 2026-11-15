@@ -66,12 +66,6 @@ const config: Config = {
           'var(--font-bebas)',
           'Bebas Neue',
           'Impact',
-          'Arial Black',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          '"Segoe UI"',
-          'Roboto',
-          'Arial',
           'sans-serif',
         ],
         montserrat: [
