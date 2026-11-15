@@ -42,16 +42,6 @@ export default function LoginPage() {
                   Pemilihan Chairman &amp; Vice Chairman HMIF Periode 2026/2027.
                 </p>
               </div>
-
-              {/* Institutional Notice */}
-              <div className="mt-8 pt-6 border-t border-outline-variant/20 max-w-md text-xs text-on-surface-variant leading-relaxed space-y-2">
-                <p>
-                  Asas pemungutan suara berlangsung langsung, bebas, dan rahasia. Identitas NIM hanya dipakai untuk verifikasi hak pilih (DPT) dan tidak pernah dikaitkan dengan surat suara yang kamu berikan.
-                </p>
-                <p className="text-[11px] text-on-surface-variant/80">
-                  Setiap sesi bilik suara dibatasi 15 menit demi keamanan hak pilih.
-                </p>
-              </div>
             </div>
           </section>
 
@@ -118,11 +108,10 @@ export default function LoginPage() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-on-surface-variant border-t border-outline-variant/20">
-        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1">
-          <span>Komisi Pemilihan Raya • HMIF Telkom University Purwokerto</span>
-          <span>Periode 2026/2027</span>
-        </div>
+      <footer className="w-full py-6 text-center text-[11px] text-on-surface-variant border-t border-outline-variant/15">
+        <p className="max-w-4xl mx-auto px-4">
+          &copy; 2026 HMIF Telkom University Purwokerto. &bull; Komisi Pemilihan Raya. Seluruh hak cipta dilindungi.
+        </p>
       </footer>
     </div>
   );

@@ -19,25 +19,55 @@ import {
 function getAuthErrorDisplay(
   urlError: string | null,
   urlMessage: string | null,
-  errorMessage: string | null
+  errorMessage: string | null,
+  step?: 'nim' | 'pin'
 ): { title: string; message: string } | null {
   // 1. Error dari aksi klien (input NIM / verifikasi PIN)
   if (errorMessage) {
-    if (errorMessage.toLowerCase().includes('pin')) {
+    const lower = errorMessage.toLowerCase();
+
+    // Jika sedang di tahap verifikasi PIN
+    if (step === 'pin') {
+      if (lower.includes('kedaluwarsa') || lower.includes('expired')) {
+        return {
+          title: 'Kode PIN Kedaluwarsa',
+          message: errorMessage,
+        };
+      }
+      if (lower.includes('batas') || lower.includes('terkunci') || lower.includes('percobaan') || lower.includes('habis')) {
+        return {
+          title: 'Percobaan Melebihi Batas',
+          message: errorMessage,
+        };
+      }
       return {
         title: 'Kode PIN Tidak Sesuai',
         message: errorMessage,
       };
     }
-    if (errorMessage.toLowerCase().includes('dpt') || errorMessage.toLowerCase().includes('terdaftar')) {
+
+    // Jika sedang di tahap input NIM
+    if (lower.includes('dpt') || lower.includes('terdaftar')) {
       return {
         title: 'NIM Belum Terdaftar di DPT',
         message: errorMessage,
       };
     }
-    if (errorMessage.toLowerCase().includes('hak suara')) {
+    if (lower.includes('hak suara')) {
       return {
         title: 'Hak Suara Sudah Digunakan',
+        message: errorMessage,
+      };
+    }
+    if (lower.includes('tunggu') || lower.includes('detik') || lower.includes('rate') || lower.includes('cooldown')) {
+      return {
+        title: 'Batas Frekuensi Permintaan',
+        message: errorMessage,
+      };
+    }
+    if (lower.includes('email') || lower.includes('kirim') || lower.includes('server') || lower.includes('smtp') || lower.includes('pin')) {
+      return {
+        title: 'Gagal Mengirim Kode PIN',
         message: errorMessage,
       };
     }
@@ -258,7 +288,7 @@ export function LoginForm() {
     }
   }
 
-  const errorDisplay = getAuthErrorDisplay(urlError, urlMessage, errorMessage);
+  const errorDisplay = getAuthErrorDisplay(urlError, urlMessage, errorMessage, step);
 
   return (
     <div className="w-full space-y-4">

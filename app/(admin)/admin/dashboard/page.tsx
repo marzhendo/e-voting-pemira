@@ -1583,7 +1583,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* PARAGRAF PEMBUKA */}
-        <p className="text-justify leading-relaxed text-xs sm:text-[13px]">
+        <p suppressHydrationWarning className="text-justify leading-relaxed text-xs sm:text-[13px]">
           Pada hari ini, <strong>{currentDateFormatted}</strong> pukul {currentTimeFormatted}, bertempat di Sekretariat Komisi Pemilihan Raya (KPR) HMIF Telkom University Purwokerto, telah diselesaikan rekapitulasi akhir penghitungan suara elektronik (<em>E-Voting</em>) Pemira HMIF 2026/2027 yang diselenggarakan berasaskan Langsung, Umum, Bebas, Rahasia, Jujur, dan Adil (LUBER JURDIL) dengan rincian sebagai berikut:
         </p>
 
@@ -1745,7 +1745,7 @@ export default function AdminDashboardPage() {
 
         {/* BAGIAN IV: TANDA TANGAN PIHAK-PIHAK */}
         <div className="pt-6 font-sans text-xs">
-          <p className="text-right text-gray-700 mb-6">
+          <p suppressHydrationWarning className="text-right text-gray-700 mb-6">
             Purwokerto, {currentDateFormatted}
           </p>
           <div className="grid grid-cols-2 gap-y-10 gap-x-8 text-center">

@@ -79,33 +79,14 @@ export default function HomePage() {
               </Link>
             </motion.div>
           </div>
-
-          {/* Institutional Information */}
-          <div className="w-full pt-8 mt-2 border-t border-outline-variant/20 flex flex-wrap items-center justify-center gap-y-2 gap-x-6 text-xs text-on-surface-variant font-medium">
-            <span>Pemilihan Terbuka Mahasiswa S1 Informatika</span>
-            <span className="hidden sm:inline text-outline-variant/40">•</span>
-            <span>Verifikasi Email SSO Kampus</span>
-            <span className="hidden sm:inline text-outline-variant/40">•</span>
-            <span>Kerahasiaan Suara Terjamin</span>
-          </div>
         </div>
       </motion.main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-outline-variant/20 py-4 text-xs text-on-surface-variant text-center">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Komisi Pemilihan Raya • HMIF Telkom University Purwokerto</span>
-          <div className="flex items-center gap-2.5">
-            <span>Periode 2026/2027</span>
-            <span className="text-outline-variant/50">•</span>
-            <Link
-              href="/admin/dashboard"
-              className="text-on-surface-variant hover:text-on-surface transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-            >
-              Portal Panitia
-            </Link>
-          </div>
-        </div>
+      <footer className="w-full border-t border-outline-variant/15 py-6 text-[11px] text-on-surface-variant text-center">
+        <p className="max-w-6xl mx-auto px-4">
+          &copy; 2026 HMIF Telkom University Purwokerto. &bull; Komisi Pemilihan Raya. Seluruh hak cipta dilindungi.
+        </p>
       </footer>
     </div>
   );

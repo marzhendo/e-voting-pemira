@@ -50,16 +50,39 @@ export class SmtpMailService implements MailService {
       pool: true,
       maxConnections: 3,
       maxMessages: 100,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
       dkim: dkimConfig,
     });
 
     return this.transporter;
   }
 
+  private extractErrorMessage(err: unknown): string {
+    if (!err) return 'Gagal mengirim email melalui SMTP.';
+
+    // Tangani AggregateError di Node.js 18+ (kegagalan multi-IP / IPv6 & IPv4 timeout)
+    if (typeof err === 'object' && 'errors' in err && Array.isArray((err as { errors: unknown[] }).errors)) {
+      const subErrors = (err as { errors: unknown[] }).errors;
+      const combined = subErrors
+        .map((e) => (e instanceof Error ? e.message : String(e)))
+        .filter(Boolean)
+        .join(', ');
+      if (combined) return combined;
+    }
+
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+
+    return 'Gagal mengirim email melalui SMTP.';
+  }
+
   async sendLoginPin({ to, voterName, nim, pin }: SendPinPayload): Promise<MailDeliveryResult> {
     const transporter = this.getTransporter();
 
-    // Fallback Dev / Offline mode
+    // Fallback Dev / Offline mode jika SMTP sengaja tidak dikonfigurasi
     if (!transporter) {
       console.log(`\n======================================================`);
       console.log(`📧 [DEV EMAIL FALLBACK] Kode PIN Masuk Dikirim`);
@@ -102,8 +125,29 @@ export class SmtpMailService implements MailService {
         messageId: info.messageId,
       };
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Gagal mengirim email melalui SMTP.';
-      console.error('[SmtpMailService] Gagal mengirim email via SMTP:', err);
+      const errorMsg = this.extractErrorMessage(err);
+      console.error('[SmtpMailService] Gagal mengirim email via SMTP:', errorMsg);
+
+      // Fail-Safe di Lingkungan Lokal / Development:
+      // Jika port SMTP keluar (25/465/587) diblokir oleh ISP/firewall lokal,
+      // cetak kode PIN ke konsol agar alur login developer/penguji tidak terputus.
+      const isDevEnv = process.env.NODE_ENV !== 'production' || process.env.APP_ENV === 'development';
+      if (isDevEnv) {
+        console.warn(`\n⚠️  [DEV FAIL-SAFE] Koneksi SMTP gagal (${errorMsg}). Mengaktifkan fallback konsol dev.`);
+        console.log(`======================================================`);
+        console.log(`📧 [DEV EMAIL FAIL-SAFE] Kode PIN Masuk Mahasiswa`);
+        console.log(`Penerima  : ${to} (${voterName} - NIM: ${nim})`);
+        console.log(`KODE PIN  : [ ${pin} ] (Berlaku 10 Menit)`);
+        console.log(`Catatan   : Port SMTP diblokir oleh jaringan lokal. PIN dicetak di console ini.`);
+        console.log(`======================================================\n`);
+
+        return {
+          success: true,
+          isDevFallback: true,
+          messageId: `dev-failsafe-${Date.now()}`,
+        };
+      }
+
       return {
         success: false,
         isDevFallback: false,
@@ -161,8 +205,19 @@ export class SmtpMailService implements MailService {
         messageId: info.messageId,
       };
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Gagal mengirim email broadcast via SMTP.';
-      console.error('[SmtpMailService] Gagal kirim broadcast via SMTP:', err);
+      const errorMsg = this.extractErrorMessage(err);
+      console.error('[SmtpMailService] Gagal kirim broadcast via SMTP:', errorMsg);
+
+      const isDevEnv = process.env.NODE_ENV !== 'production' || process.env.APP_ENV === 'development';
+      if (isDevEnv) {
+        console.warn(`[DEV FAIL-SAFE] Broadcast mail fallback untuk ${to} (NIM: ${nim}): ${errorMsg}`);
+        return {
+          success: true,
+          isDevFallback: true,
+          messageId: `dev-broadcast-failsafe-${Date.now()}-${nim}`,
+        };
+      }
+
       return {
         success: false,
         isDevFallback: false,

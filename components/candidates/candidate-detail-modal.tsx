@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Users,
   Vote,
-  ShieldCheck,
   Award,
 } from 'lucide-react';
 import type { CandidateItem } from '@/components/ballot/candidate-card';
@@ -307,37 +306,30 @@ export function CandidateDetailModal({
         </div>
 
         {/* BOTTOM ACTION BAR */}
-        <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-on-surface-variant font-medium">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Suara dijamin rahasia dan tidak ditautkan ke NIM.</span>
-          </div>
+        <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex items-center justify-end gap-3">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+            type="button"
+            onClick={onClose}
+            className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          >
+            Tutup
+          </motion.button>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
-              type="button"
-              onClick={onClose}
-              className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-            >
-              Tutup
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
-              type="button"
-              onClick={() => {
-                onSelectCandidate(candidate);
-                onClose();
-              }}
-              className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-            >
-              <Vote className="w-4 h-4" />
-              <span>{isSelected ? 'Kembali ke Surat Suara' : `Pilih Paslon ${numberStr}`}</span>
-            </motion.button>
-          </div>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+            type="button"
+            onClick={() => {
+              onSelectCandidate(candidate);
+              onClose();
+            }}
+            className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          >
+            <Vote className="w-4 h-4" />
+            <span>{isSelected ? 'Kembali ke Surat Suara' : `Pilih Paslon ${numberStr}`}</span>
+          </motion.button>
         </div>
       </motion.div>
     </div>
