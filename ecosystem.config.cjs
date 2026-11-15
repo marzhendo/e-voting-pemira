@@ -1,3 +1,37 @@
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Parser file .env sederhana tanpa dependensi eksternal
+ * Membaca .env.local dan meneruskannya ke runtime Node.js via PM2
+ */
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const envVars = {};
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eqIdx = line.indexOf('=');
+      if (eqIdx !== -1) {
+        const key = line.slice(0, eqIdx).trim();
+        let val = line.slice(eqIdx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        envVars[key] = val;
+      }
+    }
+    return envVars;
+  } catch (err) {
+    console.error('[PM2 Config] Gagal membaca env file:', err);
+    return {};
+  }
+}
+
+const localEnv = loadEnvFile(path.resolve(__dirname, '.env.local'));
+
 /**
  * PM2 Process Manager Configuration for Pemira HMIF E-Voting
  * Optimized for Ubuntu 22.04 LTS VPS (Cloudra S3: 4 Core CPU, 6 GB RAM)
@@ -19,6 +53,7 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         HOSTNAME: '0.0.0.0',
+        ...localEnv,
       },
       // Otomatis restart jika crash dengan delay eksponensial
       exp_backoff_restart_delay: 100,
