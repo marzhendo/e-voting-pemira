@@ -4,10 +4,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getElectionEventSchema } from '@/lib/seo/constants';
 
 export default function HomePage() {
   return (
     <div className="bg-surface min-h-screen text-on-surface font-montserrat flex flex-col justify-between selection:bg-primary selection:text-on-primary">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(getElectionEventSchema()),
+        }}
+      />
       {/* Top Header */}
       <header className="w-full border-b border-outline-variant/30 bg-surface/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">

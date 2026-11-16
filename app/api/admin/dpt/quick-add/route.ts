@@ -11,7 +11,7 @@ const quickAddSchema = z.object({
   nim: z.string().min(4, 'NIM minimal 4 karakter').max(20),
   name: z.string().min(2, 'Nama minimal 2 karakter').max(150),
   email: z.string().email('Format email tidak valid'),
-  generation: z.number().int().min(2020).max(2030).default(2023),
+  generation: z.number().int().min(2015).max(2035).default(2023),
 });
 
 export async function POST(req: NextRequest) {

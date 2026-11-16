@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
@@ -227,6 +227,25 @@ export default function AdminDashboardPage() {
   const [dptPage, setDptPage] = useState(1);
   const [dptPageSize, setDptPageSize] = useState(50);
   const [dptTotalPages, setDptTotalPages] = useState(1);
+
+  // Daftar angkatan unik secara dinamis dari DPT aktif (dengan fallback 2019-2026 jika data belum dimuat)
+  const availableGenerations = useMemo(() => {
+    const gens = new Set<number>();
+    if (generationData && generationData.length > 0) {
+      generationData.forEach((g) => {
+        if (g.generation && g.generation > 2000) gens.add(g.generation);
+      });
+    }
+    if (voters && voters.length > 0) {
+      voters.forEach((v) => {
+        if (v.generation && v.generation > 2000) gens.add(v.generation);
+      });
+    }
+    if (gens.size === 0) {
+      [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026].forEach((g) => gens.add(g));
+    }
+    return Array.from(gens).sort((a, b) => a - b);
+  }, [generationData, voters]);
 
   // DPT Import Staging
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2759,14 +2778,11 @@ export default function AdminDashboardPage() {
                       className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     >
                       <option value="all">Semua Angkatan</option>
-                      <option value="2019">Angkatan 2019</option>
-                      <option value="2020">Angkatan 2020</option>
-                      <option value="2021">Angkatan 2021</option>
-                      <option value="2022">Angkatan 2022</option>
-                      <option value="2023">Angkatan 2023</option>
-                      <option value="2024">Angkatan 2024</option>
-                      <option value="2025">Angkatan 2025</option>
-                      <option value="2026">Angkatan 2026</option>
+                      {availableGenerations.map((gen) => (
+                        <option key={gen} value={gen.toString()}>
+                          Angkatan {gen}
+                        </option>
+                      ))}
                     </select>
 
                     <select
@@ -3417,11 +3433,14 @@ export default function AdminDashboardPage() {
                           onChange={(e) => setBroadcastGeneration(e.target.value)}
                           className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
                         >
-                          <option value="all">Semua Angkatan (2023 - 2026)</option>
-                          <option value="2023">Angkatan 2023</option>
-                          <option value="2024">Angkatan 2024</option>
-                          <option value="2025">Angkatan 2025</option>
-                          <option value="2026">Angkatan 2026</option>
+                          <option value="all">
+                            Semua Angkatan {availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ''}
+                          </option>
+                          {availableGenerations.map((gen) => (
+                            <option key={gen} value={gen.toString()}>
+                              Angkatan {gen}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -4710,7 +4729,9 @@ export default function AdminDashboardPage() {
               <div className="flex justify-between">
                 <span className="text-on-surface-variant">Filter Angkatan:</span>
                 <span className="font-semibold text-on-surface">
-                  {broadcastGeneration === 'all' ? 'Semua (2023 - 2026)' : `Angkatan ${broadcastGeneration}`}
+                  {broadcastGeneration === 'all'
+                    ? `Semua Angkatan ${availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ''}`
+                    : `Angkatan ${broadcastGeneration}`}
                 </span>
               </div>
               <div className="pt-2 border-t border-outline-variant/20">
@@ -4856,10 +4877,11 @@ export default function AdminDashboardPage() {
                       onChange={(e) => setQuickAddGeneration(Number(e.target.value))}
                       className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                     >
-                      <option value="2023">2023</option>
-                      <option value="2024">2024</option>
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
+                      {availableGenerations.map((gen) => (
+                        <option key={gen} value={gen}>
+                          {gen}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
