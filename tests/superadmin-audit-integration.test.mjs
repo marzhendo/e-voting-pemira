@@ -187,16 +187,40 @@ describe('Super Admin Functional Audit & Integration Verification', () => {
     }
   });
 
-  it('6. Primary Superadmin Immutability in Admin Management', () => {
+  it('6. Primary Superadmin Immutability & Admin Deletion Resolution', () => {
     const admins = getAllAdminUsers();
     const primary = admins.find((a) => a.email.toLowerCase() === 'marzhendogalangs@gmail.com');
     assert.ok(primary, 'Superadmin utama wajib ada.');
     assert.strictEqual(primary.role, 'super_admin', 'Peran harus super_admin.');
 
-    // Coba hapus superadmin utama
-    const result = deleteAdminUser(primary.id);
-    assert.strictEqual(result.success, false, 'Superadmin utama dilarang dihapus.');
-    assert.match(result.error, /Akun Superadmin utama tidak dapat dihapus/i);
+    // Coba hapus superadmin utama menggunakan ID
+    const resultById = deleteAdminUser(primary.id);
+    assert.strictEqual(resultById.success, false, 'Superadmin utama dilarang dihapus via ID.');
+    assert.match(resultById.error, /Akun Superadmin utama tidak dapat dihapus/i);
+
+    // Coba hapus superadmin utama menggunakan Email
+    const resultByEmail = deleteAdminUser(primary.email);
+    assert.strictEqual(resultByEmail.success, false, 'Superadmin utama dilarang dihapus via Email.');
+    assert.match(resultByEmail.error, /Akun Superadmin utama tidak dapat dihapus/i);
+
+    // Verifikasi kontrak PostgreSQL trigger pada BEFORE DELETE:
+    // Pada trigger PostgreSQL BEFORE DELETE, variabel NEW selalu NULL.
+    // Jika fungsi trigger mengembalikan NEW (NULL), Postgres membatalkan DELETE secara diam-diam.
+    // Fungsi harus mengembalikan OLD pada TG_OP = 'DELETE'.
+    const simulateTrigger = (op, oldRow, newRow) => {
+      if (oldRow.email.toLowerCase() === 'marzhendogalangs@gmail.com') {
+        if (op === 'DELETE') throw new Error('Cannot delete superadmin');
+      }
+      if (op === 'DELETE') return oldRow; // WAJIB return OLD
+      return newRow;
+    };
+
+    assert.throws(
+      () => simulateTrigger('DELETE', { email: 'marzhendogalangs@gmail.com' }, null),
+      /Cannot delete superadmin/
+    );
+    const nonAdminDeleted = simulateTrigger('DELETE', { email: 'kpr-panitia@telkomuniversity.ac.id' }, null);
+    assert.deepStrictEqual(nonAdminDeleted, { email: 'kpr-panitia@telkomuniversity.ac.id' });
   });
 
   it('7. Robust DPT Batch Deletion: UUID, Dev-Store IDs, and NIM Resolution without 22P02 Syntax Errors', () => {

@@ -40,6 +40,12 @@ BEGIN
         END IF;
     END IF;
 
+    -- PENTING: Pada operasi DELETE, kembalikan OLD agar row deletion non-superadmin diproses.
+    -- Mengembalikan NEW (bernilai NULL pada DELETE) akan membatalkan operasi delete secara diam-diam.
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+
     RETURN NEW;
 END;
 $$;

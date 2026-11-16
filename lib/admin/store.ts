@@ -153,11 +153,11 @@ export function addAdminUser(params: {
 }
 
 export function updateAdminRole(
-  id: string,
+  idOrEmail: string,
   newRole: AdminRole
 ): { success: boolean; admin?: AdminUserRecord; error?: string } {
   const all = getAllAdminUsers();
-  const index = all.findIndex((a) => a.id === id);
+  const index = all.findIndex((a) => a.id === idOrEmail || a.email.toLowerCase() === idOrEmail.toLowerCase());
 
   if (index === -1) {
     return { success: false, error: 'Akun administrator tidak ditemukan.' };
@@ -191,11 +191,11 @@ export function updateAdminRole(
 }
 
 export function toggleAdminActive(
-  id: string,
+  idOrEmail: string,
   isActive: boolean
 ): { success: boolean; admin?: AdminUserRecord; error?: string } {
   const all = getAllAdminUsers();
-  const index = all.findIndex((a) => a.id === id);
+  const index = all.findIndex((a) => a.id === idOrEmail || a.email.toLowerCase() === idOrEmail.toLowerCase());
 
   if (index === -1) {
     return { success: false, error: 'Akun administrator tidak ditemukan.' };
@@ -214,9 +214,9 @@ export function toggleAdminActive(
   return { success: true, admin: updatedAdmin };
 }
 
-export function deleteAdminUser(id: string): { success: boolean; error?: string } {
+export function deleteAdminUser(idOrEmail: string): { success: boolean; error?: string } {
   const all = getAllAdminUsers();
-  const target = all.find((a) => a.id === id);
+  const target = all.find((a) => a.id === idOrEmail || a.email.toLowerCase() === idOrEmail.toLowerCase());
 
   if (!target) {
     return { success: false, error: 'Akun administrator tidak ditemukan.' };
@@ -227,7 +227,7 @@ export function deleteAdminUser(id: string): { success: boolean; error?: string 
     return { success: false, error: 'Akun Superadmin utama tidak dapat dihapus.' };
   }
 
-  const updated = all.filter((a) => a.id !== id);
+  const updated = all.filter((a) => a.id !== target.id);
   saveAdminsStore(updated);
 
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {

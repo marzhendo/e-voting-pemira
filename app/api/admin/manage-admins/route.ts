@@ -13,6 +13,7 @@ import {
   deleteAdminUser,
 } from '@/lib/admin/store';
 import type { AdminRole, Database } from '@/lib/supabase/types';
+import { isRootSuperadminEmail } from '@/lib/auth/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
               email: a.email,
               role: a.role as AdminRole,
               is_active: a.is_active,
-              name: p?.name || d?.name || a.created_by || a.email.split('@')[0],
+              name: p?.name || d?.name || a.email.split('@')[0],
               nim: p?.nim || d?.nim || undefined,
               created_at: a.created_at,
               updated_at: a.updated_at,
@@ -272,14 +273,13 @@ export async function PATCH(request: NextRequest) {
     if (isSupabaseConfigured()) {
       try {
         const adminSupabase = createAdminClient();
-        const { data: targetAdmin } = await adminSupabase
-          .from('admin_users')
-          .select('*')
-          .or(`id.eq.${id},email.eq.${id}`)
-          .maybeSingle();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const { data: targetAdmin } = isUuid
+          ? await adminSupabase.from('admin_users').select('*').eq('id', id).maybeSingle()
+          : await adminSupabase.from('admin_users').select('*').eq('email', id.toLowerCase()).maybeSingle();
 
         if (targetAdmin) {
-          if (targetAdmin.email.toLowerCase() === 'marzhendogalangs@gmail.com') {
+          if (isRootSuperadminEmail(targetAdmin.email)) {
             if (isActive === false) {
               return NextResponse.json({ error: 'Akun Superadmin utama tidak dapat dinonaktifkan.' }, { status: 400 });
             }
@@ -407,11 +407,10 @@ export async function DELETE(request: NextRequest) {
     if (isSupabaseConfigured()) {
       try {
         const adminSupabase = createAdminClient();
-        const { data: targetAdmin } = await adminSupabase
-          .from('admin_users')
-          .select('*')
-          .or(`id.eq.${id},email.eq.${id}`)
-          .maybeSingle();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const { data: targetAdmin } = isUuid
+          ? await adminSupabase.from('admin_users').select('*').eq('id', id).maybeSingle()
+          : await adminSupabase.from('admin_users').select('*').eq('email', id.toLowerCase()).maybeSingle();
 
         if (targetAdmin) {
           if (targetAdmin.email.toLowerCase() === session?.email?.toLowerCase()) {
@@ -421,16 +420,16 @@ export async function DELETE(request: NextRequest) {
             );
           }
 
-          if (targetAdmin.email.toLowerCase() === 'marzhendogalangs@gmail.com') {
+          if (isRootSuperadminEmail(targetAdmin.email)) {
             return NextResponse.json(
               { error: 'Akun Superadmin utama tidak dapat dihapus.' },
               { status: 400 }
             );
           }
 
-          const { error: delErr } = await adminSupabase
+          const { error: delErr, count } = await adminSupabase
             .from('admin_users')
-            .delete()
+            .delete({ count: 'exact' })
             .eq('id', targetAdmin.id);
 
           if (delErr) {
@@ -438,6 +437,14 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json(
               { error: `Gagal mencabut akses di basis data: ${delErr.message}` },
               { status: 400 }
+            );
+          }
+
+          if (count === 0) {
+            console.warn('[ManageAdminsRoute] Supabase delete affected 0 rows:', targetAdmin.id);
+            return NextResponse.json(
+              { error: 'Gagal mencabut akses: Baris data tidak terhapus di basis data (operasi dibatalkan oleh trigger database).' },
+              { status: 500 }
             );
           }
 
@@ -455,6 +462,7 @@ export async function DELETE(request: NextRequest) {
             },
           });
 
+          deleteAdminUser(targetAdmin.id);
           deleteAdminUser(targetAdmin.email);
 
           return NextResponse.json({
