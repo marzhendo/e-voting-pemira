@@ -110,6 +110,8 @@ export default async function Image() {
         >
           <div
             style={{
+              display: 'flex',
+              flexDirection: 'row',
               fontSize: '56px',
               fontWeight: 900,
               lineHeight: 1.15,
@@ -117,11 +119,13 @@ export default async function Image() {
               color: '#FFFFFF',
             }}
           >
-            PEMIRA HMIF <span style={{ color: '#EBBD1C' }}>2026/2027</span>
+            <span>PEMIRA HMIF&nbsp;</span>
+            <span style={{ color: '#EBBD1C' }}>2026/2027</span>
           </div>
 
           <div
             style={{
+              display: 'flex',
               fontSize: '24px',
               color: '#D1D5DB',
               lineHeight: 1.4,
@@ -157,6 +161,7 @@ export default async function Image() {
 
           <div
             style={{
+              display: 'flex',
               fontSize: '16px',
               color: '#EBBD1C',
               fontWeight: 700,
