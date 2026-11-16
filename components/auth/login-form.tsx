@@ -168,7 +168,7 @@ export function LoginForm() {
     const cleanId = identifier.trim();
 
     if (!cleanId || cleanId.length < 4) {
-      setErrorMessage('Masukkan NIM atau email kampus yang valid.');
+      setErrorMessage('Masukkan NIM yang valid.');
       return;
     }
 
@@ -321,9 +321,9 @@ export function LoginForm() {
         )}
       </AnimatePresence>
 
-      {/* Banner Sukses Pengiriman */}
+      {/* Banner Sukses (Hanya untuk konfirmasi redirect login) */}
       <AnimatePresence>
-        {successNotice && (
+        {successNotice && (step !== 'pin' || successNotice.includes('berhasil') || successNotice.includes('Terverifikasi')) && (
           <motion.div
             key="success-banner"
             initial={{ opacity: 0, y: -6 }}
@@ -454,7 +454,7 @@ export function LoginForm() {
                     return (
                       <div
                         key={idx}
-                        className={`h-14 sm:h-16 rounded-xl flex items-center justify-center transition-all duration-150 ${
+                        className={`h-12 sm:h-14 rounded-xl flex items-center justify-center transition-all duration-150 ${
                           isCurrent
                             ? 'border-2 border-primary bg-surface-container-highest shadow-xs'
                             : isFilled
@@ -481,17 +481,17 @@ export function LoginForm() {
                 </div>
               </div>
 
-              <div className="mt-3 p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-between gap-3 text-xs">
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] text-on-surface-variant block">Email SSO Kampus:</span>
-                  <span className="text-xs font-mono font-semibold text-on-surface truncate block" title={maskedEmail}>
-                    {maskedEmail}
+              {/* Status Pengiriman & Masa Berlaku Ringkas (Inline Zero-Shift) */}
+              <div className="mt-2.5 flex items-center justify-between text-xs px-1 text-on-surface-variant">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">
+                    Terkirim ke <span className="font-mono text-on-surface font-semibold">{maskedEmail}</span>
                   </span>
                 </div>
-                <div className="shrink-0 text-right pl-3 border-l border-outline-variant/30">
-                  <span className="text-[11px] text-on-surface-variant block">Masa Berlaku</span>
-                  <span className="text-xs font-bold text-primary">10 Menit</span>
-                </div>
+                <span className="text-[11px] text-primary shrink-0 font-medium pl-2">
+                  Berlaku 10 mnt
+                </span>
               </div>
             </div>
 

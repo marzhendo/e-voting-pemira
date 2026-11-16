@@ -239,7 +239,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         return {
           success: false,
           code: 'NIM_NOT_IN_DPT',
-          error: 'NIM atau email kamu belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
+          error: 'NIM kamu belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
         };
       }
 
@@ -376,7 +376,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
     return {
       success: false,
       code: 'NIM_NOT_IN_DPT',
-      error: 'NIM atau email kamu belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
+      error: 'NIM kamu belum terdaftar dalam Daftar Pemilih Tetap (DPT) Pemira HMIF.',
     };
   }
 

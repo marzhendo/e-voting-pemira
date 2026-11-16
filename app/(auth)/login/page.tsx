@@ -7,12 +7,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-between antialiased selection:bg-primary selection:text-on-primary">
       {/* Main Viewport Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12 animate-page-enter">
-        <div className="w-full max-w-4xl bg-surface-container border border-outline-variant/30 rounded-3xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-          {/* LEFT COLUMN: Identity & Context */}
-          <section className="hidden lg:flex lg:col-span-7 p-8 sm:p-10 flex flex-col justify-center bg-surface-container-low lg:border-r border-outline-variant/20">
+        <div className="w-full max-w-4xl bg-surface-container border border-outline-variant/30 rounded-3xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 lg:min-h-[500px]">
+          {/* LEFT COLUMN: Identity & Context (Locked in place, zero height shift) */}
+          <section className="hidden lg:flex lg:col-span-7 p-8 sm:p-10 lg:p-12 flex flex-col justify-between bg-surface-container-low lg:border-r border-outline-variant/20">
+            {/* Logo & Header */}
             <div>
-              {/* Logo */}
-              <div className="flex items-center gap-3.5 mb-8">
+              <div className="flex items-center gap-3.5">
                 <div className="relative w-11 h-11 sm:w-12 sm:h-12 shrink-0 flex items-center justify-center">
                   <Image
                     src="/assets/img/hmif-logo.png"
@@ -32,16 +32,21 @@ export default function LoginPage() {
                   </h2>
                 </div>
               </div>
+            </div>
 
-              {/* Title & Concise Copy */}
-              <div className="space-y-3 max-w-md">
-                <h1 className="font-bebas text-4xl sm:text-5xl lg:text-6xl tracking-wide uppercase text-on-surface leading-none">
-                  Waktunya Memilih.
-                </h1>
-                <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed">
-                  Pemilihan Chairman &amp; Vice Chairman HMIF Periode 2026/2027.
-                </p>
-              </div>
+            {/* Title & Concise Copy */}
+            <div className="space-y-3 max-w-md my-auto py-8">
+              <h1 className="font-bebas text-4xl sm:text-5xl lg:text-6xl tracking-wide uppercase text-on-surface leading-none">
+                Waktunya Memilih.
+              </h1>
+              <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed">
+                Pemilihan Chairman &amp; Vice Chairman HMIF Periode 2026/2027.
+              </p>
+            </div>
+
+            {/* Institutional Seal Footnote */}
+            <div className="text-[11px] text-on-surface-variant/70 border-t border-outline-variant/15 pt-4">
+              Komisi Pemilihan Raya &bull; Program Studi S1 Informatika
             </div>
           </section>
 

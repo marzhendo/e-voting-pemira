@@ -11,7 +11,7 @@ const RequestOtpSchema = z.object({
   identifier: z
     .string()
     .trim()
-    .min(4, 'NIM atau email wajib diisi.')
+    .min(4, 'NIM wajib diisi.')
     .refine(
       (val) => {
         const clean = val.toLowerCase();
@@ -22,7 +22,7 @@ const RequestOtpSchema = z.object({
       },
       {
         message:
-          'Format identitas tidak sah. Mahasiswa wajib menggunakan NIM resmi atau email @student.telkomuniversity.ac.id.',
+          'Format NIM tidak valid. Pastikan Anda memasukkan NIM resmi yang terdaftar.',
       }
     ),
 });
