@@ -51,7 +51,9 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  Crop,
 } from 'lucide-react';
+import { CandidatePhotoFrameModal } from '@/components/admin/candidate-photo-frame-modal';
 
 interface TallyItem {
   candidateId: string;
@@ -169,6 +171,10 @@ export default function AdminDashboardPage() {
   const [togglingKotakKosong, setTogglingKotakKosong] = useState(false);
   const [savingCandidate, setSavingCandidate] = useState(false);
   const [candidateActionMessage, setCandidateActionMessage] = useState<string | null>(null);
+
+  // Candidate Photo Framing Editor State
+  const [photoToFrame, setPhotoToFrame] = useState<string | null>(null);
+  const [isPhotoFrameModalOpen, setIsPhotoFrameModalOpen] = useState(false);
 
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const chairmanCvFileInputRef = useRef<HTMLInputElement>(null);
@@ -799,6 +805,20 @@ export default function AdminDashboardPage() {
     } finally {
       setLoadingState(false);
     }
+  };
+
+  // Callback saat admin menyetujui hasil framing foto paslon (rasio 4:3)
+  const handleFramedPhotoConfirm = async (croppedFile: File) => {
+    await handleUploadFile(
+      croppedFile,
+      'candidates',
+      (url) => {
+        setCandidateFormPhotoUrl(url);
+        setIsPhotoFrameModalOpen(false);
+        setPhotoToFrame(null);
+      },
+      setUploadingPhoto
+    );
   };
 
   // Toggle Kotak Kosong for Multi-Candidate Elections
@@ -4172,7 +4192,12 @@ export default function AdminDashboardPage() {
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleUploadFile(f, 'candidates', (url) => setCandidateFormPhotoUrl(url), setUploadingPhoto);
+                    if (f) {
+                      const objectUrl = URL.createObjectURL(f);
+                      setPhotoToFrame(objectUrl);
+                      setIsPhotoFrameModalOpen(true);
+                      e.target.value = '';
+                    }
                   }}
                 />
 
@@ -4193,12 +4218,24 @@ export default function AdminDashboardPage() {
                       <span className="text-[11px] text-on-surface-variant block truncate font-mono mt-0.5">
                         {candidateFormPhotoUrl}
                       </span>
-                      <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoToFrame(candidateFormPhotoUrl);
+                            setIsPhotoFrameModalOpen(true);
+                          }}
+                          className="text-[11px] font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <Crop className="w-3 h-3" />
+                          <span>Sesuaikan Frame (4:3)</span>
+                        </button>
+                        <span className="text-on-surface-variant text-[11px]">•</span>
                         <button
                           type="button"
                           disabled={uploadingPhoto}
                           onClick={() => photoFileInputRef.current?.click()}
-                          className="text-[11px] font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                          className="text-[11px] font-semibold text-on-surface hover:text-primary hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-50"
                         >
                           {uploadingPhoto ? (
                             <>
@@ -4476,6 +4513,28 @@ export default function AdminDashboardPage() {
         </div>
       </div>
     </Portal>
+    )}
+
+    {/* MODAL VISUAL FRAMING FOTO PASLON (4:3) */}
+    {isPhotoFrameModalOpen && photoToFrame && (
+      <Portal>
+        <CandidatePhotoFrameModal
+          isOpen={isPhotoFrameModalOpen}
+          onClose={() => {
+            setIsPhotoFrameModalOpen(false);
+            setPhotoToFrame(null);
+          }}
+          imageUrl={photoToFrame}
+          candidateNumber={candidateFormNumber}
+          candidateNames={
+            candidateFormLeader || candidateFormViceLeader
+              ? `${candidateFormLeader} & ${candidateFormViceLeader}`
+              : undefined
+          }
+          onConfirm={handleFramedPhotoConfirm}
+          isUploading={uploadingPhoto}
+        />
+      </Portal>
     )}
 
       {/* MODAL KUNCI DARURAT */}
