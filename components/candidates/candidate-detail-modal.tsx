@@ -5,8 +5,8 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Portal } from '@/components/ui/portal';
 import {
-  ArrowLeft,
   X,
+  Check,
   Download,
   Target,
   CheckCircle2,
@@ -115,28 +115,23 @@ export function CandidateDetailModal({
               >
             {/* TOP NAVBAR / HEADER */}
             <div className="shrink-0 px-4 sm:px-8 py-3.5 sm:py-4 bg-surface-container/95 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between gap-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest min-h-[44px] px-3.5 py-2 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Kembali ke Bilik Suara</span>
-              </button>
-
               <div className="flex items-center gap-2.5">
                 <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-bold uppercase tracking-wider">
                   Nomor Urut {numberStr}
                 </span>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label="Tutup Detail"
-                  className="w-11 h-11 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <span className="text-xs text-on-surface-variant font-medium hidden sm:inline">
+                  Detail Profil &amp; Berkas CV
+                </span>
               </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Tutup Detail"
+                className="w-10 h-10 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* SCROLLABLE MAIN CONTENT */}
@@ -306,29 +301,34 @@ export function CandidateDetailModal({
         </div>
 
         {/* BOTTOM ACTION BAR */}
-        <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex items-center justify-end gap-3">
+        <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex items-center justify-end">
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
-            type="button"
-            onClick={onClose}
-            className="flex-1 sm:flex-none h-11 min-h-[44px] px-5 rounded-xl border border-outline-variant/40 hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-          >
-            Tutup
-          </motion.button>
-
-          <motion.button
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: 0.98 }}
             transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
             type="button"
             onClick={() => {
-              onSelectCandidate(candidate);
+              if (!isSelected) {
+                onSelectCandidate(candidate);
+              }
               onClose();
             }}
-            className="flex-1 sm:flex-none h-11 min-h-[44px] px-6 rounded-xl bg-primary text-on-primary hover:bg-secondary text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+            className={`w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
+              isSelected
+                ? 'bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25'
+                : 'bg-primary text-on-primary hover:bg-secondary-fixed'
+            }`}
           >
-            <Vote className="w-4 h-4" />
-            <span>{isSelected ? 'Kembali ke Surat Suara' : `Pilih Paslon ${numberStr}`}</span>
+            {isSelected ? (
+              <>
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Terpilih &bull; Kembali ke Bilik Suara</span>
+              </>
+            ) : (
+              <>
+                <Vote className="w-4 h-4" />
+                <span>Pilih Paslon {numberStr}</span>
+              </>
+            )}
           </motion.button>
         </div>
       </motion.div>

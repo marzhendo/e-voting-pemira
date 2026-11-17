@@ -150,12 +150,9 @@ export function CandidateCard({
       </div>
 
       {/* Footer Aksi Card */}
-      <div className="pt-4 mt-4 border-t border-outline-variant/20 flex items-center justify-between">
-        <span className="text-xs text-on-surface-variant font-medium">
-          {isSelected ? '✓ Terpilih' : 'Belum dipilih'}
-        </span>
+      <div className="pt-4 mt-4 border-t border-outline-variant/20">
         <motion.button
-          whileTap={{ scale: 0.97 }}
+          whileTap={{ scale: 0.98 }}
           transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
           type="button"
           aria-pressed={isSelected}
@@ -164,13 +161,20 @@ export function CandidateCard({
             e.stopPropagation();
             onSelect(candidate);
           }}
-          className={`h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
+          className={`w-full h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
             isSelected
-              ? 'bg-primary text-on-primary'
+              ? 'bg-primary text-on-primary shadow-sm shadow-primary/20'
               : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'
           }`}
         >
-          {isSelected ? 'Terpilih' : `Pilih Paslon ${numberStr}`}
+          {isSelected ? (
+            <>
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Terpilih</span>
+            </>
+          ) : (
+            <span>Pilih Paslon {numberStr}</span>
+          )}
         </motion.button>
       </div>
     </div>
