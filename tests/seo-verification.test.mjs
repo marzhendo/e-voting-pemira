@@ -81,4 +81,11 @@ test('SEO Verification Suite', async (t) => {
     assert.ok(event.name.includes('Pemilihan Raya HMIF'));
     assert.strictEqual(event.location.url, 'https://pemirahmif.com/login');
   });
+
+  await t.test('6. Google Search Console verification metadata support', async () => {
+    const fs = await import('node:fs');
+    const layoutContent = fs.readFileSync('app/layout.tsx', 'utf-8');
+    assert.ok(layoutContent.includes('verification: {'));
+    assert.ok(layoutContent.includes('NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION'));
+  });
 });

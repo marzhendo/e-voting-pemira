@@ -73,6 +73,9 @@ export const metadata: Metadata = {
     icon: '/assets/img/hmif-logo.png',
     apple: '/assets/img/hmif-logo.png',
   },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+  },
 };
 
 export default function RootLayout({

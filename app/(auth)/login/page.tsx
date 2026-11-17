@@ -34,12 +34,12 @@ export default function LoginPage() {
         <div className="w-full max-w-[440px] bg-surface-container border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-primary/5 transition-all duration-200 ease-out">
           {/* Card Header: Brand Identity & Unified Headline */}
           <div className="text-center flex flex-col items-center space-y-3 mb-6">
-            <div className="relative w-12 h-12 rounded-full border border-primary/40 bg-surface-container-high p-1 shadow-inner flex items-center justify-center">
+            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
               <Image
                 src="/assets/img/hmif-logo.png"
                 alt="Logo HMIF Telkom University Purwokerto"
-                width={40}
-                height={40}
+                width={56}
+                height={56}
                 priority
                 className="w-full h-full object-contain"
               />
