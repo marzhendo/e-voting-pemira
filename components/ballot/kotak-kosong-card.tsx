@@ -47,7 +47,7 @@ export function KotakKosongCard({
               </div>
               <div>
                 <span className="text-[11px] text-on-surface-variant uppercase tracking-wider block font-semibold">
-                  Opsi Resmi Sah
+                  Opsi Sah
                 </span>
                 <h3 className="text-base text-on-surface font-bold">
                   Kotak Kosong
@@ -80,27 +80,27 @@ export function KotakKosongCard({
               Kotak Kosong
             </span>
             <p className="text-xs text-on-surface-variant max-w-xs mt-1 leading-relaxed">
-              Pilihan sah bagi pemilih yang tidak menentukan suara pada paslon terdaftar.
+              Pilihan resmi jika kamu belum menentukan suara untuk pasangan calon yang ada.
             </p>
           </div>
 
           {/* Deskripsi */}
           <div className="space-y-1">
             <h4 className="text-base sm:text-lg font-bold text-on-surface leading-snug">
-              Kotak Kosong (Kolom Kosong)
+              Kotak Kosong
             </h4>
             <p className="text-xs text-on-surface-variant font-medium">
-              Opsi Sah Alternatif Calon Tunggal
+              Opsi jika belum ada paslon yang pas
             </p>
           </div>
 
           {/* Keterangan Hak Pilih Sah (Seimbang dengan Visi Utama Paslon) */}
           <div className="bg-surface-container-low rounded-xl p-3 text-xs text-on-surface-variant">
             <span className="text-[11px] font-bold uppercase tracking-wider text-primary block mb-1">
-              Prinsip Demokrasi
+              HAK SUARA SAH
             </span>
             <p className="line-clamp-2 text-xs leading-relaxed text-on-surface/90">
-              Hak demokratis pemilih untuk menyatakan tidak sepakat terhadap pasangan calon terdaftar.
+              Pilih opsi ini kalau kamu merasa visi &amp; misi paslon yang ada belum sesuai harapanmu.
             </p>
           </div>
 
@@ -108,10 +108,10 @@ export function KotakKosongCard({
           <div className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest text-on-surface border border-outline-variant/40 text-xs font-semibold flex items-center justify-between gap-2 select-none">
             <span className="flex items-center gap-2">
               <Vote className="w-4 h-4 text-primary" />
-              <span>Dihitung Sah dalam Rekapitulasi</span>
+              <span>Tetap Dihitung Resmi</span>
             </span>
             <span className="text-xs font-bold text-emerald-400">
-              Resmi KPR
+              Sah KPR
             </span>
           </div>
         </div>
@@ -181,7 +181,7 @@ export function KotakKosongCard({
             </span>
           </div>
           <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-            Pilihan sah bagi pemilih yang tidak menentukan suara pada paslon terdaftar. Suara tetap dihitung dalam rekapitulasi.
+            Opsi jika belum ada paslon yang pas. Suaramu tetap dihitung resmi oleh panitia KPR.
           </p>
         </div>
       </div>
