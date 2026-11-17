@@ -98,9 +98,10 @@ export class SmtpMailService implements MailService {
       };
     }
 
-    const domain = process.env.SMTP_FROM_DOMAIN || 'pemirahmif.org';
+    const domain = process.env.SMTP_FROM_DOMAIN || 'pemirahmif.com';
     const fromName = process.env.SMTP_FROM_NAME || 'Panitia Pemira HMIF';
     const fromEmail = process.env.SMTP_FROM_EMAIL || `noreply@${domain}`;
+    const replyTo = process.env.SMTP_REPLY_TO || fromEmail;
 
     const html = generatePinEmailHtml({ voterName, nim, pin });
     const text = generatePinEmailText({ voterName, nim, pin });
@@ -109,7 +110,7 @@ export class SmtpMailService implements MailService {
       const info = await transporter.sendMail({
         from: `"${fromName}" <${fromEmail}>`,
         to,
-        replyTo: `bantuan@${domain}`,
+        replyTo,
         subject: `[PEMIRA HMIF] Kode Verifikasi Masuk: ${pin}`,
         text,
         html,
@@ -177,9 +178,10 @@ export class SmtpMailService implements MailService {
       };
     }
 
-    const domain = process.env.SMTP_FROM_DOMAIN || 'pemirahmif.org';
+    const domain = process.env.SMTP_FROM_DOMAIN || 'pemirahmif.com';
     const fromName = process.env.SMTP_FROM_NAME || 'Panitia Pemira HMIF';
     const fromEmail = process.env.SMTP_FROM_EMAIL || `noreply@${domain}`;
+    const replyTo = process.env.SMTP_REPLY_TO || fromEmail;
 
     const html = generateBroadcastEmailHtml({ voterName, nim, headline, bodyText, ctaText, ctaUrl });
     const text = generateBroadcastEmailText({ voterName, nim, headline, bodyText, ctaUrl });
@@ -188,7 +190,7 @@ export class SmtpMailService implements MailService {
       const info = await transporter.sendMail({
         from: `"${fromName}" <${fromEmail}>`,
         to,
-        replyTo: `bantuan@${domain}`,
+        replyTo,
         subject,
         text,
         html,
