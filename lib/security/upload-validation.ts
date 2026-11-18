@@ -63,3 +63,33 @@ export function validateFileMagicBytes(buffer: Buffer, mimeType: string): { vali
       return { valid: false };
   }
 }
+
+import * as path from 'node:path';
+
+/**
+ * Canonically resolves an uploaded file URL (`/uploads/<subfolder>/<filename>`)
+ * against `uploadsRoot` and guarantees the resolved path stays strictly inside `uploadsRoot`.
+ * Returns `null` on any path traversal attempt or out-of-bounds path.
+ */
+export function resolveSafeUploadPath(relativeUrl: string, uploadsRoot: string): string | null {
+  if (!relativeUrl || typeof relativeUrl !== 'string') return null;
+  if (!relativeUrl.startsWith('/uploads/')) return null;
+  if (relativeUrl.includes('\0') || relativeUrl.includes('\\')) return null;
+
+  const subPath = relativeUrl.slice('/uploads/'.length);
+  if (!subPath || subPath.startsWith('/')) return null;
+
+  const canonicalRoot = path.resolve(uploadsRoot);
+  const resolvedTarget = path.resolve(canonicalRoot, subPath);
+
+  // Must strictly sit beneath canonicalRoot (never equal to root or escaping parent)
+  const rootPrefix = canonicalRoot.endsWith(path.sep)
+    ? canonicalRoot
+    : canonicalRoot + path.sep;
+
+  if (!resolvedTarget.startsWith(rootPrefix)) {
+    return null;
+  }
+
+  return resolvedTarget;
+}

@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { isDevFallbackAllowed } from '@/lib/security/env';
 import {
   getAllAdminUsers,
   addAdminUser,
@@ -32,7 +33,7 @@ const updateAdminSchema = z.object({
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_admins');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_admins');
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -50,12 +51,15 @@ export async function GET(request: NextRequest) {
           .select('*')
           .order('created_at', { ascending: true });
 
-        if (!error && dbAdmins && dbAdmins.length > 0) {
+        if (!error && dbAdmins) {
           const emails = dbAdmins.map((a) => a.email.toLowerCase());
-          const { data: voterProfiles } = await adminSupabase
-            .from('voters_whitelist')
-            .select('email, name, nim')
-            .in('email', emails);
+          const { data: voterProfiles } =
+            emails.length > 0
+              ? await adminSupabase
+                  .from('voters_whitelist')
+                  .select('email, name, nim')
+                  .in('email', emails)
+              : { data: [] };
 
           const profileMap = new Map((voterProfiles || []).map((v) => [v.email.toLowerCase(), v]));
           const devAdmins = getAllAdminUsers();
@@ -88,8 +92,23 @@ export async function GET(request: NextRequest) {
           });
         }
       } catch (err) {
-        console.warn('[ManageAdminsRoute] Supabase error in GET, falling back to local store:', err);
+        console.error('[ManageAdminsRoute] Supabase error in GET:', err);
+        return NextResponse.json(
+          { error: 'Gagal memuat daftar administrator dari basis data.' },
+          { status: 500 }
+        );
       }
+      return NextResponse.json(
+        { error: 'Gagal memuat daftar administrator dari basis data.' },
+        { status: 500 }
+      );
+    }
+
+    if (!isDevFallbackAllowed(false)) {
+      return NextResponse.json(
+        { error: 'Basis data administrator tidak tersedia pada mode produksi.' },
+        { status: 500 }
+      );
     }
 
     const admins = getAllAdminUsers();
@@ -114,7 +133,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_admins');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_admins');
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -203,8 +222,23 @@ export async function POST(request: NextRequest) {
           },
         });
       } catch (err) {
-        console.warn('[ManageAdminsRoute] Supabase error in POST, using dev store:', err);
+        console.error('[ManageAdminsRoute] Supabase error in POST:', err);
+        return NextResponse.json(
+          { error: 'Gagal menambahkan administrator ke basis data.' },
+          { status: 500 }
+        );
       }
+      return NextResponse.json(
+        { error: 'Gagal menambahkan administrator ke basis data.' },
+        { status: 500 }
+      );
+    }
+
+    if (!isDevFallbackAllowed(false)) {
+      return NextResponse.json(
+        { error: 'Basis data administrator tidak tersedia pada mode produksi.' },
+        { status: 500 }
+      );
     }
 
     const result = addAdminUser({ name, email, nim, role: role as AdminRole });
@@ -247,7 +281,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_admins');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_admins');
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -327,8 +361,23 @@ export async function PATCH(request: NextRequest) {
           });
         }
       } catch (err) {
-        console.warn('[ManageAdminsRoute] Supabase error in PATCH:', err);
+        console.error('[ManageAdminsRoute] Supabase error in PATCH:', err);
+        return NextResponse.json(
+          { error: 'Gagal memperbarui administrator di basis data.' },
+          { status: 500 }
+        );
       }
+      return NextResponse.json(
+        { error: 'Data administrator tidak ditemukan di basis data.' },
+        { status: 404 }
+      );
+    }
+
+    if (!isDevFallbackAllowed(false)) {
+      return NextResponse.json(
+        { error: 'Basis data administrator tidak tersedia pada mode produksi.' },
+        { status: 500 }
+      );
     }
 
     let updatedAdmin;
@@ -385,7 +434,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_admins');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_admins');
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -471,8 +520,23 @@ export async function DELETE(request: NextRequest) {
           });
         }
       } catch (err) {
-        console.warn('[ManageAdminsRoute] Supabase error in DELETE:', err);
+        console.error('[ManageAdminsRoute] Supabase error in DELETE:', err);
+        return NextResponse.json(
+          { error: 'Gagal mencabut akses administrator dari basis data.' },
+          { status: 500 }
+        );
       }
+      return NextResponse.json(
+        { error: 'Data administrator tidak ditemukan di basis data.' },
+        { status: 404 }
+      );
+    }
+
+    if (!isDevFallbackAllowed(false)) {
+      return NextResponse.json(
+        { error: 'Basis data administrator tidak tersedia pada mode produksi.' },
+        { status: 500 }
+      );
     }
 
     const allAdmins = getAllAdminUsers();

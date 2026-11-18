@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { isDevFallbackAllowed } from '@/lib/security/env';
+import { isSafeCandidateAssetUrl } from '@/lib/security/url-validation';
 import type { Database } from '@/lib/supabase/types';
 import {
   type CandidateRecord,
@@ -15,15 +16,25 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+const safeAssetUrlSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => val === '' || isSafeCandidateAssetUrl(val),
+    'URL aset tidak valid. Hanya path lokal (/uploads/*, /assets/*, /candidates/*) atau HTTPS domain resmi yang diizinkan.'
+  )
+  .nullable()
+  .optional();
+
 const candidateSchema = z.object({
   candidate_number: z.number().int().min(0, 'Nomor urut minimal 0'),
   leader_name: z.string().min(2, 'Nama Calon Chairman minimal 2 karakter'),
   vice_leader_name: z.string().min(2, 'Nama Calon Vice Chairman minimal 2 karakter'),
   vision: z.string().min(5, 'Visi minimal 5 karakter'),
   mission: z.array(z.string()).min(1, 'Minimal sertakan 1 butir misi'),
-  photo_url: z.string().nullable().optional(),
-  chairman_cv_url: z.string().nullable().optional(),
-  vice_chairman_cv_url: z.string().nullable().optional(),
+  photo_url: safeAssetUrlSchema,
+  chairman_cv_url: safeAssetUrlSchema,
+  vice_chairman_cv_url: safeAssetUrlSchema,
   is_active: z.boolean().default(true),
 });
 
@@ -31,7 +42,7 @@ const candidateUpdateSchema = candidateSchema.partial();
 
 export async function GET() {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = await verifyActiveAdminAccess(session);
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -69,9 +80,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_candidates');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized || session?.role === 'auditor') {
+  if (!authCheck.authorized || authCheck.effectiveRole === 'auditor') {
     return NextResponse.json(
       { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak mengelola data kandidat.', code: 'FORBIDDEN' },
       { status: authCheck.authorized ? 403 : authCheck.status }
@@ -190,9 +201,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_candidates');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized || session?.role === 'auditor') {
+  if (!authCheck.authorized || authCheck.effectiveRole === 'auditor') {
     return NextResponse.json(
       { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak memperbarui data kandidat.', code: 'FORBIDDEN' },
       { status: authCheck.authorized ? 403 : authCheck.status }
@@ -295,9 +306,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_candidates');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized || session?.role === 'auditor') {
+  if (!authCheck.authorized || authCheck.effectiveRole === 'auditor') {
     return NextResponse.json(
       { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak menghapus kandidat.', code: 'FORBIDDEN' },
       { status: authCheck.authorized ? 403 : authCheck.status }

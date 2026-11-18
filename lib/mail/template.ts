@@ -1,4 +1,5 @@
 import type { SendPinPayload } from './types';
+import { resolveSafeEmailCtaUrl } from '../security/url-validation.ts';
 
 /**
  * Meloloskan karakter spesial HTML untuk mencegah injeksi HTML atau tampilan rusak pada email client
@@ -14,25 +15,10 @@ export function escapeHtml(text: string): string {
 
 /**
  * Mengonversi path relatif menjadi absolute URL yang valid untuk email client
- * serta mencegah skema berbahaya (javascript:, data:)
+ * dengan strict allowlist protokol (`https:`, `http:`, atau relative `/...`).
  */
 export function resolveSafeCtaUrl(rawUrl?: string): string {
-  const fallback = 'http://localhost:3000/login';
-  if (!rawUrl || typeof rawUrl !== 'string') return fallback;
-  const trimmed = rawUrl.trim();
-
-  // Cegah protokol berbahaya
-  if (/^(javascript|data|vbscript):/i.test(trimmed)) {
-    return fallback;
-  }
-
-  // Jika URL relatif (e.g. '/login'), konversikan menjadi URL lengkap berbasis domain aplikasi
-  if (trimmed.startsWith('/')) {
-    const base = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-    return `${base}${trimmed}`;
-  }
-
-  return trimmed;
+  return resolveSafeEmailCtaUrl(rawUrl);
 }
 
 export function generatePinEmailHtml({ voterName, pin }: Omit<SendPinPayload, 'to'>): string {

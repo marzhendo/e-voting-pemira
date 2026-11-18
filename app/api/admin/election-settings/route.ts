@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getDevElectionSettings, updateDevElectionSettings } from '@/lib/election/dev-settings-store';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
+import { isDevFallbackAllowed } from '@/lib/security/env';
 import type { Database } from '@/lib/supabase/types';
 
 const validDateStringSchema = z
@@ -29,7 +30,7 @@ const updateSettingsSchema = z.object({
 
 export async function GET() {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = await verifyActiveAdminAccess(session);
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -50,17 +51,29 @@ export async function GET() {
       if (!error && data) {
         return NextResponse.json({ success: true, settings: data });
       }
+      console.error('[ElectionSettings] Supabase GET error:', error?.message);
     } catch (err) {
-      console.warn('[ElectionSettings] Supabase error, using dev fallback:', err);
+      console.error('[ElectionSettings] Supabase GET exception:', err);
     }
+    return NextResponse.json(
+      { error: 'Gagal memuat pengaturan pemilihan dari basis data.' },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.json({ success: true, settings: getDevElectionSettings() });
+  if (isDevFallbackAllowed(false)) {
+    return NextResponse.json({ success: true, settings: getDevElectionSettings() });
+  }
+
+  return NextResponse.json(
+    { error: 'Basis data pengaturan pemilihan tidak tersedia.' },
+    { status: 500 }
+  );
 }
 
 export async function PATCH(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_election_settings');
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -70,7 +83,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   // Auditor bersifat read-only mutlak, tidak berhak mengubah pengaturan
-  if (session?.role === 'auditor') {
+  if (authCheck.effectiveRole === 'auditor') {
     return NextResponse.json(
       { error: 'Akses Ditolak: Peran Auditor hanya memiliki hak baca (read-only).' },
       { status: 403 }
@@ -125,7 +138,7 @@ export async function PATCH(request: NextRequest) {
     // 1. Superadmin memiliki wewenang penuh atas konfigurasi sistem, pembukaan/penutupan bilik suara, serta maintenance mode.
     // 2. KPR Admin tidak boleh mengubah maintenance mode teknis jika itu ranah Superadmin/IT Coordinator.
     if (
-      session?.role === 'kpr_admin' &&
+      authCheck.effectiveRole === 'kpr_admin' &&
       maintenance_mode !== undefined &&
       maintenance_mode !== currentMaintenanceMode
     ) {

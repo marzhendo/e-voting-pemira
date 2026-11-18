@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import crypto from 'crypto';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { escapeCsvCell } from '@/lib/utils/csv';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'export_reports');
+  const authCheck = await verifyActiveAdminAccess(session, 'export_reports');
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const isClosed = snapshot.electionSettings.isClosed;
 
     // Auditor dilarang mengekspor tally paslon jika pemungutan suara masih berjalan
-    if (session?.role === 'auditor' && !isClosed) {
+    if (authCheck.effectiveRole === 'auditor' && !isClosed) {
       return NextResponse.json(
         { error: 'Akses Ditolak: Peran Auditor hanya dapat mengekspor rekapitulasi setelah pemilihan resmi ditutup.' },
         { status: 403 }

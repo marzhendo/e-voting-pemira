@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { addSingleVoter } from '@/lib/dpt/store';
+import { isDevFallbackAllowed } from '@/lib/security/env';
 
 const quickAddSchema = z.object({
   nim: z.string().min(4, 'NIM minimal 4 karakter').max(20),
@@ -16,10 +17,13 @@ const quickAddSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_dpt');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_dpt');
 
-  if (!authCheck.authorized) {
-    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+  if (!authCheck.authorized || authCheck.effectiveRole === 'auditor') {
+    return NextResponse.json(
+      { error: authCheck.error || 'Akses Ditolak.' },
+      { status: authCheck.authorized ? 403 : authCheck.status }
+    );
   }
 
   try {
@@ -76,8 +80,13 @@ export async function POST(req: NextRequest) {
           voter: data,
         });
       } catch (err) {
-        console.warn('[DptQuickAdd] Supabase offline, using dev store:', err);
+        console.error('[DptQuickAdd] Supabase exception:', err);
+        return NextResponse.json({ error: 'Gagal menghubungi basis data DPT.' }, { status: 500 });
       }
+    }
+
+    if (!isDevFallbackAllowed(isSupabaseConfigured())) {
+      return NextResponse.json({ error: 'Basis data DPT tidak tersedia pada mode produksi.' }, { status: 500 });
     }
 
     const res = addSingleVoter({

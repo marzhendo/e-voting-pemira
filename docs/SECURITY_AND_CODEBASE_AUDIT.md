@@ -50,6 +50,9 @@ Namun, pada audit menyeluruh lapisan aplikasi dan API routes ditemukan **2 temua
 | **SEC-08** | **MEDIUM** | `app/api/admin/dpt/route.ts` | String pencarian `search` disisipkan langsung ke `.or(...)` PostgREST tanpa sanitasi karakter parser (`,`, `.`, `()`). | **FIXED** |
 | **SEC-09** | **MEDIUM** | `app/api/admin/broadcast-email/route.ts` | `parseInt(generation, 10)` tidak divalidasi `Number.isInteger`, berisiko mengirim `NaN` ke query PostgreSQL. | **FIXED** |
 | **SEC-10** | **MEDIUM** | `next.config.mjs` | Belum menyertakan HTTP Security Headers standar (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`). | **FIXED** |
+| **SEC-11** | **HIGH** | `app/api/admin/candidates/route.ts`, `lib/mail/template.ts`, `next.config.mjs` | Stored XSS via skema URL bebas (`javascript:`) pada `photo_url`/`chairman_cv_url`/`vice_chairman_cv_url`, email CTA denylist fallback `localhost`, serta belum adanya header `Content-Security-Policy` (CSP) & `HSTS`. | **FIXED (Tahap 3)** |
+| **SEC-12** | **HIGH** | `app/api/admin/**`, `lib/rbac/active-admin.ts` | Sesi JWT admin stateless (15 menit) tidak mengecek status pencabutan `admin_users.is_active` secara real-time, serta 4 admin route (`quick-add`, `manage-admins`, `broadcast-email`, `election-settings`) masih fail-open ke dev-store saat Supabase error. | **FIXED (Tahap 3)** |
+| **SEC-13** | **MEDIUM** | `app/api/admin/upload/route.ts`, `nginx.conf.example`, `package.json` | Cek path traversal `DELETE /api/admin/upload` memakai regex strip (bukan `path.resolve()`), template Nginx memakai `$proxy_add_x_forwarded_for` yang rawan IP-spoofing rate limit, dan `package.json` belum mem-pin `next` minimal `^14.2.35` (CVE-2025-29927). | **FIXED (Tahap 3)** |
 
 ---
 

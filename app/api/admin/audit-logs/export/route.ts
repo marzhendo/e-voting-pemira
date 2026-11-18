@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { fetchAuditLogsSnapshot } from '@/lib/audit/query';
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'view_audit_logs');
+  const authCheck = await verifyActiveAdminAccess(session, 'view_audit_logs');
 
   if (!authCheck.authorized) {
     return NextResponse.json(

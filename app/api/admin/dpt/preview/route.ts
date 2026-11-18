@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getAllVoters } from '@/lib/dpt/store';
 
@@ -19,7 +19,7 @@ const dptRowSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_dpt');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_dpt');
 
   if (!authCheck.authorized) {
     return NextResponse.json(

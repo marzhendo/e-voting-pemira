@@ -15,6 +15,7 @@ import {
   Award,
 } from 'lucide-react';
 import type { CandidateItem } from '@/components/ballot/candidate-card';
+import { sanitizeCandidateAssetUrl } from '@/lib/security/url-validation';
 
 interface CandidateDetailModalProps {
   isOpen: boolean;
@@ -25,17 +26,7 @@ interface CandidateDetailModalProps {
 }
 
 function sanitizeCvUrl(url?: string | null, fallbackUrl: string = '#'): string {
-  if (!url || typeof url !== 'string') return fallbackUrl;
-  const trimmed = url.trim();
-  // Cegah injeksi protokol berbahaya (javascript:, data:, vbscript:)
-  if (/^(javascript|data|vbscript):/i.test(trimmed)) {
-    return fallbackUrl;
-  }
-  // Hanya izinkan path lokal yang aman atau URL http/https
-  if (trimmed.startsWith('/') || /^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-  return fallbackUrl;
+  return sanitizeCandidateAssetUrl(url, fallbackUrl);
 }
 
 export function CandidateDetailModal({
@@ -140,10 +131,10 @@ export function CandidateDetailModal({
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-surface-container-low p-6 rounded-2xl border border-outline-variant/20">
             {/* Foto Paslon */}
             <div className="relative w-40 h-48 sm:w-48 sm:h-56 shrink-0 rounded-2xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center shadow-md">
-              {candidate.photo_url ? (
+              {sanitizeCandidateAssetUrl(candidate.photo_url) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={candidate.photo_url}
+                  src={sanitizeCandidateAssetUrl(candidate.photo_url)}
                   alt={`Paslon ${numberStr}`}
                   className="w-full h-full object-cover object-top"
                 />

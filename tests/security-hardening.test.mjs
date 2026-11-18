@@ -4,9 +4,15 @@ import crypto from 'node:crypto';
 
 import { isProductionEnvironment, isDevFallbackAllowed } from '../lib/security/env.ts';
 import { SlidingWindowRateLimiter } from '../lib/security/rate-limit.ts';
-import { validateFileMagicBytes } from '../lib/security/upload-validation.ts';
+import { validateFileMagicBytes, resolveSafeUploadPath } from '../lib/security/upload-validation.ts';
+import {
+  isSafeCandidateAssetUrl,
+  sanitizeCandidateAssetUrl,
+  resolveSafeEmailCtaUrl,
+} from '../lib/security/url-validation.ts';
 import { escapeCsvCell } from '../lib/utils/csv.ts';
 import { verifyAdminAccess } from '../lib/rbac/permissions.ts';
+import path from 'node:path';
 
 test('Security Hardening Verification Suite', async (t) => {
   await t.test('1. Environment resolver detects production via either NODE_ENV or APP_ENV', () => {
@@ -117,5 +123,57 @@ test('Security Hardening Verification Suite', async (t) => {
 
     assert.strictEqual(isExactValid, true);
     assert.strictEqual(isExactFake, false);
+  });
+
+  await t.test('7. Candidate Asset & Email CTA URL allowlist blocks javascript:, data:, traversal, and untrusted external origins', () => {
+    // Allowed local & trusted HTTPS assets
+    assert.strictEqual(isSafeCandidateAssetUrl('/uploads/candidates/1-abc.webp'), true);
+    assert.strictEqual(isSafeCandidateAssetUrl('/uploads/cv/1-cv.pdf'), true);
+    assert.strictEqual(isSafeCandidateAssetUrl('/assets/img/hmif-logo.png'), true);
+    assert.strictEqual(isSafeCandidateAssetUrl('https://pemirahmif.com/uploads/cv/paslon1.pdf'), true);
+
+    // Blocked XSS & spoofing vectors
+    assert.strictEqual(isSafeCandidateAssetUrl('javascript:alert(1)'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('JAVASCRIPT:alert(document.cookie)'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('data:text/html,<script>alert(1)</script>'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('vbscript:msgbox(1)'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('//evil.example/payload.js'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('/uploads/../../.env.local'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('https://evil.example/fake.pdf'), false);
+    assert.strictEqual(isSafeCandidateAssetUrl('http://pemirahmif.com/uploads/cv/1.pdf'), false);
+
+    assert.strictEqual(sanitizeCandidateAssetUrl('javascript:alert(1)', '/fallback.pdf'), '/fallback.pdf');
+
+    // Email CTA URL allowlist
+    assert.strictEqual(resolveSafeEmailCtaUrl('javascript:alert(1)').endsWith('/login'), true);
+    assert.strictEqual(resolveSafeEmailCtaUrl('//evil.example/phish').endsWith('/login'), true);
+    assert.strictEqual(resolveSafeEmailCtaUrl('/vote').endsWith('/vote'), true);
+    assert.strictEqual(resolveSafeEmailCtaUrl('https://pemirahmif.com/login'), 'https://pemirahmif.com/login');
+  });
+
+  await t.test('8. Upload DELETE canonical path resolver blocks directory traversal', () => {
+    const uploadsRoot = path.resolve(process.cwd(), 'public', 'uploads');
+
+    const safeTarget = resolveSafeUploadPath('/uploads/candidates/1-photo.webp', uploadsRoot);
+    assert.ok(safeTarget && safeTarget.startsWith(uploadsRoot));
+
+    assert.strictEqual(resolveSafeUploadPath('/uploads/../.env.local', uploadsRoot), null);
+    assert.strictEqual(resolveSafeUploadPath('/uploads/candidates/../../package.json', uploadsRoot), null);
+    assert.strictEqual(resolveSafeUploadPath('/uploads/..\\secret.txt', uploadsRoot), null);
+    assert.strictEqual(resolveSafeUploadPath('/uploads/candidates/file.png\0.jpg', uploadsRoot), null);
+    assert.strictEqual(resolveSafeUploadPath('/assets/img/hmif-logo.png', uploadsRoot), null);
+  });
+
+  await t.test('9. Next.js security headers include CSP, DENY frame options, nosniff, and Referrer-Policy', async () => {
+    const { default: nextConfig } = await import('../next.config.mjs');
+    const headerRules = await nextConfig.headers();
+    const globalHeaders = headerRules[0]?.headers || [];
+    const headerMap = new Map(globalHeaders.map((h) => [h.key, h.value]));
+
+    assert.ok(headerMap.get('Content-Security-Policy')?.includes("object-src 'none'"));
+    assert.ok(headerMap.get('Content-Security-Policy')?.includes("frame-ancestors 'none'"));
+    assert.strictEqual(headerMap.get('X-Frame-Options'), 'DENY');
+    assert.strictEqual(headerMap.get('X-Content-Type-Options'), 'nosniff');
+    assert.strictEqual(headerMap.get('Referrer-Policy'), 'strict-origin-when-cross-origin');
   });
 });

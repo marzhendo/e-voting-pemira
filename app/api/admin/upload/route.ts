@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import crypto from 'node:crypto';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
-import { validateFileMagicBytes } from '@/lib/security/upload-validation';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
+import { validateFileMagicBytes, resolveSafeUploadPath } from '@/lib/security/upload-validation';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
@@ -17,9 +17,9 @@ const ALLOWED_PDF_TYPES = ['application/pdf'];
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_candidates');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized || session?.role === 'auditor') {
+  if (!authCheck.authorized || authCheck.effectiveRole === 'auditor') {
     return NextResponse.json(
       { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak mengunggah berkas kandidat.', code: 'FORBIDDEN' },
       { status: authCheck.authorized ? 403 : authCheck.status }
@@ -122,9 +122,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_candidates');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized || session?.role === 'auditor') {
+  if (!authCheck.authorized || authCheck.effectiveRole === 'auditor') {
     return NextResponse.json(
       { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak menghapus berkas kandidat.', code: 'FORBIDDEN' },
       { status: authCheck.authorized ? 403 : authCheck.status }
@@ -135,16 +135,15 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const relativeUrl = searchParams.get('path');
 
-    if (!relativeUrl || !relativeUrl.startsWith('/uploads/')) {
+    const uploadsRoot = path.join(process.cwd(), 'public', 'uploads');
+    const fullPath = relativeUrl ? resolveSafeUploadPath(relativeUrl, uploadsRoot) : null;
+
+    if (!fullPath) {
       return NextResponse.json(
         { error: 'Path berkas tidak valid atau di luar direktori uploads.' },
         { status: 400 }
       );
     }
-
-    // Mencegah path traversal attack
-    const cleanSubPath = path.normalize(relativeUrl.replace(/^\/uploads\//, '')).replace(/^(\.\.[\/\\])+/, '');
-    const fullPath = path.join(process.cwd(), 'public', 'uploads', cleanSubPath);
 
     if (existsSync(fullPath)) {
       await fs.unlink(fullPath);

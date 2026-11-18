@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
@@ -10,7 +10,7 @@ import { getElectionTallySnapshot } from '@/lib/ballots/tally-service';
 
 export async function GET() {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = await verifyActiveAdminAccess(session);
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -26,7 +26,7 @@ export async function GET() {
     const snapshot = await getElectionTallySnapshot();
 
     // Auditor hanya berhak melihat perolehan suara paslon jika pemungutan suara telah ditutup resmi
-    if (session?.role === 'auditor' && !snapshot.electionSettings.isClosed) {
+    if (authCheck.effectiveRole === 'auditor' && !snapshot.electionSettings.isClosed) {
       return NextResponse.json(
         {
           error: 'Akses Ditolak: Peran Auditor hanya diperbolehkan melihat tally suara setelah pemungutan suara resmi ditutup oleh KPR.',
@@ -57,13 +57,13 @@ export async function GET() {
  */
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = await verifyActiveAdminAccess(session);
 
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
 
-  if (session?.role !== 'super_admin') {
+  if (authCheck.effectiveRole !== 'super_admin') {
     return NextResponse.json(
       { error: 'Akses Ditolak: Fitur reset surat suara hanya dapat dieksekusi oleh Superadmin.' },
       { status: 403 }

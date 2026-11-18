@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
-import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { queryVoters, deleteSingleVoter, deleteVotersBatch, resetAllVoters, getAllVoters } from '@/lib/dpt/store';
 import { recordAuditLog } from '@/lib/audit/store';
@@ -22,7 +22,7 @@ const DeleteDptSchema = z.object({
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = await verifyActiveAdminAccess(session);
 
   if (!authCheck.authorized) {
     return NextResponse.json(
@@ -141,9 +141,9 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session, 'manage_dpt');
+  const authCheck = await verifyActiveAdminAccess(session, 'manage_dpt');
 
-  if (!authCheck.authorized) {
+  if (!authCheck.authorized || !session) {
     return NextResponse.json(
       { error: authCheck.error || 'Akses Ditolak.', code: 'FORBIDDEN' },
       { status: authCheck.status }
@@ -151,12 +151,14 @@ export async function DELETE(req: NextRequest) {
   }
 
   // Wewenang hapus dan reset DPT secara ketat dibatasi hanya untuk super_admin
-  if (session?.role !== 'super_admin') {
+  if (authCheck.effectiveRole !== 'super_admin') {
     return NextResponse.json(
       { error: 'Akses Ditolak: Fitur penghapusan atau reset DPT hanya dapat diakses oleh peran Superadmin.' },
       { status: 403 }
     );
   }
+
+  const actorRole = authCheck.effectiveRole;
 
   try {
     const body = await req.json();
@@ -226,7 +228,7 @@ export async function DELETE(req: NextRequest) {
           recordAuditLog({
             actorEmail: session.email,
             actorName: session.name,
-            actorRole: session.role,
+            actorRole,
             action: 'DPT_DELETE',
             description: `Menghapus pemilih DPT: ${voter.name} (NIM: ${voter.nim})${voter.has_voted ? ' [PERINGATAN: Pemilih sudah memilih]' : ''}.`,
             ipAddress: clientIp,
@@ -250,7 +252,7 @@ export async function DELETE(req: NextRequest) {
       recordAuditLog({
         actorEmail: session.email,
         actorName: session.name,
-        actorRole: session.role,
+        actorRole,
         action: 'DPT_DELETE',
         description: `Menghapus pemilih DPT: ${delResult.voter?.name} (NIM: ${delResult.voter?.nim})${delResult.voter?.has_voted ? ' [PERINGATAN: Pemilih sudah memilih]' : ''} (Dev Mode).`,
         ipAddress: clientIp,
@@ -343,7 +345,7 @@ export async function DELETE(req: NextRequest) {
       recordAuditLog({
         actorEmail: session.email,
         actorName: session.name,
-        actorRole: session.role,
+        actorRole,
         action: 'DPT_BATCH_DELETE',
         description: `Menghapus massal secara selektif sejumlah ${finalCount} data pemilih DPT.`,
         ipAddress: clientIp,
@@ -373,7 +375,7 @@ export async function DELETE(req: NextRequest) {
           recordAuditLog({
             actorEmail: session.email,
             actorName: session.name,
-            actorRole: session.role,
+            actorRole,
             action: 'DPT_RESET',
             description: 'Mereset status voting seluruh pemilih menjadi Belum Memilih (Simulasi DPT).',
             ipAddress: clientIp,
@@ -395,7 +397,7 @@ export async function DELETE(req: NextRequest) {
           recordAuditLog({
             actorEmail: session.email,
             actorName: session.name,
-            actorRole: session.role,
+            actorRole,
             action: 'DPT_RESET',
             description: 'Mengosongkan seluruh data pemilih mahasiswa DPT (kecuali akun Superadmin).',
             ipAddress: clientIp,
@@ -432,7 +434,7 @@ export async function DELETE(req: NextRequest) {
           recordAuditLog({
             actorEmail: session.email,
             actorName: session.name,
-            actorRole: session.role,
+            actorRole,
             action: 'DPT_RESET',
             description: 'Mereset data DPT dan memulihkan data pemilih standar ke basis data.',
             ipAddress: clientIp,
@@ -451,7 +453,7 @@ export async function DELETE(req: NextRequest) {
       recordAuditLog({
         actorEmail: session.email,
         actorName: session.name,
-        actorRole: session.role,
+        actorRole,
         action: 'DPT_RESET',
         description: `Mereset data DPT dengan mode: ${selectedMode} (Dev Mode).`,
         ipAddress: clientIp,
