@@ -7,6 +7,7 @@ import { queryVoters, deleteSingleVoter, deleteVotersBatch, resetAllVoters, getA
 import { recordAuditLog } from '@/lib/audit/store';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { getRootSuperadminEmail, isRootSuperadminEmail } from '@/lib/auth/constants';
+import { isDevFallbackAllowed } from '@/lib/security/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,12 +50,16 @@ export async function GET(req: NextRequest) {
         .from('voters_whitelist')
         .select('id, nim, name, email, generation, has_voted, created_at', { count: 'exact' });
 
-      if (search.trim()) {
-        query = query.or(`nim.ilike.%${search.trim()}%,name.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`);
+      const sanitizedSearch = search.trim().replace(/[^a-zA-Z0-9\s@._-]/g, '');
+      if (sanitizedSearch) {
+        query = query.or(`nim.ilike.%${sanitizedSearch}%,name.ilike.%${sanitizedSearch}%,email.ilike.%${sanitizedSearch}%`);
       }
 
       if (generation && generation !== 'all') {
-        query = query.eq('generation', Number(generation));
+        const parsedGen = Number(generation);
+        if (Number.isInteger(parsedGen)) {
+          query = query.eq('generation', parsedGen);
+        }
       }
 
       if (status === 'voted') {
@@ -90,12 +95,13 @@ export async function GET(req: NextRequest) {
         });
       }
     } catch (err) {
-      console.warn('[AdminDptRoute] Database offline, checking dev fallback:', err);
+      console.error('[AdminDptRoute] Database error:', err);
+      return NextResponse.json({ error: 'Gagal memuat data pemilih dari basis data.' }, { status: 500 });
     }
   }
 
   // Dev store jika Supabase belum online
-  if (process.env.APP_ENV !== 'production') {
+  if (isDevFallbackAllowed(isSupabaseConfigured())) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('q') || '';
     const generation = searchParams.get('generation');

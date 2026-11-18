@@ -6,14 +6,9 @@ import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
 import { calculateLiveTally } from '@/lib/ballots/store';
 import { recordAuditLog } from '@/lib/audit/store';
+import { escapeCsvCell } from '@/lib/utils/csv';
 
 export const dynamic = 'force-dynamic';
-
-function escapeCsvCell(val: string | number | null | undefined): string {
-  if (val === null || val === undefined) return '""';
-  const str = String(val).replace(/"/g, '""');
-  return `"${str}"`;
-}
 
 export async function GET() {
   const session = await getSession();

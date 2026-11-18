@@ -5,6 +5,7 @@ import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
+import { isDevFallbackAllowed } from '@/lib/security/env';
 import type { Database } from '@/lib/supabase/types';
 import {
   type CandidateRecord,
@@ -25,6 +26,8 @@ const candidateSchema = z.object({
   vice_chairman_cv_url: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
 });
+
+const candidateUpdateSchema = candidateSchema.partial();
 
 export async function GET() {
   const session = await getSession();
@@ -57,7 +60,7 @@ export async function GET() {
     }
   }
 
-  if (process.env.APP_ENV !== 'production') {
+  if (isDevFallbackAllowed(isSupabaseConfigured())) {
     return NextResponse.json({ success: true, candidates: getDevCandidates() });
   }
 
@@ -66,12 +69,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = verifyAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized) {
+  if (!authCheck.authorized || session?.role === 'auditor') {
     return NextResponse.json(
-      { error: authCheck.error || 'Akses Ditolak.', code: 'FORBIDDEN' },
-      { status: authCheck.status }
+      { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak mengelola data kandidat.', code: 'FORBIDDEN' },
+      { status: authCheck.authorized ? 403 : authCheck.status }
     );
   }
 
@@ -135,11 +138,12 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: true, candidate: data });
         }
       } catch (dbErr) {
-        console.warn('[AdminCandidatesRoute] DB offline during insert, using dev memory store:', dbErr);
+        console.error('[AdminCandidatesRoute] DB error during insert:', dbErr);
+        return NextResponse.json({ error: 'Gagal terhubung ke basis data kandidat.' }, { status: 500 });
       }
     }
 
-    if (process.env.APP_ENV !== 'production') {
+    if (isDevFallbackAllowed(isSupabaseConfigured())) {
       const created: CandidateRecord = {
         id: `dev-cand-${Date.now()}`,
         candidate_number: newCandidate.candidate_number,
@@ -186,30 +190,41 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = verifyAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized) {
+  if (!authCheck.authorized || session?.role === 'auditor') {
     return NextResponse.json(
-      { error: authCheck.error || 'Akses Ditolak.', code: 'FORBIDDEN' },
-      { status: authCheck.status }
+      { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak memperbarui data kandidat.', code: 'FORBIDDEN' },
+      { status: authCheck.authorized ? 403 : authCheck.status }
     );
   }
 
   try {
     const body = await req.json();
-    const { id, ...updates } = body;
+    const { id, ...rawUpdates } = body;
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       return NextResponse.json({ error: 'ID kandidat wajib disertakan.' }, { status: 400 });
     }
+
+    const parsedUpdates = candidateUpdateSchema.safeParse(rawUpdates);
+    if (!parsedUpdates.success) {
+      return NextResponse.json(
+        { error: 'Data pembaruan kandidat tidak valid.', details: parsedUpdates.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const updates = parsedUpdates.data;
 
     if (isSupabaseConfigured()) {
       try {
         const adminSupabase = createAdminClient();
-        const updatePayload: Database['public']['Tables']['candidates']['Update'] = { ...updates };
-        if (updatePayload.photo_url === null || updatePayload.photo_url === undefined) {
-          updatePayload.photo_url = '';
-        }
+        const { photo_url, ...restUpdates } = updates;
+        const updatePayload: Database['public']['Tables']['candidates']['Update'] = {
+          ...restUpdates,
+          ...(photo_url !== undefined ? { photo_url: photo_url ?? '' } : {}),
+        };
 
         const { data, error } = await adminSupabase
           .from('candidates')
@@ -243,11 +258,12 @@ export async function PUT(req: NextRequest) {
           return NextResponse.json({ success: true, candidate: data });
         }
       } catch (dbErr) {
-        console.warn('[AdminCandidatesRoute] DB offline during update, using dev memory store:', dbErr);
+        console.error('[AdminCandidatesRoute] DB error during update:', dbErr);
+        return NextResponse.json({ error: 'Gagal terhubung ke basis data saat memperbarui kandidat.' }, { status: 500 });
       }
     }
 
-    if (process.env.APP_ENV !== 'production') {
+    if (isDevFallbackAllowed(isSupabaseConfigured())) {
       const currentList = getDevCandidates();
       const updatedList = currentList.map((c) => (c.id === id ? { ...c, ...updates } : c));
       setDevCandidates(updatedList);
@@ -279,12 +295,12 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = verifyAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized) {
+  if (!authCheck.authorized || session?.role === 'auditor') {
     return NextResponse.json(
-      { error: authCheck.error || 'Akses Ditolak.', code: 'FORBIDDEN' },
-      { status: authCheck.status }
+      { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak menghapus kandidat.', code: 'FORBIDDEN' },
+      { status: authCheck.authorized ? 403 : authCheck.status }
     );
   }
 
@@ -374,11 +390,12 @@ export async function DELETE(req: NextRequest) {
 
         return NextResponse.json({ success: true, message: 'Kandidat berhasil dihapus dari database.' });
       } catch (dbErr) {
-        console.warn('[AdminCandidatesRoute] DB offline during delete, using dev memory store:', dbErr);
+        console.error('[AdminCandidatesRoute] DB error during delete:', dbErr);
+        return NextResponse.json({ error: 'Gagal terhubung ke basis data saat menghapus kandidat.' }, { status: 500 });
       }
     }
 
-    if (process.env.APP_ENV !== 'production') {
+    if (isDevFallbackAllowed(isSupabaseConfigured())) {
       const filtered = getDevCandidates().filter((c) => c.id !== id);
       setDevCandidates(filtered);
 

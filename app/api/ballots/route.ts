@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession, createSessionToken, setSessionCookie, type SessionUser } from '@/lib/auth/session';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
+import { isProductionEnvironment, isDevFallbackAllowed } from '@/lib/security/env';
 import { generateReceipt } from '@/lib/receipt/generator';
 import { castBallotAtomicDev } from '@/lib/ballots/store';
 
@@ -75,7 +76,35 @@ export async function POST(request: NextRequest) {
     // 3. Hasilkan Digital Receipt Kriptografis di Server
     const receipt = generateReceipt();
 
-    // 4. Eksekusi Transaksi Atomik Database via Stored Procedure
+    // 4. Mode Pengembangan Offline (hanya saat Supabase tidak dikonfigurasi & non-produksi)
+    if (!isSupabaseConfigured()) {
+      if (!isDevFallbackAllowed(false)) {
+        return NextResponse.json(
+          { error: 'Konfigurasi basis data tidak tersedia.', code: 'SERVER_ERROR' },
+          { status: 500 }
+        );
+      }
+
+      const devResult = castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
+      if (!devResult.success) {
+        return NextResponse.json({ error: devResult.message, code: devResult.code }, { status: 400 });
+      }
+      const updatedUser: SessionUser = { ...session, hasVoted: true };
+      const updatedToken = await createSessionToken(updatedUser);
+      setSessionCookie(updatedToken);
+
+      return NextResponse.json({
+        success: true,
+        code: 'SUCCESS',
+        message: 'Suara kamu berhasil dicatat secara sah (Mode Pengujian Lokal).',
+        receipt: {
+          token: receipt.rawToken,
+          date: receipt.sessionDate,
+        },
+      });
+    }
+
+    // 5. Eksekusi Transaksi Atomik Database via Stored Procedure (Fail-Closed saat DB live aktif)
     const adminSupabase = createAdminClient();
     const { data: rpcResult, error: rpcError } = await adminSupabase.rpc('cast_ballot_secure', {
       p_nim: session.nim,
@@ -84,41 +113,24 @@ export async function POST(request: NextRequest) {
     });
 
     if (rpcError) {
-      console.warn('[CastBallotRoute] Database RPC error:', rpcError);
-
-      if (process.env.APP_ENV !== 'production') {
-        const devResult = castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
-        if (!devResult.success) {
-          return NextResponse.json({ error: devResult.message, code: devResult.code }, { status: 400 });
-        }
-        const updatedUser: SessionUser = { ...session, hasVoted: true };
-        const updatedToken = await createSessionToken(updatedUser);
-        setSessionCookie(updatedToken);
-
-        return NextResponse.json({
-          success: true,
-          code: 'SUCCESS',
-          message: 'Suara kamu berhasil dicatat secara sah (Mode Pengujian Lokal).',
-          receipt: {
-            token: receipt.rawToken,
-            date: receipt.sessionDate,
-          },
-        });
-      }
-
+      console.error('[CastBallotRoute] Database RPC error (fail-closed):', rpcError);
       return NextResponse.json(
         {
-          error: 'Terjadi kegagalan transaksi pada database bilik suara.',
+          error: 'Terjadi kegagalan transaksi pada database bilik suara. Suara tidak tercatat — silakan coba kembali.',
           code: 'TRANSACTION_FAILED',
         },
         { status: 500 }
       );
     }
 
-    // 5. Tangani Respon Bisnis dari Stored Procedure
+    // 6. Tangani Respon Bisnis dari Stored Procedure
     if (!rpcResult || !rpcResult.success) {
-      // In non-production, if voter is a mock account not in remote DB, fallback to dev atomic store
-      if (process.env.APP_ENV !== 'production' && (session.id?.startsWith('mock-') || session.id?.startsWith('dev-'))) {
+      // Hanya izinkan mock fallback untuk akun simulasi eksplisit non-produksi ketika belum ada di DB remote
+      if (
+        !isProductionEnvironment() &&
+        rpcResult?.code === 'NOT_REGISTERED' &&
+        (session.id?.startsWith('mock-') || session.id?.startsWith('dev-'))
+      ) {
         const devResult = castBallotAtomicDev(session.nim, candidateId, receipt.receiptHash);
         if (devResult.success) {
           const updatedUser: SessionUser = { ...session, hasVoted: true };

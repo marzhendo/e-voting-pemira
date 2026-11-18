@@ -1,4 +1,5 @@
 import { resolveUserIdentity, type IdentityResolutionResult } from './voter';
+import { isProductionEnvironment } from '@/lib/security/env';
 
 export interface DummyAccount {
   id: string;
@@ -87,7 +88,7 @@ export const DUMMY_ACCOUNTS: DummyAccount[] = [
  * In non-production environments (development, staging, test), ENABLE_DUMMY_AUTH must be 'true'.
  */
 export function isDummyAuthAllowed(): boolean {
-  if (process.env.APP_ENV === 'production') {
+  if (isProductionEnvironment()) {
     return false;
   }
 

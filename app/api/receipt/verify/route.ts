@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { verifyReceiptToken } from '@/lib/receipt/generator';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { publicVerifyRateLimiter } from '@/lib/security/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +34,29 @@ function formatVotingDate(isoDate?: string | null): string {
   }
 }
 
+function checkVerifyRateLimit(request: NextRequest): NextResponse | null {
+  const clientIp = getClientIp(request.headers);
+  const rateCheck = publicVerifyRateLimiter.consume(`receipt-verify:${clientIp}`);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        valid: false,
+        verified: false,
+        message: `Terlalu banyak permintaan verifikasi. Silakan coba lagi dalam ${rateCheck.retryAfterSeconds} detik.`,
+      },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) },
+      }
+    );
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
+  const limited = checkVerifyRateLimit(request);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const rawToken = searchParams.get('token');
@@ -74,6 +98,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = checkVerifyRateLimit(request);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const parsed = verifyReceiptSchema.safeParse(body);

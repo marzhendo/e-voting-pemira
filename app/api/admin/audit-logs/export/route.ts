@@ -3,14 +3,9 @@ import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { getAllAuditLogs, queryAuditLogs, recordAuditLog, type AuditLogEntry, type AuditActionType } from '@/lib/audit/store';
 import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/admin';
+import { escapeCsvCell } from '@/lib/utils/csv';
 
 export const dynamic = 'force-dynamic';
-
-function escapeCsvCell(val: string | number | null | undefined): string {
-  if (val === null || val === undefined) return '""';
-  const str = String(val).replace(/"/g, '""');
-  return `"${str}"`;
-}
 
 function getLogDescription(action: string, details: any): string {
   if (details?.description) return String(details.description);

@@ -52,7 +52,13 @@ export async function GET(request: NextRequest) {
 
       if (targetGroup === 'not_voted') query = query.eq('has_voted', false);
       if (targetGroup === 'voted') query = query.eq('has_voted', true);
-      if (generation !== 'all') query = query.eq('generation', parseInt(generation, 10));
+      if (generation !== 'all') {
+        const parsedGen = Number(generation);
+        if (!Number.isInteger(parsedGen) || parsedGen < 2000 || parsedGen > 2100) {
+          return NextResponse.json({ error: 'Parameter angkatan tidak valid.' }, { status: 400 });
+        }
+        query = query.eq('generation', parsedGen);
+      }
 
       const { data: voters, error } = await query;
       if (!error && voters) {
@@ -133,7 +139,13 @@ export async function POST(request: NextRequest) {
 
       if (targetGroup === 'not_voted') query = query.eq('has_voted', false);
       if (targetGroup === 'voted') query = query.eq('has_voted', true);
-      if (generation !== 'all') query = query.eq('generation', parseInt(generation, 10));
+      if (generation !== 'all') {
+        const parsedGen = Number(generation);
+        if (!Number.isInteger(parsedGen) || parsedGen < 2000 || parsedGen > 2100) {
+          return NextResponse.json({ error: 'Parameter angkatan tidak valid.' }, { status: 400 });
+        }
+        query = query.eq('generation', parsedGen);
+      }
 
       const { data, error } = await query;
       if (error) {

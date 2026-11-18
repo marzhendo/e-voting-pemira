@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import crypto from 'node:crypto';
 import { getSession } from '@/lib/auth/session';
 import { verifyAdminAccess } from '@/lib/rbac/permissions';
+import { validateFileMagicBytes } from '@/lib/security/upload-validation';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
@@ -15,20 +17,12 @@ const ALLOWED_PDF_TYPES = ['application/pdf'];
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = verifyAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized) {
+  if (!authCheck.authorized || session?.role === 'auditor') {
     return NextResponse.json(
-      { error: authCheck.error || 'Akses Ditolak.', code: 'FORBIDDEN' },
-      { status: authCheck.status }
-    );
-  }
-
-  // Auditor bersifat read-only
-  if (session?.role === 'auditor') {
-    return NextResponse.json(
-      { error: 'Akses Ditolak: Peran Auditor hanya memiliki hak baca (read-only).' },
-      { status: 403 }
+      { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak mengunggah berkas kandidat.', code: 'FORBIDDEN' },
+      { status: authCheck.authorized ? 403 : authCheck.status }
     );
   }
 
@@ -77,17 +71,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ekstensi berkas yang aman
-    let extension = '.bin';
-    if (mimeType === 'image/jpeg') extension = '.jpg';
-    else if (mimeType === 'image/png') extension = '.png';
-    else if (mimeType === 'image/webp') extension = '.webp';
-    else if (mimeType === 'application/pdf') extension = '.pdf';
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // Validasi Magic Bytes asli berkas (mencegah MIME spoofing / file berbahaya ber-header palsu)
+    const magicCheck = validateFileMagicBytes(buffer, mimeType);
+    if (!magicCheck.valid || !magicCheck.extension) {
+      return NextResponse.json(
+        {
+          error: 'Isi berkas tidak valid atau tidak sesuai dengan format yang dinyatakan (magic bytes mismatch).',
+          code: 'INVALID_FILE_SIGNATURE',
+        },
+        { status: 400 }
+      );
+    }
 
     const safeCandidatePrefix = candidateNumber.replace(/[^a-zA-Z0-9_-]/g, '');
     const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const filename = `${safeCandidatePrefix}-${timestamp}-${randomSuffix}${extension}`;
+    const randomSuffix = crypto.randomBytes(4).toString('hex');
+    const filename = `${safeCandidatePrefix}-${timestamp}-${randomSuffix}${magicCheck.extension}`;
 
     const targetDir = path.join(process.cwd(), 'public', 'uploads', subfolder);
     if (!existsSync(targetDir)) {
@@ -95,8 +97,6 @@ export async function POST(request: NextRequest) {
     }
 
     const targetFilePath = path.join(targetDir, filename);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
 
     await fs.writeFile(targetFilePath, buffer);
 
@@ -122,12 +122,12 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
-  const authCheck = verifyAdminAccess(session);
+  const authCheck = verifyAdminAccess(session, 'manage_candidates');
 
-  if (!authCheck.authorized) {
+  if (!authCheck.authorized || session?.role === 'auditor') {
     return NextResponse.json(
-      { error: authCheck.error || 'Akses Ditolak.', code: 'FORBIDDEN' },
-      { status: authCheck.status }
+      { error: authCheck.error || 'Akses Ditolak: Anda tidak memiliki hak menghapus berkas kandidat.', code: 'FORBIDDEN' },
+      { status: authCheck.authorized ? 403 : authCheck.status }
     );
   }
 

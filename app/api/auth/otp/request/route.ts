@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { requestVoterOtp } from '@/lib/auth/otp';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { otpRequestRateLimiter } from '@/lib/security/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +31,23 @@ const RequestOtpSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req.headers);
+    const rateCheck = otpRequestRateLimiter.consume(`otp-req:${clientIp}`);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'RATE_LIMITED',
+          cooldownSeconds: rateCheck.retryAfterSeconds,
+          error: `Terlalu banyak permintaan PIN dari jaringan kamu. Silakan tunggu ${rateCheck.retryAfterSeconds} detik.`,
+        },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) },
+        }
+      );
+    }
+
     const body = await req.json();
     const parsed = RequestOtpSchema.safeParse(body);
 

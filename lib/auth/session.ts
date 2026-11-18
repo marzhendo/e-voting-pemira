@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import type { AdminRole } from '@/lib/supabase/types';
+import { isProductionEnvironment } from '@/lib/security/env';
 
 export const SESSION_COOKIE_NAME = 'hmif_voting_session';
 export const SESSION_MAX_AGE_SECONDS = 15 * 60; // 15 menit sesuai batas PRD bilik suara
@@ -24,10 +25,12 @@ interface SessionJwtPayload extends SessionUser {
 }
 
 function getSessionSecret(): Uint8Array {
-  const secret = process.env.SESSION_SECRET || 'dev-session-secret-must-be-changed-in-production-at-least-32-chars';
-  if (process.env.APP_ENV === 'production' && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)) {
+  const isProd = isProductionEnvironment();
+  const configuredSecret = process.env.SESSION_SECRET;
+  if (isProd && (!configuredSecret || configuredSecret.length < 32)) {
     throw new Error('FATAL SECURITY ERROR: SESSION_SECRET must be at least 32 characters in production.');
   }
+  const secret = configuredSecret || 'dev-session-secret-must-be-changed-in-production-at-least-32-chars';
   return new TextEncoder().encode(secret);
 }
 

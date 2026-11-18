@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { verifyVoterOtp } from '@/lib/auth/otp';
+import { getClientIp } from '@/lib/auth/client-ip';
+import { otpVerifyRateLimiter } from '@/lib/security/rate-limit';
 import {
   createSessionToken,
   SESSION_COOKIE_NAME,
@@ -17,6 +19,22 @@ const VerifyOtpSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req.headers);
+    const rateCheck = otpVerifyRateLimiter.consume(`otp-verify:${clientIp}`);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'RATE_LIMITED',
+          error: `Terlalu banyak percobaan verifikasi. Mohon tunggu ${rateCheck.retryAfterSeconds} detik sebelum mencoba kembali.`,
+        },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) },
+        }
+      );
+    }
+
     const body = await req.json();
     const parsed = VerifyOtpSchema.safeParse(body);
 

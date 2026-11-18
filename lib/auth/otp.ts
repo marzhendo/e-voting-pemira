@@ -6,6 +6,7 @@ import { smtpMailService } from '@/lib/mail/smtp-service';
 import { findVoterByIdentifier } from '@/lib/dpt/store';
 import { findAdminByEmail } from '@/lib/admin/store';
 import { isRootSuperadminEmail } from './constants';
+import { isProductionEnvironment, isDevFallbackAllowed } from '@/lib/security/env';
 import type { AdminRole } from '@/lib/supabase/types';
 import type { SessionUser } from './session';
 
@@ -99,12 +100,20 @@ export function resetDevOtpStore(): void {
   } catch {}
 }
 
-const OTP_SECRET_SALT = process.env.OTP_SECRET_SALT || 'hmif-pemira-otp-salt-secure-2026';
-if (process.env.APP_ENV === 'production' && !process.env.OTP_SECRET_SALT) {
-  console.warn(
-    '[SECURITY WARNING] Variabel OTP_SECRET_SALT belum dikonfigurasi di server produksi! Menggunakan salt default (tidak disarankan untuk peluncuran resmi).'
-  );
+function getOtpSecretSalt(): string {
+  if (process.env.OTP_SECRET_SALT) {
+    return process.env.OTP_SECRET_SALT;
+  }
+  if (isProductionEnvironment()) {
+    const sessionSecret = process.env.SESSION_SECRET;
+    if (!sessionSecret || sessionSecret.length < 32) {
+      throw new Error('FATAL SECURITY ERROR: OTP_SECRET_SALT or valid SESSION_SECRET (32+ chars) is required in production.');
+    }
+    return `otp-salt:${sessionSecret}`;
+  }
+  return 'hmif-pemira-otp-salt-secure-2026';
 }
+
 const OTP_EXPIRATION_MS = 10 * 60 * 1000; // 10 menit
 const OTP_COOLDOWN_MS = 60 * 1000; // 60 detik cooldown kirim ulang
 const MAX_FAILED_ATTEMPTS = 3;
@@ -122,7 +131,7 @@ export function generate6DigitPin(): string {
 export function hashPin(pin: string): string {
   return crypto
     .createHash('sha256')
-    .update(`${pin}:${OTP_SECRET_SALT}`)
+    .update(`${pin}:${getOtpSecretSalt()}`)
     .digest('hex');
 }
 
@@ -308,8 +317,20 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
       };
     } catch (err) {
       console.error('[OtpService] Exception saat request OTP:', err);
-      // Fallback ke dev mode jika exception
+      return {
+        success: false,
+        code: 'SERVER_ERROR',
+        error: 'Terjadi kegagalan koneksi ke basis data pemilihan. Silakan coba beberapa saat lagi.',
+      };
     }
+  }
+
+  if (!isDevFallbackAllowed(isSupabaseConfigured())) {
+    return {
+      success: false,
+      code: 'SERVER_ERROR',
+      error: 'Basis data pemilihan tidak tersedia pada mode produksi.',
+    };
   }
 
   // Fallback Dev Mode (In-Memory + Disk Sync)
@@ -425,6 +446,25 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
   };
 }
 
+async function resolveRoleFromSupabaseAdmin(
+  adminClient: ReturnType<typeof createAdminClient>,
+  email: string
+): Promise<AdminRole | 'voter'> {
+  const normalized = email.trim().toLowerCase();
+  const { data: dbAdmin } = await adminClient
+    .from('admin_users')
+    .select('role')
+    .eq('email', normalized)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (dbAdmin?.role) {
+    return dbAdmin.role as AdminRole;
+  }
+
+  return isRootSuperadminEmail(normalized) ? 'super_admin' : 'voter';
+}
+
 /**
  * Memverifikasi PIN 6-digit yang dimasukkan mahasiswa.
  */
@@ -465,24 +505,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         }
 
         const voter = rpcResult.voter!;
-        let assignedRole: AdminRole | 'voter' = 'voter';
-
-        // 1. Cek dari tabel admin_users Supabase secara dinamis
-        const { data: dbAdmin } = await adminClient
-          .from('admin_users')
-          .select('role')
-          .eq('email', voter.email.toLowerCase())
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (dbAdmin?.role) {
-          assignedRole = dbAdmin.role as AdminRole;
-        } else {
-          const adminMatch = findAdminByEmail(voter.email);
-          if (adminMatch?.role) {
-            assignedRole = adminMatch.role;
-          }
-        }
+        const assignedRole = await resolveRoleFromSupabaseAdmin(adminClient, voter.email);
 
         return {
           success: true,
@@ -598,7 +621,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
         })
         .eq('id', voter.id);
 
-      const adminMatch = findAdminByEmail(voter.email);
+      const assignedRole = await resolveRoleFromSupabaseAdmin(adminClient, voter.email);
       return {
         success: true,
         voter: {
@@ -606,7 +629,7 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
           email: voter.email,
           name: voter.name,
           nim: voter.nim,
-          role: adminMatch ? adminMatch.role : 'voter',
+          role: assignedRole,
           isDptVerified: true,
           hasVoted: voter.has_voted,
           generation: voter.generation,
@@ -614,7 +637,20 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
       };
     } catch (err) {
       console.error('[OtpService] Exception saat verify OTP:', err);
+      return {
+        success: false,
+        code: 'SERVER_ERROR',
+        error: 'Terjadi kegagalan koneksi saat memverifikasi kode PIN. Silakan coba lagi.',
+      };
     }
+  }
+
+  if (!isDevFallbackAllowed(isSupabaseConfigured())) {
+    return {
+      success: false,
+      code: 'SERVER_ERROR',
+      error: 'Basis data pemilihan tidak tersedia pada mode produksi.',
+    };
   }
 
   // Fallback Dev Mode (In-Memory + Disk Sync)
