@@ -24,18 +24,15 @@ Namun, pada audit menyeluruh lapisan aplikasi dan API routes ditemukan **2 temua
 - **Modul Terfokus (`lib/receipt/generator.ts`, `lib/rbac/permissions.ts`, `lib/auth/client-ip.ts`)**:
   Memiliki tanggung jawab tunggal, antarmuka bersih, dan mudah diuji secara terisolasi.
 
-### B. Utang Desain Struktural (*Codebase Design Debt* — Roadmap Tahap 2)
-1. **God Component Monolith — `app/(admin)/admin/dashboard/page.tsx` (5.529 baris)**:
-   Seluruh 7 tab dashboard admin beserta modal, ekspor PDF/CSV, import Excel, dan handler API masih menyatu dalam satu file.  
-   *Rekomendasi:* Pecah ke komponen modular per fitur (`components/admin/tabs/TallyTab.tsx`, `CandidatesTab.tsx`, `DptTab.tsx`, `SettingsTab.tsx`, `BroadcastTab.tsx`, `AuditLogsTab.tsx`, `AdminsTab.tsx`).
-2. **Leaky Seam & Duplikasi Adapter Supabase vs Dev JSON Store**:
-   Setiap Route Handler mengulang blok percabangan `if (isSupabaseConfigured()) ... else ...` secara manual.  
-   *Rekomendasi:* Ekstrak ke pola Repository/Adapter dengan seam tunggal (misal `VoterRepository`, `CandidateRepository`, `AuditRepository`).
-3. **Duplikasi Alur Voting (`app/api/ballots/route.ts` vs `lib/actions/ballot.ts`)**:
-   Validasi sesi, pembuatan receipt, RPC `cast_ballot_secure`, dan pembaruan cookie masih ditulis di dua tempat.  
-   *Rekomendasi:* Satukan dalam satu fungsi inti `castVoteCore(session, candidateId)` di `lib/ballots/cast-core.ts`.
-4. **Duplikasi Helper `getLogDescription`**:
-   Masih terduplikasi di `app/api/admin/audit-logs/route.ts` dan `app/api/admin/audit-logs/export/route.ts`.
+### B. Utang Desain Struktural (*Codebase Design Debt* — Selesai di Tahap 2)
+1. **Modularisasi Monolith Dashboard — `app/(admin)/admin/dashboard/page.tsx` (`5.528` → `2.095` baris)**: **[DONE]**
+   - Seluruh 8 tab (`OverviewTab`, `CandidatesTab`, `DptTab`, `TallyTab`, `SettingsTab`, `BroadcastTab`, `AuditLogsTab`, `AdminsTab`), 10 modal (`CandidateFormModal`, `EmergencyLockModal`, `ToggleSettingConfirmModal`, `BroadcastConfirmModal`, `QuickAddVoterModal`, `DeleteVoterModal`, `BatchDeleteVotersModal`, `ResetDptModal`, `AddAdminModal`, `BastPreviewModal`), helper status (`election-status-helper.ts`), tipe data (`types.ts`), dan template laporan cetak (`BastPrintableReport`) telah diekstrak ke `components/admin/**`.
+2. **Sentralisasi Query Tally & Audit Logs (*Deep Modules*)**: **[DONE]**
+   - Logika agregasi suara (`getElectionTallySnapshot()` di `lib/ballots/tally-service.ts`) serta pengambilan & statistik audit log (`fetchAuditLogsSnapshot()`, `getLogDescription()`, `computeAuditStats()` di `lib/audit/query.ts`) kini terpusat di satu seam tunggal tanpa duplikasi antar API route (`/api/admin/tally`, `/api/admin/tally/export`, `/api/bast/verify`, `/api/admin/audit-logs`, `/api/admin/audit-logs/export`).
+3. **Penyatuan Alur Voting Atomik (`castVoteForSession`)**: **[DONE]**
+   - Duplikasi validasi sesi, pembuatan receipt, RPC `cast_ballot_secure`, dan pembaruan session cookie antara `app/api/ballots/route.ts` dan `lib/actions/ballot.ts` telah disatukan ke dalam `lib/ballots/cast-core.ts`.
+4. **Sisa Pekerjaan Opsional (Tahap Lanjutan):**
+   - Ekstraksi repository CRUD penuh untuk DPT/Candidates jika nantinya ada penambahan kanal integrasi non-HTTP (saat ini sudah aman dan tervalidasi Zod per endpoint).
 
 ---
 

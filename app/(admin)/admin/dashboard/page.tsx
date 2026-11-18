@@ -2,137 +2,63 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
-import { Portal } from '@/components/ui/portal';
 import {
-  Vote,
-  Users,
-  Shield,
-  ShieldAlert,
-  Lock,
-  LockKeyhole,
-  CheckCircle,
-  Clock,
-  ArrowRight,
-  UploadCloud,
-  Download,
-  Search,
-  Filter,
-  FileText,
-  AlertTriangle,
+  BarChart3,
+  History,
   LogOut,
+  Mail,
+  Menu,
+  PieChart,
   RefreshCw,
   Settings,
-  BarChart3,
-  PieChart,
   UserCheck,
-  Check,
-  X,
-  Loader2,
-  UserPlus,
-  Edit3,
-  Trash2,
-  LayoutGrid,
-  Mail,
-  Send,
-  Calendar,
-  CheckCircle2,
-  Upload,
-  Eye,
-  Image as ImageIcon,
-  Menu,
-  Printer,
-  History,
   UserCog,
-  ToggleLeft,
-  ToggleRight,
-  KeyRound,
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-  Crop,
+  Users,
+  X,
 } from 'lucide-react';
-import { CandidatePhotoFrameModal } from '@/components/admin/candidate-photo-frame-modal';
-
-interface TallyItem {
-  candidateId: string;
-  candidateNumber: number;
-  leaderName: string;
-  viceLeaderName: string;
-  voteCount: number;
-  percentage: number;
-}
-
-interface GenerationTurnout {
-  generation: number;
-  totalVoters: number;
-  votedCount: number;
-  turnoutPercentage: number;
-}
-
-interface VoterRow {
-  id: string;
-  nim: string;
-  name: string;
-  email: string;
-  generation: number;
-  has_voted: boolean;
-  updated_at: string;
-}
-
-interface CandidateItem {
-  id: string;
-  candidate_number: number;
-  leader_name: string;
-  vice_leader_name: string;
-  vision: string;
-  mission: string[];
-  photo_url: string | null;
-  chairman_cv_url?: string | null;
-  vice_chairman_cv_url?: string | null;
-  is_active?: boolean;
-}
-
-interface AuditLogItem {
-  id: string;
-  timestamp: string;
-  actor_email: string;
-  actor_name: string;
-  actor_role: string;
-  action: string;
-  description: string;
-  ip_address: string;
-  details?: Record<string, unknown> | null;
-}
-
-interface AdminUserItem {
-  id: string;
-  nim?: string;
-  name: string;
-  email: string;
-  role: 'super_admin' | 'kpr_admin' | 'auditor';
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-function formatDateTimeLocal(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return '2026-11-04T08:00';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch {
-    return '2026-11-04T08:00';
-  }
-}
+import type {
+  AdminUserItem,
+  AuditLogItem,
+  CandidateItem,
+  DashboardTabId,
+  GenerationTurnout,
+  TallyItem,
+  ToggleModalConfig,
+  VoterRow,
+} from '@/components/admin/types';
+import {
+  formatDateTimeLocal,
+  getElectionSystemStatus,
+} from '@/components/admin/election-status-helper';
+import { BastPrintableReport } from '@/components/admin/bast-printable-report';
+import { OverviewTab } from '@/components/admin/tabs/overview-tab';
+import { CandidatesTab } from '@/components/admin/tabs/candidates-tab';
+import { DptTab } from '@/components/admin/tabs/dpt-tab';
+import { TallyTab } from '@/components/admin/tabs/tally-tab';
+import { SettingsTab } from '@/components/admin/tabs/settings-tab';
+import { BroadcastTab } from '@/components/admin/tabs/broadcast-tab';
+import { AuditLogsTab } from '@/components/admin/tabs/audit-logs-tab';
+import { AdminsTab } from '@/components/admin/tabs/admins-tab';
+import { CandidateFormModal } from '@/components/admin/modals/candidate-form-modal';
+import {
+  BroadcastConfirmModal,
+  EmergencyLockModal,
+  ToggleSettingConfirmModal,
+} from '@/components/admin/modals/settings-and-broadcast-modals';
+import {
+  BatchDeleteVotersModal,
+  DeleteVoterModal,
+  QuickAddVoterModal,
+  ResetDptModal,
+  type ResetDptMode,
+} from '@/components/admin/modals/dpt-action-modals';
+import { AddAdminModal } from '@/components/admin/modals/admin-management-modal';
+import { BastPreviewModal } from '@/components/admin/modals/bast-preview-modal';
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
-
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'candidates' | 'dpt' | 'tally' | 'settings' | 'emails' | 'audit' | 'admins'>('overview');
+  const [activeTab, setActiveTab] = useState<DashboardTabId>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Admin user & roles
@@ -141,7 +67,6 @@ export default function AdminDashboardPage() {
 
   // Tally & Election Data
   const [loadingTally, setLoadingTally] = useState(true);
-  const [tallyError, setTallyError] = useState<string | null>(null);
   const [isTallyLocked, setIsTallyLocked] = useState(false);
   const [tallyData, setTallyData] = useState<TallyItem[]>([]);
   const [generationData, setGenerationData] = useState<GenerationTurnout[]>([]);
@@ -183,25 +108,28 @@ export default function AdminDashboardPage() {
   // Settings State
   const [isVotingOpen, setIsVotingOpen] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [startTime, setStartTime] = useState<string>('2026-11-04T08:00');
-  const [endTime, setEndTime] = useState<string>('2026-11-04T16:00');
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+  const [savedStartTime, setSavedStartTime] = useState<string>('');
+  const [savedEndTime, setSavedEndTime] = useState<string>('');
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsReason, setSettingsReason] = useState('');
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+
+  const isScheduleDirty = Boolean(
+    savedStartTime &&
+      savedEndTime &&
+      (startTime !== savedStartTime || endTime !== savedEndTime)
+  );
+  const isScheduleDirtyRef = useRef(false);
+  isScheduleDirtyRef.current = isScheduleDirty;
 
   // Emergency Modal State
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [emergencyReason, setEmergencyReason] = useState('Jeda Teknis Terjadwal');
 
   // Sakelar Bilik Suara & Maintenance Confirmation Modal
-  interface ToggleModalConfig {
-    type: 'voting_open' | 'maintenance_mode';
-    targetValue: boolean;
-    title: string;
-    description: string;
-    defaultReason: string;
-    isDanger: boolean;
-  }
   const [toggleModalConfig, setToggleModalConfig] = useState<ToggleModalConfig | null>(null);
   const [toggleReason, setToggleReason] = useState<string>('');
 
@@ -265,7 +193,6 @@ export default function AdminDashboardPage() {
     sampleErrors?: Array<unknown>;
     databaseConflictsSample?: Array<unknown>;
   } | null>(null);
-  const [isAnalyzingFile, setIsAnalyzingFile] = useState(false);
   const [isCommittingImport, setIsCommittingImport] = useState(false);
   const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
 
@@ -285,7 +212,7 @@ export default function AdminDashboardPage() {
   const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
   const [isDeletingBatchVoters, setIsDeletingBatchVoters] = useState(false);
   const [isResetDptModalOpen, setIsResetDptModalOpen] = useState(false);
-  const [resetDptMode, setResetDptMode] = useState<'reset_to_default' | 'clear_all' | 'reset_vote_status'>('reset_to_default');
+  const [resetDptMode, setResetDptMode] = useState<ResetDptMode>('reset_to_default');
   const [resetDptConfirmText, setResetDptConfirmText] = useState('');
   const [isResettingDpt, setIsResettingDpt] = useState(false);
   const [dptActionMessage, setDptActionMessage] = useState<string | null>(null);
@@ -293,7 +220,6 @@ export default function AdminDashboardPage() {
 
   // State Reset Ballots Simulasi
   const [isResettingBallots, setIsResettingBallots] = useState(false);
-  const [ballotActionMessage, setBallotActionMessage] = useState<string | null>(null);
 
   // State Modal Pratinjau Berita Acara (BAST) & Verifikasi Digital
   const [isBastModalOpen, setIsBastModalOpen] = useState(false);
@@ -410,10 +336,52 @@ export default function AdminDashboardPage() {
       .catch(() => {});
   }, []);
 
+  const applyServerSettings = useCallback((settings: {
+    isVotingOpen?: boolean;
+    maintenanceMode?: boolean;
+    startTime?: string;
+    endTime?: string;
+    allowKotakKosongMulti?: boolean;
+  }) => {
+    if (settings.isVotingOpen !== undefined) setIsVotingOpen(settings.isVotingOpen);
+    if (settings.maintenanceMode !== undefined) setMaintenanceMode(settings.maintenanceMode);
+    if (settings.allowKotakKosongMulti !== undefined) {
+      setAllowKotakKosongMulti(settings.allowKotakKosongMulti);
+    }
+
+    const formattedStart = settings.startTime ? formatDateTimeLocal(settings.startTime) : '';
+    const formattedEnd = settings.endTime ? formatDateTimeLocal(settings.endTime) : '';
+    if (formattedStart) setSavedStartTime(formattedStart);
+    if (formattedEnd) setSavedEndTime(formattedEnd);
+
+    if (!isScheduleDirtyRef.current) {
+      if (formattedStart) setStartTime(formattedStart);
+      if (formattedEnd) setEndTime(formattedEnd);
+    }
+    setLoadingSchedule(false);
+  }, []);
+
+  const fetchElectionSettings = useCallback(() => {
+    fetch('/api/admin/election-settings', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.settings) {
+          applyServerSettings({
+            isVotingOpen: data.settings.is_voting_open,
+            maintenanceMode: data.settings.maintenance_mode,
+            startTime: data.settings.start_time,
+            endTime: data.settings.end_time,
+            allowKotakKosongMulti: data.settings.allow_kotak_kosong_multi,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSchedule(false));
+  }, [applyServerSettings]);
+
   // 2. Muat data Tally & Turnout
   const fetchTally = useCallback((silent = false) => {
     if (!silent) setLoadingTally(true);
-    setTallyError(null);
 
     fetch('/api/admin/tally', { cache: 'no-store' })
       .then(async (res) => {
@@ -438,38 +406,33 @@ export default function AdminDashboardPage() {
           setGenerationData(data.turnout.byGeneration || []);
         }
         if (data.electionSettings) {
-          setIsVotingOpen(data.electionSettings.isVotingOpen);
-          setMaintenanceMode(data.electionSettings.maintenanceMode);
-          if (data.electionSettings.startTime) {
-            setStartTime(formatDateTimeLocal(data.electionSettings.startTime));
-          }
-          if (data.electionSettings.endTime) {
-            setEndTime(formatDateTimeLocal(data.electionSettings.endTime));
-          }
-          if (data.electionSettings.allowKotakKosongMulti !== undefined) {
-            setAllowKotakKosongMulti(data.electionSettings.allowKotakKosongMulti);
-          }
+          applyServerSettings(data.electionSettings);
         }
       })
-      .catch((err) => {
-        if (!silent) setTallyError(err.message);
-      })
+      .catch(() => {})
       .finally(() => {
         if (!silent) setLoadingTally(false);
       });
-  }, []);
+  }, [applyServerSettings]);
+
+  useEffect(() => {
+    fetchElectionSettings();
+  }, [fetchElectionSettings]);
 
   useEffect(() => {
     fetchTally();
+    if (activeTab === 'settings') {
+      fetchElectionSettings();
+    }
 
-    // Auto-polling real-time setiap 3 detik saat tab Overview atau Tally aktif
+    // Auto-polling real-time setiap 15 detik saat tab Overview atau Tally aktif
     if (activeTab === 'overview' || activeTab === 'tally') {
       const pollTimer = setInterval(() => {
         fetchTally(true);
-      }, 15000); // Polling 15s untuk optimasi beban DB
+      }, 15000);
       return () => clearInterval(pollTimer);
     }
-  }, [fetchTally, activeTab]);
+  }, [fetchTally, fetchElectionSettings, activeTab]);
 
   // 3. Muat data Kandidat
   const fetchCandidates = useCallback((silent = false) => {
@@ -740,9 +703,9 @@ export default function AdminDashboardPage() {
 
   // Open candidate modal for Add
   const handleOpenAddCandidate = () => {
-    const regularCandidates = candidates.filter((c) => c.candidate_number > 0);
-    const nextNumber = regularCandidates.length > 0
-      ? Math.max(...regularCandidates.map((c) => c.candidate_number)) + 1
+    const regularList = candidates.filter((c) => c.candidate_number > 0);
+    const nextNumber = regularList.length > 0
+      ? Math.max(...regularList.map((c) => c.candidate_number)) + 1
       : 1;
 
     setEditingCandidate(null);
@@ -986,6 +949,12 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleResetScheduleDraft = () => {
+    if (savedStartTime) setStartTime(savedStartTime);
+    if (savedEndTime) setEndTime(savedEndTime);
+    setSettingsMessage(null);
+  };
+
   // Handle Simpan Pengaturan Pemilihan & Jadwal
   const handleSaveSettings = async (
     newVotingOpen: boolean,
@@ -994,6 +963,23 @@ export default function AdminDashboardPage() {
     newEndTime: string,
     reasonText: string
   ) => {
+    const startDate = new Date(newStartTime);
+    const endDate = new Date(newEndTime);
+    if (!newStartTime || !newEndTime || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      setSettingsMessage('❌ Waktu mulai dan penutupan pemilihan wajib diisi dengan format yang valid.');
+      return { success: false, error: 'Format waktu tidak valid.' };
+    }
+    if (startDate >= endDate) {
+      setSettingsMessage('❌ Waktu mulai pemilihan harus lebih awal daripada waktu penutupan.');
+      return { success: false, error: 'Urutan waktu tidak valid.' };
+    }
+
+    const trimmedReason = reasonText.trim();
+    if (trimmedReason.length > 0 && trimmedReason.length < 3) {
+      setSettingsMessage('❌ Jika diisi, catatan audit minimal terdiri dari 3 karakter.');
+      return { success: false, error: 'Alasan terlalu pendek.' };
+    }
+
     setSettingsSaving(true);
     setSettingsMessage(null);
 
@@ -1004,9 +990,9 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({
           isVotingOpen: newVotingOpen,
           maintenanceMode: newMaintenance,
-          startTime: new Date(newStartTime).toISOString(),
-          endTime: new Date(newEndTime).toISOString(),
-          reason: reasonText || 'Pembaruan jadwal dan status pemilihan via dashboard KPR',
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
+          reason: trimmedReason || 'Pembaruan jadwal dan status pemilihan via dashboard KPR',
         }),
       });
 
@@ -1015,10 +1001,18 @@ export default function AdminDashboardPage() {
         setSettingsMessage(`❌ ${data.error || 'Gagal menyimpan pengaturan.'}`);
         return { success: false, error: data.error };
       } else {
+        const nextStart = data.settings.start_time ? formatDateTimeLocal(data.settings.start_time) : newStartTime;
+        const nextEnd = data.settings.end_time ? formatDateTimeLocal(data.settings.end_time) : newEndTime;
         setIsVotingOpen(data.settings.is_voting_open);
         setMaintenanceMode(data.settings.maintenance_mode);
-        if (data.settings.start_time) setStartTime(formatDateTimeLocal(data.settings.start_time));
-        if (data.settings.end_time) setEndTime(formatDateTimeLocal(data.settings.end_time));
+        if (nextStart) {
+          setSavedStartTime(nextStart);
+          setStartTime(nextStart);
+        }
+        if (nextEnd) {
+          setSavedEndTime(nextEnd);
+          setEndTime(nextEnd);
+        }
         setSettingsMessage('✓ Pengaturan jadwal dan bilik suara berhasil diperbarui.');
         setIsEmergencyModalOpen(false);
         fetchTally(true);
@@ -1170,7 +1164,6 @@ export default function AdminDashboardPage() {
     if (!file) return;
 
     setStagedFile(file);
-    setIsAnalyzingFile(true);
     setImportSuccessMessage(null);
 
     const fileName = file.name.toLowerCase();
@@ -1190,7 +1183,6 @@ export default function AdminDashboardPage() {
 
           if (!firstSheetName) {
             alert('Berkas Excel tidak memiliki sheet yang dapat dibaca.');
-            setIsAnalyzingFile(false);
             return;
           }
 
@@ -1199,7 +1191,6 @@ export default function AdminDashboardPage() {
 
           if (rawJson.length === 0) {
             alert('Berkas Excel kosong atau tidak memiliki baris data.');
-            setIsAnalyzingFile(false);
             return;
           }
 
@@ -1223,7 +1214,6 @@ export default function AdminDashboardPage() {
 
           if (lines.length <= 1) {
             alert('Berkas CSV kosong atau hanya berisi baris header.');
-            setIsAnalyzingFile(false);
             return;
           }
 
@@ -1262,7 +1252,6 @@ export default function AdminDashboardPage() {
 
             if (nimIdx === -1 || nameIdx === -1 || emailIdx === -1 || genIdx === -1) {
               alert('Header kolom berkas wajib memuat: nim, name, email, generation.');
-              setIsAnalyzingFile(false);
               return;
             }
 
@@ -1280,7 +1269,6 @@ export default function AdminDashboardPage() {
 
         if (rawRows.length === 0) {
           alert('Tidak ada baris data valid yang terbaca dari berkas.');
-          setIsAnalyzingFile(false);
           return;
         }
 
@@ -1307,8 +1295,6 @@ export default function AdminDashboardPage() {
       } catch (parseErr) {
         console.error('[FileImport] Parse error:', parseErr);
         alert('Terjadi kesalahan saat membaca berkas data DPT.');
-      } finally {
-        setIsAnalyzingFile(false);
       }
     };
 
@@ -1536,7 +1522,6 @@ export default function AdminDashboardPage() {
       return;
     }
     setIsResettingBallots(true);
-    setBallotActionMessage(null);
 
     try {
       const res = await fetch('/api/admin/tally', {
@@ -1544,7 +1529,6 @@ export default function AdminDashboardPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setBallotActionMessage(data.message || '✓ Seluruh surat suara simulasi berhasil direset ke 0.');
         fetchTally();
         fetchVoters();
       } else {
@@ -1560,3969 +1544,637 @@ export default function AdminDashboardPage() {
   const regularCandidates = candidates.filter((c) => c.candidate_number > 0);
   const regularCount = regularCandidates.length;
 
-  const renderBeritaAcaraContent = () => {
-    const currentDateFormatted = new Intl.DateTimeFormat('id-ID', {
-      dateStyle: 'full',
-    }).format(new Date());
-
-    const currentTimeFormatted =
-      new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Jakarta',
-      }).format(new Date()) + ' WIB';
-
-    const sortedCandidates = [...tallyData].sort((a, b) => b.voteCount - a.voteCount);
-    const leadingCandidate = sortedCandidates[0];
-
-    return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* KOP SURAT RESMI */}
-        <div className="flex items-center justify-between gap-4 pb-4 border-b-4 border-double border-black">
-          <div className="w-20 h-20 shrink-0 flex items-center justify-center">
-            <Image
-              src="/assets/img/hmif-logo.png"
-              alt="Logo HMIF"
-              width={72}
-              height={72}
-              priority
-              className="object-contain"
-            />
-          </div>
-          <div className="flex-1 text-center font-sans">
-            <div className="text-xs sm:text-sm font-bold tracking-wider uppercase text-gray-900">
-              KOMISI PEMILIHAN RAYA (KPR)
-            </div>
-            <div className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-black">
-              HIMPUNAN MAHASISWA INFORMATIKA (HMIF)
-            </div>
-            <div className="text-xs sm:text-sm font-bold tracking-wider uppercase text-gray-900">
-              TELKOM UNIVERSITY PURWOKERTO
-            </div>
-            <p className="text-[10px] text-gray-600 mt-1 leading-tight">
-              Sekretariat: Gedung Student Center Lt. 2, Jl. D.I. Panjaitan No. 128, Purwokerto 53147
-              <br />
-              Laman Resmi: pemirahmif.org • Surel: kpr.hmif@student.telkomuniversity.ac.id
-            </p>
-          </div>
-          <div className="w-20 h-20 shrink-0 hidden sm:block" />
-        </div>
-
-        {/* JUDUL DOKUMEN */}
-        <div className="text-center space-y-1 pt-2 font-sans">
-          <div className="text-sm sm:text-base font-bold underline uppercase tracking-wide">
-            BERITA ACARA REKAPITULASI DAN PENETAPAN HASIL PEROLEHAN SUARA
-          </div>
-          <p className="text-xs font-semibold text-gray-800">
-            PEMILIHAN RAYA KETUA DAN WAKIL KETUA HMIF PERIODE 2026/2027
-          </p>
-          <p className="text-[11px] font-mono text-gray-600">
-            Nomor: 009/BA-KPR/HMIF/XI/2026
-          </p>
-        </div>
-
-        {/* PARAGRAF PEMBUKA */}
-        <p suppressHydrationWarning className="text-justify leading-relaxed text-xs sm:text-[13px]">
-          Pada hari ini, <strong>{currentDateFormatted}</strong> pukul {currentTimeFormatted}, bertempat di Sekretariat Komisi Pemilihan Raya (KPR) HMIF Telkom University Purwokerto, telah diselesaikan rekapitulasi akhir penghitungan suara elektronik (<em>E-Voting</em>) Pemira HMIF 2026/2027 yang diselenggarakan berasaskan Langsung, Umum, Bebas, Rahasia, Jujur, dan Adil (LUBER JURDIL) dengan rincian sebagai berikut:
-        </p>
-
-        {/* BAGIAN I: DATA PARTISIPASI PEMILIH */}
-        <div className="space-y-2">
-          <h4 className="font-bold font-sans text-xs uppercase tracking-wider text-gray-900">
-            I. DATA PARTISIPASI DAN DAFTAR PEMILIH TETAP (DPT)
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-sans">
-            <div className="p-2.5 border border-gray-300 rounded bg-gray-50">
-              <span className="text-[10px] text-gray-600 block">Total DPT Terdaftar:</span>
-              <span className="font-bold text-sm text-black font-mono">{totalDpt} Mahasiswa</span>
-            </div>
-            <div className="p-2.5 border border-gray-300 rounded bg-gray-50">
-              <span className="text-[10px] text-gray-600 block">Total Suara Masuk:</span>
-              <span className="font-bold text-sm text-black font-mono">{totalVotes} Suara</span>
-            </div>
-            <div className="p-2.5 border border-gray-300 rounded bg-gray-50">
-              <span className="text-[10px] text-gray-600 block">Tingkat Partisipasi (Turnout):</span>
-              <span className="font-bold text-sm text-black font-mono">{turnoutPercentage}%</span>
-            </div>
-          </div>
-
-          {generationData.length > 0 && (
-            <table className="w-full text-xs font-sans border-collapse border border-gray-300 mt-2">
-              <thead>
-                <tr className="bg-gray-100 text-gray-800">
-                  <th className="border border-gray-300 p-1.5 text-center w-12">No.</th>
-                  <th className="border border-gray-300 p-1.5 text-left">Angkatan Mahasiswa</th>
-                  <th className="border border-gray-300 p-1.5 text-center">Jumlah DPT</th>
-                  <th className="border border-gray-300 p-1.5 text-center">Suara Digunakan</th>
-                  <th className="border border-gray-300 p-1.5 text-center">Partisipasi (%)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {generationData.map((gen, idx) => (
-                  <tr key={gen.generation} className="text-gray-900">
-                    <td className="border border-gray-300 p-1.5 text-center">{idx + 1}</td>
-                    <td className="border border-gray-300 p-1.5 font-medium">Informatika Angkatan {gen.generation}</td>
-                    <td className="border border-gray-300 p-1.5 text-center font-mono">{gen.totalVoters}</td>
-                    <td className="border border-gray-300 p-1.5 text-center font-mono">{gen.votedCount}</td>
-                    <td className="border border-gray-300 p-1.5 text-center font-mono">{gen.turnoutPercentage}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* BAGIAN II: REKAPITULASI HASIL PEROLEHAN SUARA */}
-        <div className="space-y-2 pt-2">
-          <h4 className="font-bold font-sans text-xs uppercase tracking-wider text-gray-900">
-            II. HASIL PEROLEHAN SUARA PASANGAN CALON
-          </h4>
-          <table className="w-full text-xs font-sans border-collapse border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100 text-gray-800">
-                <th className="border border-gray-300 p-2 text-center w-12">No.</th>
-                <th className="border border-gray-300 p-2 text-center w-16">No. Urut</th>
-                <th className="border border-gray-300 p-2 text-left">Nama Pasangan Calon / Opsi</th>
-                <th className="border border-gray-300 p-2 text-center w-28">Perolehan Suara</th>
-                <th className="border border-gray-300 p-2 text-center w-24">Persentase</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tallyData.map((cand, idx) => (
-                <tr key={cand.candidateId} className="text-gray-900">
-                  <td className="border border-gray-300 p-2 text-center">{idx + 1}</td>
-                  <td className="border border-gray-300 p-2 text-center font-bold font-mono">
-                    {cand.candidateNumber === 0 ? '-' : cand.candidateNumber.toString().padStart(2, '0')}
-                  </td>
-                  <td className="border border-gray-300 p-2 font-medium">
-                    {cand.candidateNumber === 0
-                      ? 'Kotak Kosong (Abstain Sah)'
-                      : `${cand.leaderName} & ${cand.viceLeaderName}`}
-                  </td>
-                  <td className="border border-gray-300 p-2 text-center font-mono font-bold">
-                    {cand.voteCount} Suara
-                  </td>
-                  <td className="border border-gray-300 p-2 text-center font-mono font-bold">
-                    {cand.percentage}%
-                  </td>
-                </tr>
-              ))}
-              <tr className="bg-gray-50 font-bold text-gray-900">
-                <td colSpan={3} className="border border-gray-300 p-2 text-right">
-                  TOTAL SUARA SAH MASUK:
-                </td>
-                <td className="border border-gray-300 p-2 text-center font-mono">
-                  {totalVotes} Suara
-                </td>
-                <td className="border border-gray-300 p-2 text-center font-mono">
-                  100%
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* BAGIAN III: KETETAPAN DAN PENJAMINAN KEAMANAN */}
-        <div className="space-y-1.5 pt-2 text-justify text-xs sm:text-[13px]">
-          <h4 className="font-bold font-sans text-xs uppercase tracking-wider text-gray-900">
-            III. KETETAPAN DAN INTEGRITAS SISTEM
-          </h4>
-          <p>
-            Berdasarkan hasil rekapitulasi suara di atas, pasangan calon{' '}
-            <strong>
-              {leadingCandidate
-                ? leadingCandidate.candidateNumber === 0
-                  ? 'Kotak Kosong'
-                  : `${leadingCandidate.leaderName} & ${leadingCandidate.viceLeaderName}`
-                : '-'}
-            </strong>{' '}
-            memperoleh akumulasi suara tertinggi sejumlah{' '}
-            <strong>{leadingCandidate ? leadingCandidate.voteCount : 0} suara</strong> (
-              {leadingCandidate ? leadingCandidate.percentage : 0}%).
-          </p>
-          <p className="text-[11px] text-gray-600 italic">
-            Seluruh surat suara telah diverifikasi secara kriptografis dan disimpan secara anonim tanpa rekaman identitas pemilih ke surat suara (*Ballot Secrecy*), sesuai ketetapan Komisi Pemilihan Raya HMIF Telkom University Purwokerto.
-          </p>
-        </div>
-
-        {/* SEGEL DIGITAL & VERIFIKASI QR PUBLIK */}
-        <div className="my-3 p-3 sm:p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 flex flex-col sm:flex-row items-center gap-4">
-          <div className="shrink-0 bg-white p-1.5 border border-gray-300 rounded shadow-xs flex items-center justify-center">
-            {bastQrDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={bastQrDataUrl}
-                alt="QR Verifikasi Berita Acara"
-                className="w-24 h-24 object-contain"
-              />
-            ) : (
-              <div className="w-24 h-24 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400 font-sans">
-                QR Kode
-              </div>
-            )}
-          </div>
-          <div className="flex-1 text-left space-y-1 font-sans">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
-                Integritas Terverifikasi Kriptografis
-              </span>
-              <span className="text-[10px] text-gray-500 font-mono">HMIF-E-VOTE-2026</span>
-            </div>
-            <p className="text-[11px] text-gray-700 leading-snug">
-              Pindai kode QR untuk menguji keabsahan Berita Acara ini secara publik di portal resmi Pemira HMIF. Nilai hash di bawah ini mengunci jumlah DPT dan perolehan suara sah saat dokumen ini diterbitkan.
-            </p>
-            <div className="pt-1">
-              <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wide">
-                SHA-256 Digital Signature:
-              </span>
-              <code className="text-[10px] font-mono font-bold text-gray-900 bg-gray-200/80 px-2 py-0.5 rounded break-all select-all block mt-0.5">
-                {bastIntegrityHash || 'MENGHITUNG INTEGRITAS TANDA TANGAN DIGITAL...'}
-              </code>
-            </div>
-          </div>
-        </div>
-
-        {/* BAGIAN IV: TANDA TANGAN PIHAK-PIHAK */}
-        <div className="pt-6 font-sans text-xs">
-          <p suppressHydrationWarning className="text-right text-gray-700 mb-6">
-            Purwokerto, {currentDateFormatted}
-          </p>
-          <div className="grid grid-cols-2 gap-y-10 gap-x-8 text-center">
-            <div>
-              <p className="font-bold text-gray-800">Ketua Panitia KPR HMIF</p>
-              <div className="h-14 flex items-center justify-center">
-                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan &amp; Cap )</span>
-              </div>
-              <p className="font-bold underline text-black">Marzhendo Galang Saputra</p>
-              <p className="text-[11px] text-gray-600">NIM. 103112400102</p>
-            </div>
-
-            <div>
-              <p className="font-bold text-gray-800">Sekretaris KPR HMIF</p>
-              <div className="h-14 flex items-center justify-center">
-                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan )</span>
-              </div>
-              <p className="font-bold underline text-black">Siti Nurhaliza</p>
-              <p className="text-[11px] text-gray-600">NIM. 103012400015</p>
-            </div>
-
-            <div>
-              <p className="font-bold text-gray-800">Saksi Paslon 01</p>
-              <div className="h-14 flex items-center justify-center">
-                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan )</span>
-              </div>
-              <p className="font-bold underline text-black">( ........................................ )</p>
-              <p className="text-[11px] text-gray-600">Saksi Mandat Resmi</p>
-            </div>
-
-            <div>
-              <p className="font-bold text-gray-800">Pengawas Pemira / DPM</p>
-              <div className="h-14 flex items-center justify-center">
-                <span className="text-[10px] text-gray-400 italic">( Tanda Tangan )</span>
-              </div>
-              <p className="font-bold underline text-black">( ........................................ )</p>
-              <p className="text-[11px] text-gray-600">Dewan Perwakilan Mahasiswa</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Unified System Status Helper for Consistent Visual Hierarchy & State Alignment
-  const getElectionSystemStatus = () => {
-    if (maintenanceMode) {
-      return {
-        label: 'Mode Pemeliharaan Darurat',
-        shortLabel: 'Pemeliharaan',
-        badgeBg: 'bg-error/15 border-error/30 text-error',
-        icon: ShieldAlert,
-        scheduleCardText: 'Mode Pemeliharaan Aktif',
-        scheduleCardBadge: 'bg-error/15 text-error border-error/30',
-        isOperational: false,
-      };
-    }
-
-    if (!isVotingOpen) {
-      return {
-        label: 'Pemilihan Ditutup Panitia',
-        shortLabel: 'Ditutup Panitia',
-        badgeBg: 'bg-surface-container border-outline-variant/40 text-on-surface-variant',
-        icon: Lock,
-        scheduleCardText: 'Ditutup Manual oleh Panitia',
-        scheduleCardBadge: 'bg-surface-container-high text-on-surface-variant border-outline-variant/40',
-        isOperational: false,
-      };
-    }
-
-    const now = new Date();
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-
-    if (now < start) {
-      return {
-        label: 'Menunggu Jadwal Pemilihan',
-        shortLabel: 'Belum Dimulai',
-        badgeBg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-        icon: Clock,
-        scheduleCardText: 'Belum Dimulai',
-        scheduleCardBadge: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-        isOperational: false,
-      };
-    }
-
-    if (now > end) {
-      return {
-        label: 'Jadwal Pemilihan Berakhir',
-        shortLabel: 'Telah Berakhir',
-        badgeBg: 'bg-surface-container border-outline-variant/40 text-on-surface-variant',
-        icon: Lock,
-        scheduleCardText: 'Telah Berakhir',
-        scheduleCardBadge: 'bg-surface-container-high text-on-surface-variant border-outline-variant/40',
-        isOperational: false,
-      };
-    }
-
-    return {
-      label: 'Pemilihan Berlangsung Aktif',
-      shortLabel: 'Sedang Berlangsung',
-      badgeBg: 'bg-primary/10 border-primary/30 text-primary',
-      icon: Activity,
-      scheduleCardText: 'Sedang Berlangsung',
-      scheduleCardBadge: 'bg-primary/10 text-primary border-primary/30',
-      isOperational: true,
-    };
-  };
+  const systemStatus = getElectionSystemStatus({
+    maintenanceMode,
+    isVotingOpen,
+    startTime,
+    endTime,
+  });
+  const StatusIcon = systemStatus.icon;
 
   return (
     <>
       <div className="print:hidden bg-surface font-montserrat text-on-surface antialiased min-h-screen flex selection:bg-primary selection:text-on-primary">
-      {/* Mobile Sidebar Backdrop */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden backdrop-blur-xs transition-opacity duration-200"
-          onClick={() => setIsSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+        {/* Mobile Sidebar Backdrop */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 lg:hidden backdrop-blur-xs transition-opacity duration-200"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
 
-      {/* SIDEBAR NAVIGATION */}
-      <aside
-        className={`fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between py-6 border-r border-outline-variant/30 transition-transform duration-150 ease-out ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
-      >
-        <div className="flex flex-col gap-6">
-          {/* Logo & Title */}
-          <div className="px-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
-                <Image
-                  src="/assets/img/hmif-logo.png"
-                  alt="Logo HMIF"
-                  width={36}
-                  height={36}
-                  priority
-                  className="w-full h-full object-contain"
-                />
+        {/* SIDEBAR NAVIGATION */}
+        <aside
+          className={`fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between py-6 border-r border-outline-variant/30 transition-transform duration-150 ease-out ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } lg:translate-x-0`}
+        >
+          <div className="flex flex-col gap-6">
+            {/* Logo & Title */}
+            <div className="px-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+                  <Image
+                    src="/assets/img/hmif-logo.png"
+                    alt="Logo HMIF"
+                    width={36}
+                    height={36}
+                    priority
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-sm text-on-surface tracking-tight leading-tight">
+                    PEMIRA HMIF
+                  </span>
+                  <span className="text-[11px] text-on-surface-variant font-medium">
+                    Panel Panitia KPR
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-sm text-on-surface tracking-tight leading-tight">
-                  PEMIRA HMIF
+
+              <button
+                type="button"
+                className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                onClick={() => setIsSidebarOpen(false)}
+                aria-label="Tutup navigasi"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* User Role Badge */}
+            <div className="px-6">
+              <div className="px-3 py-1.5 rounded-lg bg-surface-container flex items-center justify-between border border-outline-variant/20">
+                <span className="text-[11px] text-on-surface-variant uppercase font-medium">
+                  Role
                 </span>
-                <span className="text-[11px] text-on-surface-variant font-medium">
-                  Panel Panitia KPR
+                <span className="text-xs text-primary font-bold uppercase">
+                  {userRole.replace('_', ' ')}
                 </span>
               </div>
             </div>
 
-            <button
-              type="button"
-              className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              onClick={() => setIsSidebarOpen(false)}
-              aria-label="Tutup navigasi"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* User Role Badge */}
-          <div className="px-6">
-            <div className="px-3 py-1.5 rounded-lg bg-surface-container flex items-center justify-between border border-outline-variant/20">
-              <span className="text-[11px] text-on-surface-variant uppercase font-medium">
-                Role
-              </span>
-              <span className="text-xs text-primary font-bold uppercase">
-                {userRole.replace('_', ' ')}
-              </span>
-            </div>
-          </div>
-
-          {/* Nav Items */}
-          <nav className="flex flex-col gap-1 px-3">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('overview');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'overview'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Overview &amp; Partisipasi</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('candidates');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'candidates'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Kelola Pasangan Calon</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('dpt');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'dpt'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Manajemen DPT</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('tally');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'tally'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <PieChart className="w-4 h-4" />
-              <span>Rekapitulasi Suara</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('settings');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'settings'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>Pengaturan Pemilihan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('emails');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'emails'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <Mail className="w-4 h-4" />
-              <span>Broadcast Email</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('audit');
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'audit'
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-              }`}
-            >
-              <History className="w-4 h-4" />
-              <span>Audit Log</span>
-            </button>
-
-            {userRole === 'super_admin' && (
+            {/* Nav Items */}
+            <nav className="flex flex-col gap-1 px-3">
               <button
                 type="button"
                 onClick={() => {
-                  setActiveTab('admins');
+                  setActiveTab('overview');
                   setIsSidebarOpen(false);
                 }}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'admins'
+                  activeTab === 'overview'
                     ? 'bg-primary text-on-primary'
                     : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
                 }`}
               >
-                <UserCog className="w-4 h-4" />
-                <span>Kelola Admin</span>
+                <BarChart3 className="w-4 h-4" />
+                <span>Overview &amp; Partisipasi</span>
               </button>
-            )}
-          </nav>
-        </div>
-
-        {/* Bottom Actions */}
-        <div className="px-4 pt-4 border-t border-outline-variant/20 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => fetchTally()}
-            className="flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-          >
-            <RefreshCw className="w-4 h-4 text-primary" />
-            <span>Segarkan Data</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-error hover:bg-error/10 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-error focus-visible:outline-none"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Keluar Sesi</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* MAIN VIEWPORT CONTAINER */}
-      <div className="lg:pl-64 flex-1 flex flex-col min-h-screen">
-        {/* TOP HEADER BAR */}
-        <header className="fixed top-0 lg:left-64 left-0 right-0 h-16 bg-surface/90 backdrop-blur-md z-40 px-4 sm:px-8 flex items-center justify-between border-b border-outline-variant/20 shadow-sm">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-on-surface hover:bg-surface-container transition-colors -ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              aria-label="Buka menu navigasi"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            {/* Unified System Status Indicator */}
-            {(() => {
-              const status = getElectionSystemStatus();
-              const StatusIcon = status.icon;
-              return (
-                <div
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold tracking-wide transition-colors ${status.badgeBg}`}
-                  title={`Status Operasional: ${status.label}`}
-                >
-                  <StatusIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">{status.label}</span>
-                  <span className="sm:hidden">{status.shortLabel}</span>
-                </div>
-              );
-            })()}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-xs font-bold text-on-surface">{userName}</span>
-              <span className="text-[11px] text-on-surface-variant uppercase font-medium">
-                {userRole.replace('_', ' ')}
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {/* MAIN BODY CONTENT */}
-        <main className="flex-1 pt-20 px-6 sm:px-8 pb-12">
-          <div className="max-w-6xl mx-auto flex flex-col gap-6">
-
-            {/* TAB 1: OVERVIEW & PARTISIPASI */}
-            {activeTab === 'overview' && (
-              <>
-                {/* Header Status Panel */}
-                <section className="w-full rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
-                      <Vote className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface">
-                          Bilik Suara Digital Pemira HMIF
-                        </h1>
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-medium text-on-surface-variant">
-                          <Activity className="w-3.5 h-3.5 text-primary" />
-                          <span>Live Telemetri</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-on-surface-variant mt-0.5">
-                        <Clock className="w-3.5 h-3.5 text-primary" />
-                        <span>Jadwal Resmi: 08.00 - 16.00 WIB</span>
-                        <span>•</span>
-                        <span>Tata letak bilik suara aktif: <strong className="text-on-surface font-semibold">
-                          {regularCount === 1 ? 'Head-to-Head' : `${regularCount} Paslon Grid`}
-                        </strong></span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => fetchTally()}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-semibold text-xs border border-outline-variant/30 transition-colors"
-                      title="Segarkan data perolehan suara sekarang"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${loadingTally ? 'animate-spin' : ''}`} />
-                      <span className="hidden sm:inline">Segarkan</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsEmergencyModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-semibold text-xs border border-outline-variant/30 transition-colors"
-                    >
-                      <ShieldAlert className="w-4 h-4 text-primary" />
-                      <span>Kunci Darurat Bilik</span>
-                    </button>
-                  </div>
-                </section>
-
-                {/* KPI Cards */}
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-xs text-on-surface-variant font-medium">TOTAL DPT</span>
-                    <div className="my-3 flex items-baseline gap-1.5">
-                      <span className="font-bebas text-4xl text-primary leading-none">
-                        {totalDpt.toLocaleString('id-ID')}
-                      </span>
-                      <span className="text-xs text-on-surface-variant">Pemilih</span>
-                    </div>
-                    <span className="text-xs text-on-surface-variant">Mahasiswa Aktif Terdaftar</span>
-                  </div>
-
-                  <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-xs text-on-surface-variant font-medium">SUARA MASUK</span>
-                    <div className="my-3 flex items-baseline gap-1.5">
-                      <span className="font-bebas text-4xl text-on-surface leading-none">
-                        {totalVotes.toLocaleString('id-ID')}
-                      </span>
-                      <span className="text-xs text-secondary">Suara Sah</span>
-                    </div>
-                    <span className="text-xs text-on-surface-variant">Tercatat di Basis Data</span>
-                  </div>
-
-                  <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-xs text-on-surface-variant font-medium">TINGKAT PARTISIPASI</span>
-                    <div className="my-3 flex items-baseline gap-1.5">
-                      <span className="font-bebas text-4xl text-primary leading-none">
-                        {turnoutPercentage}%
-                      </span>
-                      <span className="text-xs text-on-surface-variant">Tercapai</span>
-                    </div>
-                    <span className={`text-xs font-medium ${turnoutPercentage >= 65 ? 'text-secondary' : 'text-hmif-yellow'}`}>
-                      {turnoutPercentage >= 65 ? 'Memenuhi Kuorum (65%)' : 'Target Kuorum 65%'}
-                    </span>
-                  </div>
-                </section>
-
-                {/* Partisipasi per Angkatan & Rekap Singkat */}
-                <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  <div className="lg:col-span-7 bg-surface-container rounded-2xl p-6 border border-outline-variant/30">
-                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-outline-variant/20">
-                      <h2 className="text-sm font-bold text-on-surface">
-                    Partisipasi per Angkatan
-                  </h2>
-                  <span className="text-xs text-on-surface-variant">Agregat Realtime</span>
-                </div>
-
-                <div className="space-y-4">
-                  {generationData.length > 0 ? (
-                    generationData.map((gen) => (
-                      <div key={gen.generation} className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-on-surface">
-                            Angkatan {gen.generation}
-                          </span>
-                          <span className="text-on-surface-variant">
-                            {gen.votedCount} / {gen.totalVoters} Pemilih ({gen.turnoutPercentage}%)
-                          </span>
-                        </div>
-                        <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all duration-500"
-                            style={{ width: `${Math.min(gen.turnoutPercentage, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                        <div className="text-xs text-on-surface-variant py-4 text-center">
-                          Memuat data partisipasi angkatan...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-5 bg-surface-container rounded-2xl p-6 border border-outline-variant/30 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between pb-3 mb-4 border-b border-outline-variant/20">
-                        <h2 className="text-sm font-bold text-on-surface">
-                          Rekapitulasi Suara
-                        </h2>
-                        {isTallyLocked && (
-                          <span className="px-2 py-0.5 rounded bg-error/15 text-error text-[11px] font-bold flex items-center gap-1">
-                            <Lock className="w-3 h-3" />
-                            Terkunci
-                          </span>
-                        )}
-                      </div>
-
-                      {isTallyLocked ? (
-                        <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs text-on-surface-variant leading-relaxed flex flex-col gap-2">
-                          <p>
-                            Hasil suara ditutup selama pemilihan aktif untuk menjaga objektivitas dan netralitas.
-                          </p>
-                          <span className="text-primary font-medium">
-                            {totalVotes} surat suara sah telah tercatat.
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {tallyData.map((cand) => (
-                            <div
-                              key={cand.candidateId}
-                              className="p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-outline-variant/20"
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className="font-bebas text-2xl text-primary">
-                                  {cand.candidateNumber.toString().padStart(2, '0')}
-                                </span>
-                                <div>
-                                  <span className="text-xs font-bold text-on-surface block">
-                                    {cand.candidateNumber === 0
-                                      ? 'Kotak Kosong'
-                                      : `${cand.leaderName} & ${cand.viceLeaderName}`}
-                                  </span>
-                                  <span className="text-[11px] text-on-surface-variant">
-                                    {cand.voteCount} Suara
-                                  </span>
-                                </div>
-                              </div>
-                              <span className="font-bebas text-lg text-primary font-bold">
-                                {cand.percentage}%
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-outline-variant/20 text-xs text-on-surface-variant text-center">
-                      Ballot Secrecy: Data pemilih dan surat suara terpisah murni.
-                    </div>
-                  </div>
-                </section>
-              </>
-            )}
-
-            {/* TAB 2: KELOLA PASANGAN CALON (KANDIDAT) */}
-            {activeTab === 'candidates' && (
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
-                      Kelola Pasangan Calon (Kandidat)
-                    </h1>
-                    <p className="text-xs text-on-surface-variant mt-0.5">
-                      Atur daftar calon Chairman &amp; Vice Chairman HMIF. Tata letak bilik suara menyesuaikan otomatis.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleOpenAddCandidate}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary hover:bg-secondary-fixed font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer self-start sm:self-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Tambah Paslon Baru</span>
-                  </button>
-                </div>
-
-                {/* Banner Notifikasi Pesan Aksi */}
-                {candidateActionMessage && (
-                  <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 text-xs text-primary flex items-center justify-between">
-                    <span>{candidateActionMessage}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCandidateActionMessage(null)}
-                      className="text-primary hover:text-on-surface"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Layout Bilik Suara Indicator */}
-                <div className="rounded-2xl bg-surface-container p-5 border border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                      <LayoutGrid className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-on-surface-variant uppercase tracking-wider block font-medium">
-                        Adaptasi Tata Letak Bilik Suara
-                      </span>
-                      <h3 className="text-sm font-bold text-on-surface">
-                        {regularCount === 1
-                          ? 'Model Head-to-Head (1 Paslon vs Kotak Kosong)'
-                          : regularCount === 2
-                          ? 'Model 2 Kolom (Kotak Kosong di Bawah)'
-                          : `Model Grid ${regularCount} Kolom Responsif`}
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-3 py-1 rounded-full bg-surface-container-high text-xs text-on-surface font-semibold border border-outline-variant/30">
-                      Total: {regularCount} Paslon
-                    </span>
-                    {regularCount === 1 ? (
-                      <span className="px-3 py-1 rounded-full bg-primary/10 text-xs text-primary font-semibold border border-primary/30">
-                        Kotak Kosong: Wajib Aktif (Calon Tunggal)
-                      </span>
-                    ) : regularCount >= 2 ? (
-                      <div className="flex items-center gap-3 bg-surface-container-high px-3 py-1.5 rounded-xl border border-outline-variant/30">
-                        <div className="text-right">
-                          <span className="text-[11px] font-bold text-on-surface block leading-tight">
-                            Opsi Kotak Kosong
-                          </span>
-                          <span className="text-[11px] text-on-surface-variant">
-                            {allowKotakKosongMulti ? 'Diikutsertakan' : 'Dinonaktifkan'}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={allowKotakKosongMulti}
-                          aria-label="Opsi Kotak Kosong Multi-Paslon"
-                          title={
-                            allowKotakKosongMulti
-                              ? 'Klik untuk mematikan opsi Kotak Kosong'
-                              : 'Klik untuk mengaktifkan opsi Kotak Kosong'
-                          }
-                          disabled={togglingKotakKosong}
-                          onClick={handleToggleKotakKosong}
-                          className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] disabled:opacity-50 ${
-                            allowKotakKosongMulti
-                              ? 'bg-primary border-primary'
-                              : 'bg-surface-container-highest border-outline-variant/40'
-                          }`}
-                        >
-                          <span
-                            className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
-                              allowKotakKosongMulti ? 'translate-x-6' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Candidates List Cards */}
-                {loadingCandidates ? (
-                  <div className="py-16 text-center text-xs text-on-surface-variant flex flex-col items-center gap-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <span>Memuat data calon...</span>
-                  </div>
-                ) : regularCandidates.length === 0 ? (
-                  <div className="py-16 text-center text-xs text-on-surface-variant bg-surface-container rounded-2xl border border-outline-variant/30 p-8">
-                    <Users className="w-10 h-10 text-on-surface-variant mx-auto mb-2 opacity-60" />
-                    <h3 className="text-sm font-bold text-on-surface">Belum ada pasangan calon</h3>
-                    <p className="mt-1">Klik tombol &ldquo;Tambah Paslon Baru&rdquo; untuk mendaftarkan kandidat pertama.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {regularCandidates.map((cand) => (
-                      <div
-                        key={cand.id}
-                        className="rounded-2xl bg-surface-container p-5 border border-outline-variant/30 flex flex-col justify-between gap-4"
-                      >
-                        <div className="flex flex-col gap-3">
-                          {/* Card Top: Number & Actions */}
-                          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-                            <div className="flex items-center gap-2">
-                              <span className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center font-bebas text-xl text-primary">
-                                {cand.candidate_number.toString().padStart(2, '0')}
-                              </span>
-                              <span className="text-xs font-bold text-on-surface">
-                                Paslon {cand.candidate_number.toString().padStart(2, '0')}
-                              </span>
-                              {cand.is_active === false ? (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                                  Nonaktif
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                  Aktif
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditCandidate(cand)}
-                                className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
-                                title="Edit Paslon"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteCandidate(cand)}
-                                className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors"
-                                title="Hapus Paslon"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Leader & Vice Leader with Photo / Avatar */}
-                          <div className="flex items-center gap-3">
-                            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center shrink-0">
-                              {cand.photo_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={cand.photo_url}
-                                  alt={`Paslon ${cand.candidate_number}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <Users className="w-5 h-5 text-primary/70" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <h4 className="text-sm font-bold text-on-surface leading-snug truncate">
-                                {cand.leader_name}
-                              </h4>
-                              <p className="text-xs text-on-surface-variant truncate">
-                                &amp; {cand.vice_leader_name}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* CV status badges */}
-                          <div className="flex flex-wrap gap-1.5 text-[11px]">
-                            <span
-                              className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                                cand.chairman_cv_url
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
-                                  : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'
-                              }`}
-                            >
-                              <FileText className="w-3 h-3" />
-                              <span>{cand.chairman_cv_url ? 'CV Chairman ✓' : 'CV Chairman -'}</span>
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                                cand.vice_chairman_cv_url
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
-                                  : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'
-                              }`}
-                            >
-                              <FileText className="w-3 h-3" />
-                              <span>{cand.vice_chairman_cv_url ? 'CV Vice ✓' : 'CV Vice -'}</span>
-                            </span>
-                          </div>
-
-                          {/* Vision preview */}
-                          <div className="p-3 rounded-xl bg-surface-container-low text-xs text-on-surface-variant border border-outline-variant/20">
-                            <span className="text-[11px] text-on-surface-variant uppercase font-semibold block mb-0.5">
-                              Visi:
-                            </span>
-                            <p className="line-clamp-2 leading-relaxed">
-                              {cand.vision || 'Belum ada visi.'}
-                            </p>
-                          </div>
-
-                          {/* Missions summary */}
-                          <div className="text-xs text-on-surface-variant">
-                            <span>{Array.isArray(cand.mission) ? cand.mission.length : 0} butir misi</span>
-                          </div>
-                        </div>
-
-                        {/* Card Footer Status */}
-                        <div className="pt-2 border-t border-outline-variant/20 flex items-center justify-between text-[11px] text-on-surface-variant">
-                          <span>Status: {cand.is_active === false ? 'Diarsipkan' : 'Terdaftar Resmi'}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCandidateActive(cand)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 border transition-colors cursor-pointer ${
-                              cand.is_active === false
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                            }`}
-                            title={cand.is_active === false ? 'Aktifkan Paslon di Bilik Suara' : 'Nonaktifkan Paslon dari Bilik Suara'}
-                          >
-                            <span>{cand.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB 3: MANAJEMEN DPT */}
-            {activeTab === 'dpt' && (
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
-                      Manajemen Daftar Pemilih Tetap (DPT)
-                    </h1>
-                    <p className="text-xs text-on-surface-variant mt-0.5">
-                      Kelola hak pilih mahasiswa aktif Informatika Telkom University Purwokerto.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickAddModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/30 transition-colors shadow-sm cursor-pointer"
-                    >
-                      <UserPlus className="w-3.5 h-3.5 text-primary" />
-                      <span>+ Pemilih Uji Coba</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDownloadTemplate}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface border border-outline-variant/30 transition-colors cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-primary" />
-                      <span>Template CSV</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Unggah berkas DPT format CSV atau Excel (.xlsx, .xls)"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all shadow-sm cursor-pointer"
-                    >
-                      <UploadCloud className="w-4 h-4" />
-                      <span>Upload DPT</span>
-                    </button>
-
-                    {userRole === 'super_admin' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsResetDptModalOpen(true);
-                          setResetDptConfirmText('');
-                          setDptErrorMessage(null);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-xs font-bold text-error border border-error/30 transition-colors shadow-sm cursor-pointer"
-                        title="Reset atau Kosongkan Data DPT (Khusus Superadmin)"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-error" />
-                        <span>Reset DPT</span>
-                      </button>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".csv,.txt,.xlsx,.xls"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  </div>
-                </div>
-
-                {importSuccessMessage && (
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5 text-xs text-emerald-400 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4" />
-                      <span>{importSuccessMessage}</span>
-                    </div>
-                    <button onClick={() => setImportSuccessMessage(null)} className="text-emerald-400 hover:text-white cursor-pointer">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                {dptActionMessage && (
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5 text-xs text-emerald-400 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4" />
-                      <span>{dptActionMessage}</span>
-                    </div>
-                    <button onClick={() => setDptActionMessage(null)} className="text-emerald-400 hover:text-white cursor-pointer">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                {dptErrorMessage && (
-                  <div className="rounded-xl border border-error/30 bg-error/10 p-3.5 text-xs text-error flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span>{dptErrorMessage}</span>
-                    </div>
-                    <button onClick={() => setDptErrorMessage(null)} className="text-error hover:text-white cursor-pointer">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Staging / Pre-commit Preview Area */}
-                {importPreview && (
-                  <div className="rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col gap-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-outline-variant/30">
-                      <div>
-                        <h3 className="text-sm font-bold text-on-surface flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-primary" />
-                          <span>Pratinjau Berkas: {stagedFile?.name}</span>
-                        </h3>
-                        <span className="text-xs text-on-surface-variant">
-                          Sistem memvalidasi kelengkapan data sebelum disimpan ke database.
-                        </span>
-                      </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-bold">
-                        Staging
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-on-surface-variant text-[11px] block">Total Baris:</span>
-                        <span className="font-bebas text-2xl text-on-surface">{importPreview.totalRows}</span>
-                      </div>
-                      <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-on-surface-variant text-[11px] block">Valid:</span>
-                        <span className="font-bebas text-2xl text-secondary">{importPreview.validCount}</span>
-                      </div>
-                      <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-on-surface-variant text-[11px] block">Duplikat:</span>
-                        <span className="font-bebas text-2xl text-hmif-yellow">{importPreview.duplicateCount}</span>
-                      </div>
-                      <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                        <span className="text-on-surface-variant text-[11px] block">Format Invalid:</span>
-                        <span className="font-bebas text-2xl text-error">{importPreview.invalidCount}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStagedFile(null);
-                          setImportPreview(null);
-                        }}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                      >
-                        Batal
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isCommittingImport || importPreview.validCount === 0}
-                        onClick={handleCommitImport}
-                        className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
-                      >
-                        {isCommittingImport ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Menyimpan ke Database...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-4 h-4" />
-                            <span>Simpan {importPreview.validCount} Data</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Voter Search & Filters */}
-                <div className="rounded-2xl bg-surface-container p-4 border border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="relative w-full sm:w-80">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setDptPage(1);
-                      }}
-                      placeholder="Cari NIM, Nama, atau Email..."
-                      className="w-full bg-surface-container-lowest text-xs rounded-xl pl-9 pr-3 py-2.5 min-h-[44px] border border-outline-variant/30 focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary text-on-surface placeholder:text-on-surface-variant/60"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <select
-                      value={selectedGeneration}
-                      onChange={(e) => {
-                        setSelectedGeneration(e.target.value);
-                        setDptPage(1);
-                      }}
-                      className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-                    >
-                      <option value="all">Semua Angkatan</option>
-                      {availableGenerations.map((gen) => (
-                        <option key={gen} value={gen.toString()}>
-                          Angkatan {gen}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={selectedStatus}
-                      onChange={(e) => {
-                        setSelectedStatus(e.target.value);
-                        setDptPage(1);
-                      }}
-                      className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-                    >
-                      <option value="all">Semua Status</option>
-                      <option value="voted">Sudah Memilih</option>
-                      <option value="not_voted">Belum Memilih</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Batch Action Bar untuk Seleksi Pemilih */}
-                {selectedVoterIds.length > 0 && (
-                  <div className="rounded-2xl bg-primary/10 border border-primary/30 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-                      <span className="text-xs font-bold text-on-surface">
-                        {selectedVoterIds.length} pemilih dipilih
-                      </span>
-                      <span className="text-[11px] text-on-surface-variant hidden sm:inline">
-                        (dari {voters.length} pemilih yang ditampilkan)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedVoterIds([])}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                      >
-                        Batal
-                      </button>
-                      {userRole === 'super_admin' && (
-                        <button
-                          type="button"
-                          onClick={() => setIsBatchDeleteModalOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Hapus Terpilih ({selectedVoterIds.length})</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Voters Table */}
-                <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-surface-container-high/60 border-b border-outline-variant/30 text-on-surface-variant uppercase tracking-wider font-semibold">
-                          {userRole === 'super_admin' && (
-                            <th className="py-3 px-4 w-10 text-center">
-                              <input
-                                type="checkbox"
-                                checked={isAllVisibleVotersSelected}
-                                onChange={toggleSelectAllVoters}
-                                className="rounded border-outline-variant/40 text-primary focus:ring-0 cursor-pointer"
-                                title="Pilih semua pemilih di halaman ini"
-                              />
-                            </th>
-                          )}
-                          <th className="py-3 px-5">NIM</th>
-                          <th className="py-3 px-5">Nama Mahasiswa</th>
-                          <th className="py-3 px-5">Email SSO</th>
-                          <th className="py-3 px-5">Angkatan</th>
-                          <th className="py-3 px-5">Status</th>
-                          {userRole === 'super_admin' && (
-                            <th className="py-3 px-5 text-right w-20">Aksi</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-outline-variant/20">
-                        {loadingVoters ? (
-                          <tr>
-                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-on-surface-variant">
-                              Memuat data pemilih...
-                            </td>
-                          </tr>
-                        ) : voters.length === 0 ? (
-                          <tr>
-                            <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-on-surface-variant">
-                              Tidak ada data yang cocok dengan pencarian.
-                            </td>
-                          </tr>
-                        ) : (
-                          voters.map((v) => (
-                            <tr key={v.id} className="hover:bg-surface-container-high/40 transition-colors">
-                              {userRole === 'super_admin' && (
-                                <td className="py-3 px-4 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedVoterIds.includes(v.id)}
-                                    onChange={() => toggleSelectVoter(v.id)}
-                                    className="rounded border-outline-variant/40 text-primary focus:ring-0 cursor-pointer"
-                                  />
-                                </td>
-                              )}
-                              <td className="py-3 px-5 font-mono font-semibold text-primary">{v.nim}</td>
-                              <td className="py-3 px-5 font-medium text-on-surface">{v.name}</td>
-                              <td className="py-3 px-5 font-mono text-[11px] text-on-surface-variant">{v.email}</td>
-                              <td className="py-3 px-5">
-                                <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[11px]">
-                                  {v.generation}
-                                </span>
-                              </td>
-                              <td className="py-3 px-5">
-                                {v.has_voted ? (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-[11px] font-semibold">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                                    Sudah Memilih
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[11px]">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-outline-variant" />
-                                    Belum Memilih
-                                  </span>
-                                )}
-                              </td>
-                              {userRole === 'super_admin' && (
-                                <td className="py-3 px-5 text-right">
-                                  {v.email?.toLowerCase() === 'marzhendogalangs@gmail.com' ? (
-                                    <span className="text-[10px] text-primary/70 font-mono italic" title="Akun Superadmin Utama (Dilindungi)">
-                                      Utama
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => setVoterToDelete(v)}
-                                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                                      title={`Hapus ${v.name} (${v.nim}) dari DPT`}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </td>
-                              )}
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Pagination Controls */}
-                  <div className="p-4 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span>
-                        Menampilkan{' '}
-                        <strong className="text-on-surface">
-                          {voterTotalCount > 0 ? (dptPage - 1) * dptPageSize + 1 : 0} -{' '}
-                          {Math.min(dptPage * dptPageSize, voterTotalCount)}
-                        </strong>{' '}
-                        dari <strong className="text-on-surface">{voterTotalCount}</strong> pemilih terdaftar
-                      </span>
-
-                      <div className="flex items-center gap-1.5 ml-2">
-                        <span className="text-[11px] text-on-surface-variant/70">Baris:</span>
-                        <select
-                          value={dptPageSize}
-                          onChange={(e) => {
-                            const newSize = Number(e.target.value);
-                            setDptPageSize(newSize);
-                            setDptPage(1);
-                          }}
-                          className="bg-surface-container-lowest text-xs rounded-lg px-2.5 py-1 min-h-[32px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary cursor-pointer font-medium"
-                        >
-                          <option value={25}>25</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDptPage((p) => Math.max(p - 1, 1))}
-                        disabled={dptPage <= 1 || loadingVoters}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[36px] rounded-xl border border-outline-variant/30 text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        title="Halaman Sebelumnya"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                        <span>Sebelumnya</span>
-                      </button>
-
-                      <div className="px-3 py-1.5 min-h-[36px] flex items-center font-mono text-xs text-on-surface font-semibold bg-surface-container-high rounded-xl border border-outline-variant/30">
-                        <span>Halaman {dptPage} / {dptTotalPages}</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setDptPage((p) => Math.min(p + 1, dptTotalPages))}
-                        disabled={dptPage >= dptTotalPages || loadingVoters}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[36px] rounded-xl border border-outline-variant/30 text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        title="Halaman Berikutnya"
-                      >
-                        <span>Berikutnya</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 4: REKAPITULASI SUARA */}
-            {activeTab === 'tally' && (
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface">
-                        Rekapitulasi Suara
-                      </h1>
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-medium text-on-surface-variant">
-                        <Activity className="w-3.5 h-3.5 text-primary" />
-                        <span>Live Telemetri</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-on-surface-variant mt-0.5">
-                      Hasil agregasi surat suara yang sah tanpa keterkaitan identitas pemilih.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => fetchTally()}
-                      disabled={loadingTally}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface-variant hover:text-on-surface border border-outline-variant/30 transition-colors cursor-pointer"
-                      title="Segarkan Perolehan Suara"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${loadingTally ? 'animate-spin text-primary' : ''}`} />
-                      <span className="hidden sm:inline">Segarkan</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleResetDevBallots}
-                      disabled={isResettingBallots}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-xs font-semibold text-error border border-error/30 transition-colors"
-                      title="Kosongkan Suara Pengujian Simulasi"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Reset Suara</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsBastModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-xs font-semibold hover:bg-surface-bright transition-colors border border-outline-variant/30"
-                    >
-                      <FileText className="w-4 h-4 text-primary" />
-                      <span>Cetak Berita Acara</span>
-                    </button>
-
-                    <a
-                      href="/api/admin/tally/export"
-                      download="Rekapitulasi-Suara-Pemira-HMIF-2026-2027.csv"
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold transition-colors border border-outline-variant/30"
-                      title="Ekspor Rekapitulasi Suara Resmi ke Format CSV"
-                    >
-                      <Download className="w-4 h-4 text-primary" />
-                      <span>Unduh CSV</span>
-                    </a>
-                  </div>
-                </div>
-
-                {isTallyLocked ? (
-                  <div className="rounded-2xl bg-surface-container p-8 text-center flex flex-col items-center justify-center gap-3 border border-outline-variant/30 max-w-md mx-auto my-8">
-                    <div className="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary">
-                      <LockKeyhole className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-sm font-bold text-on-surface">
-                      Hasil Rekapitulasi Suara Terkunci
-                    </h3>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
-                      Sesuai keputusan KPR HMIF, hasil perolehan suara ditutup selama pemilihan berlangsung aktif untuk menjaga kerahasiaan dan integritas proses.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {tallyData.map((cand) => (
-                      <div
-                        key={cand.candidateId}
-                        className="rounded-2xl bg-surface-container p-5 border border-outline-variant/30 flex flex-col justify-between gap-4"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="font-bebas text-3xl text-primary font-bold">
-                              {cand.candidateNumber.toString().padStart(2, '0')}
-                            </span>
-                            <div>
-                              <h3 className="text-sm font-bold text-on-surface">
-                                {cand.candidateNumber === 0
-                                  ? 'Kotak Kosong'
-                                  : `${cand.leaderName} & ${cand.viceLeaderName}`}
-                              </h3>
-                              <span className="text-xs text-on-surface-variant">
-                                {cand.candidateNumber === 0 ? 'Opsi Abstain Sah' : 'Pasangan Calon'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <span className="font-bebas text-2xl text-secondary">
-                            {cand.percentage}%
-                          </span>
-                        </div>
-
-                        <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all duration-500"
-                            style={{ width: `${cand.percentage}%` }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-on-surface-variant pt-2 border-t border-outline-variant/20">
-                          <span>Suara Masuk:</span>
-                          <span className="font-bold text-on-surface font-mono">{cand.voteCount} Suara</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB 5: PENGATURAN PEMILIHAN & JADWAL */}
-            {activeTab === 'settings' && (
-              <div className="flex flex-col gap-6 max-w-3xl">
-                <div className="pb-4 border-b border-outline-variant/30">
-                  <h1 className="text-xl sm:text-2xl font-bold text-on-surface">
-                    Pengaturan Pemilihan & Jadwal Pemira
-                  </h1>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    Atur jadwal resmi pelaksanaan, kendali pembukaan bilik suara, dan sakelar darurat teknis.
-                  </p>
-                </div>
-
-                {settingsMessage && (
-                  <div className="rounded-xl border border-outline-variant/40 bg-surface-container p-3.5 text-xs text-on-surface">
-                    {settingsMessage}
-                  </div>
-                )}
-
-                {/* KARTU 1: JADWAL RESMI PELAKSANAAN PEMIRA */}
-                <div className="rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col gap-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-outline-variant/20">
-                    <div className="flex items-center gap-2.5">
-                      <Calendar className="w-5 h-5 text-primary" />
-                      <div>
-                        <h3 className="text-sm font-bold text-on-surface">
-                          Jadwal Operasional Pemira
-                        </h3>
-                        <p className="text-xs text-on-surface-variant">
-                          Rentang waktu resmi pembukaan bilik suara digital (WIB / UTC+7).
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Schedule Status Badge */}
-                    {(() => {
-                      const status = getElectionSystemStatus();
-                      const StatusIcon = status.icon;
-                      return (
-                        <span className={`self-start sm:self-auto px-3 py-1 rounded-xl text-[11px] font-bold uppercase tracking-wider border flex items-center gap-1.5 transition-colors ${status.scheduleCardBadge}`}>
-                          <StatusIcon className="w-3.5 h-3.5 shrink-0" />
-                          <span>{status.scheduleCardText}</span>
-                        </span>
-                      );
-                    })()}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold uppercase text-on-surface-variant flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-primary" />
-                        <span>Waktu Mulai Pemilihan:</span>
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono min-h-[44px] focus-visible:ring-2 focus-visible:ring-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold uppercase text-on-surface-variant flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-primary" />
-                        <span>Waktu Penutupan Pemilihan:</span>
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-mono min-h-[44px] focus-visible:ring-2 focus-visible:ring-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-on-surface-variant leading-relaxed bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-                    ℹ️ Sistem akan mengizinkan pengiriman suara hanya ketika waktu saat ini berada di antara waktu mulai dan penutupan. Di luar rentang waktu tersebut, bilik suara otomatis terkunci secara aman.
-                  </p>
-                </div>
-
-                {/* KARTU 2: KENDALI BILIK SUARA & SAKELAR DARURAT */}
-                <div className="rounded-2xl bg-surface-container p-6 border border-outline-variant/30 flex flex-col gap-5">
-                  <h3 className="text-sm font-bold text-on-surface pb-2 border-b border-outline-variant/20">
-                    Kendali Akses &amp; Sakelar Darurat
-                  </h3>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-on-surface">
-                        Buka Pemungutan Suara
-                      </h4>
-                      <p className="text-xs text-on-surface-variant mt-0.5">
-                        Sakelar utama izin pengiriman suara pemilih di bilik suara digital.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isVotingOpen}
-                      aria-label="Buka Pemungutan Suara"
-                      onClick={handleOpenVotingToggleModal}
-                      className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] ${
-                        isVotingOpen
-                          ? 'bg-primary border-primary'
-                          : 'bg-surface-container-highest border-outline-variant/40'
-                      }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
-                          isVotingOpen ? 'translate-x-6' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 pt-4 border-t border-outline-variant/20">
-                    <div>
-                      <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-hmif-red" />
-                        Mode Pemeliharaan Darurat
-                      </h4>
-                      <p className="text-xs text-on-surface-variant mt-0.5">
-                        Nonaktifkan sementara pengiriman suara, bisa diaktifkan kembali kapan saja.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={maintenanceMode}
-                      aria-label="Mode Pemeliharaan Darurat"
-                      onClick={handleOpenMaintenanceToggleModal}
-                      className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] ${
-                        maintenanceMode
-                          ? 'bg-hmif-red border-hmif-red'
-                          : 'bg-surface-container-highest border-outline-variant/40'
-                      }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
-                          maintenanceMode ? 'translate-x-6' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 pt-4 border-t border-outline-variant/20">
-                    <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                      Alasan Perubahan:
-                    </label>
-                    <textarea
-                      value={settingsReason}
-                      onChange={(e) => setSettingsReason(e.target.value)}
-                      placeholder="Contoh: Jeda teknis sebelum penghitungan suara"
-                      rows={2}
-                      className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={settingsSaving || !settingsReason.trim()}
-                    onClick={() => handleSaveSettings(isVotingOpen, maintenanceMode, startTime, endTime, settingsReason)}
-                    className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {settingsSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Menyimpan Pengaturan...</span>
-                      </>
-                    ) : (
-                      <span>Simpan Pengaturan &amp; Jadwal</span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 6: BROADCAST EMAIL */}
-            {activeTab === 'emails' && (
-              <div className="flex flex-col gap-6">
-                <div className="pb-4 border-b border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-on-surface flex items-center gap-2.5">
-                      <Mail className="w-6 h-6 text-primary" />
-                      <span>Broadcast Email Pemira HMIF</span>
-                    </h1>
-                    <p className="text-xs text-on-surface-variant mt-0.5">
-                      Kirim email pengumuman resmi dan pengingat hak suara ke mahasiswa Telkom University.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={fetchBroadcastCount}
-                    className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-semibold bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-primary" />
-                    <span>Segarkan Kuota</span>
-                  </button>
-                </div>
-
-                {/* Metrics Summary Strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-                    <span className="text-[11px] font-semibold uppercase text-on-surface-variant block">Total DPT Resmi</span>
-                    <span className="text-xl font-bold text-on-surface font-mono">{totalDpt} Mahasiswa</span>
-                  </div>
-                  <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-                    <span className="text-[11px] font-semibold uppercase text-emerald-400 block">Sudah Menggunakan Hak Suara</span>
-                    <span className="text-xl font-bold text-emerald-400 font-mono">{totalVotes} Mahasiswa</span>
-                  </div>
-                  <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-                    <span className="text-[11px] font-semibold uppercase text-amber-400 block">Belum Menggunakan Hak Suara</span>
-                    <span className="text-xl font-bold text-amber-400 font-mono">{Math.max(0, totalDpt - totalVotes)} Mahasiswa</span>
-                  </div>
-                </div>
-
-                {/* Results / Error Banner */}
-                {broadcastResult && (
-                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-400 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold block">Broadcast terkirim.</span>
-                      <span className="text-emerald-300 block mt-0.5">
-                        Total {broadcastResult.sentCount} email berhasil terkirim ke mahasiswa ({broadcastResult.failedCount} gagal) dari total target {broadcastResult.totalTarget} penerima.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {broadcastError && (
-                  <div className="rounded-2xl border border-hmif-red/30 bg-hmif-red/10 p-4 text-xs text-hmif-red flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold block">Gagal Mengirim Broadcast</span>
-                      <span className="block mt-0.5">{broadcastError}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Main 2-Column Interface: Composer & Live Preview */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  {/* Left Column: Configuration & Message Composer */}
-                  <div className="lg:col-span-7 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-5">
-                    {/* Template Picker */}
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-2">
-                        Pilih Template Pesan:
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTemplate('reminder')}
-                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
-                            broadcastTemplate === 'reminder'
-                              ? 'bg-primary text-on-primary border-primary shadow-sm'
-                              : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
-                          }`}
-                        >
-                          <span className="block">⏳ Pengingat (Nudge)</span>
-                          <span className="text-[11px] opacity-80 block mt-0.5">Khusus belum memilih</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTemplate('invitation')}
-                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
-                            broadcastTemplate === 'invitation'
-                              ? 'bg-primary text-on-primary border-primary shadow-sm'
-                              : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
-                          }`}
-                        >
-                          <span className="block">📢 Undangan Buka</span>
-                          <span className="text-[11px] opacity-80 block mt-0.5">Untuk semua DPT</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTemplate('custom')}
-                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
-                            broadcastTemplate === 'custom'
-                              ? 'bg-primary text-on-primary border-primary shadow-sm'
-                              : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
-                          }`}
-                        >
-                          <span className="block">✍️ Pesan Kustom</span>
-                          <span className="text-[11px] opacity-80 block mt-0.5">Tulis bebas</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Filter Target Penerima */}
-                    <div className="pt-4 border-t border-outline-variant/20 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                          Target Kelompok Pemilih:
-                        </label>
-                        <select
-                          value={broadcastTargetGroup}
-                          onChange={(e) => setBroadcastTargetGroup(e.target.value as any)}
-                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
-                        >
-                          <option value="not_voted">🔴 Khusus yang Belum Memilih (Rekomendasi)</option>
-                          <option value="all">👥 Seluruh Mahasiswa di DPT</option>
-                          <option value="voted">🟢 Khusus yang Sudah Memilih</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                          Filter Angkatan:
-                        </label>
-                        <select
-                          value={broadcastGeneration}
-                          onChange={(e) => setBroadcastGeneration(e.target.value)}
-                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
-                        >
-                          <option value="all">
-                            Semua Angkatan {availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ''}
-                          </option>
-                          {availableGenerations.map((gen) => (
-                            <option key={gen} value={gen.toString()}>
-                              Angkatan {gen}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Target Counter Badge */}
-                    <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/20 flex items-center justify-between text-xs">
-                      <span className="text-on-surface-variant">Jumlah Penerima Sasaran:</span>
-                      <span className="font-bold text-primary font-mono text-sm">
-                        {loadingBroadcastCount ? (
-                          <Loader2 className="w-4 h-4 animate-spin inline" />
-                        ) : (
-                          `${broadcastTargetCount ?? '...'} Mahasiswa`
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Form Fields */}
-                    <div className="space-y-4 pt-2">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                          Subjek Email:
-                        </label>
-                        <input
-                          type="text"
-                          value={broadcastSubject}
-                          onChange={(e) => setBroadcastSubject(e.target.value)}
-                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-medium"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                          Judul Pengumuman:
-                        </label>
-                        <input
-                          type="text"
-                          value={broadcastHeadline}
-                          onChange={(e) => setBroadcastHeadline(e.target.value)}
-                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary font-bold"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                          Isi Pesan Pengumuman:
-                        </label>
-                        <textarea
-                          rows={6}
-                          value={broadcastBody}
-                          onChange={(e) => setBroadcastBody(e.target.value)}
-                          className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary leading-relaxed"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                            Teks Tombol Aksi (CTA):
-                          </label>
-                          <input
-                            type="text"
-                            value={broadcastCtaText}
-                            onChange={(e) => setBroadcastCtaText(e.target.value)}
-                            className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-semibold uppercase text-on-surface-variant">
-                            Tautan Tombol Aksi:
-                          </label>
-                          <input
-                            type="text"
-                            value={broadcastCtaUrl}
-                            placeholder="/login atau https://pemirahmif.org/login"
-                            onChange={(e) => setBroadcastCtaUrl(e.target.value)}
-                            className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
-                          />
-                          <span className="text-[11px] text-on-surface-variant block">
-                            Tautan relatif (contoh: /login) akan otomatis dikonversi sistem ke alamat domain resmi Pemira.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Submit Action */}
-                    <button
-                      type="button"
-                      disabled={isBroadcasting || (broadcastTargetCount !== null && broadcastTargetCount === 0)}
-                      onClick={() => setIsConfirmBroadcastOpen(true)}
-                      className="w-full h-12 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer mt-4"
-                    >
-                      <Send className="w-4 h-4" />
-                      <span>Kirim Broadcast Email ({broadcastTargetCount ?? '...'} Penerima)</span>
-                    </button>
-                  </div>
-
-                  {/* Right Column: Live Email Preview */}
-                  <div className="hidden lg:block lg:col-span-5 bg-surface-container rounded-3xl p-6 sm:p-7 border border-outline-variant/30 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
-                      <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                        Pratinjau Email Mahasiswa
-                      </span>
-                      <span className="text-[11px] text-on-surface-variant font-mono">
-                        Outlook Preview
-                      </span>
-                    </div>
-
-                    {/* Email Container Frame */}
-                    <div className="bg-[#181818] rounded-2xl border border-neutral-800 p-5 space-y-4 text-xs font-sans">
-                      {/* Email Meta Headers */}
-                      <div className="pb-3 border-b border-neutral-800 space-y-1 text-[11px]">
-                        <div><strong className="text-neutral-400">Dari:</strong> <span className="text-neutral-200">Panitia Pemira HMIF &lt;noreply@pemirahmif.org&gt;</span></div>
-                        <div><strong className="text-neutral-400">Kepada:</strong> <span className="text-neutral-200 font-mono">103012300001@student.telkomuniversity.ac.id</span></div>
-                        <div><strong className="text-neutral-400">Subjek:</strong> <span className="text-primary font-medium">{broadcastSubject}</span></div>
-                      </div>
-
-                      {/* Rendered Email Card */}
-                      <div className="bg-[#1E1E1E] rounded-xl p-5 border border-neutral-800 space-y-4">
-                        <div className="text-center pb-3 border-b border-neutral-800">
-                          <span className="text-[11px] font-bold text-hmif-gold uppercase tracking-widest block">
-                            PEMIRA HMIF 2026/2027
-                          </span>
-                          <h4 className="text-sm font-bold text-white mt-1">
-                            {broadcastHeadline}
-                          </h4>
-                          <span className="text-[11px] text-neutral-400 block mt-0.5">
-                            Telkom University Purwokerto
-                          </span>
-                        </div>
-
-                        <p className="text-neutral-300 leading-relaxed text-[11px]">
-                          Halo <strong>Ahmad Rizky Pratama</strong>,
-                        </p>
-
-                        <div className="text-neutral-300 leading-relaxed text-[11px] whitespace-pre-line space-y-2">
-                          {broadcastBody}
-                        </div>
-
-                        <div className="pt-2 text-center">
-                          <span className="inline-block px-5 py-2.5 rounded-lg bg-hmif-blue text-white text-[11px] font-bold shadow-md">
-                            {broadcastCtaText}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded bg-neutral-900 border-l-2 border-hmif-gold text-[11px] text-neutral-400 leading-normal">
-                          Pilihan suaramu bersifat rahasia dan disimpan secara anonim tanpa mencatat identitas pemilih pada surat suara.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 7: AUDIT LOG & REKAM JEJAK SISTEM */}
-            {activeTab === 'audit' && (
-              <div className="space-y-6">
-                {/* Header Section */}
-                <div className="rounded-2xl bg-surface-container p-6 sm:p-7 border border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
-                      <History className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg sm:text-xl font-bold text-on-surface flex items-center gap-2">
-                        Audit Trail &amp; Rekam Jejak Sistem
-                      </h2>
-                      <p className="text-xs text-on-surface-variant mt-0.5">
-                        Transparansi penuh seluruh aktivitas konfigurasi, perubahan paslon, DPT, dan aksi administratif panitia.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-                    <button
-                      type="button"
-                      disabled={loadingAuditLogs}
-                      onClick={() => fetchAuditLogs()}
-                      className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center gap-1.5 border border-outline-variant/30 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${loadingAuditLogs ? 'animate-spin' : ''}`} />
-                      <span>Segarkan Log</span>
-                    </button>
-
-                    <a
-                      href={`/api/admin/audit-logs/export?action=${encodeURIComponent(auditFilterAction)}&q=${encodeURIComponent(auditSearchQuery)}`}
-                      download="Audit-Trail-Pemira-HMIF.csv"
-                      className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-semibold flex items-center gap-1.5 border border-outline-variant/30 transition-colors"
-                      title="Ekspor Seluruh Log Audit ke Format CSV"
-                    >
-                      <Download className="w-3.5 h-3.5 text-primary" />
-                      <span>Ekspor Log (CSV)</span>
-                    </a>
-                  </div>
-                </div>
-
-                {/* Audit Statistics Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Total Log</span>
-                    <span className="text-xl sm:text-2xl font-bold text-on-surface mt-2 font-mono">
-                      {auditStats?.total || auditLogs.length}
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Konfigurasi</span>
-                    <span className="text-xl sm:text-2xl font-bold text-blue-400 mt-2 font-mono">
-                      {auditStats?.settingsCount || 0}
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Paslon</span>
-                    <span className="text-xl sm:text-2xl font-bold text-emerald-400 mt-2 font-mono">
-                      {auditStats?.candidatesCount || 0}
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">DPT &amp; Pemilih</span>
-                    <span className="text-xl sm:text-2xl font-bold text-amber-400 mt-2 font-mono">
-                      {auditStats?.dptCount || 0}
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Broadcast</span>
-                    <span className="text-xl sm:text-2xl font-bold text-purple-400 mt-2 font-mono">
-                      {auditStats?.broadcastCount || 0}
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Administrator</span>
-                    <span className="text-xl sm:text-2xl font-bold text-primary mt-2 font-mono">
-                      {auditStats?.adminCount || 0}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Filter & Search Bar */}
-                <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Cari pelaksana, email, atau rincian aksi..."
-                      value={auditSearchQuery}
-                      onChange={(e) => {
-                        setAuditSearchQuery(e.target.value);
-                        fetchAuditLogs(auditFilterAction, e.target.value);
-                      }}
-                      className="w-full pl-10 pr-4 py-2.5 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-3.5 h-3.5 text-primary shrink-0 ml-1" />
-                    <select
-                      value={auditFilterAction}
-                      onChange={(e) => {
-                        setAuditFilterAction(e.target.value);
-                        fetchAuditLogs(e.target.value, auditSearchQuery);
-                      }}
-                      className="px-3 py-2.5 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-                    >
-                      <option value="all">Semua Kategori Aktivitas</option>
-                      <option value="ELECTION_SETTINGS_UPDATE">Pengaturan Jadwal &amp; Jam</option>
-                      <option value="MAINTENANCE_TOGGLE">Mode Pemeliharaan</option>
-                      <option value="CANDIDATE_CREATE">Pendaftaran Paslon</option>
-                      <option value="CANDIDATE_UPDATE">Pembaruan Paslon</option>
-                      <option value="CANDIDATE_DELETE">Penghapusan Paslon</option>
-                      <option value="KOTAK_KOSONG_TOGGLE">Sakelar Kotak Kosong</option>
-                      <option value="DPT_QUICK_ADD">Tambah Pemilih Cepat</option>
-                      <option value="DPT_BATCH_IMPORT">Impor DPT Massal</option>
-                      <option value="BROADCAST_EMAIL_SENT">Broadcast Email</option>
-                      <option value="BALLOTS_RESET">Reset Surat Suara</option>
-                      <option value="ADMIN_CREATE">Tambah Administrator</option>
-                      <option value="ADMIN_UPDATE_ROLE">Ubah Peran Administrator</option>
-                      <option value="ADMIN_REVOKE">Cabut Akses Administrator</option>
-                    </select>
-
-                    {(auditFilterAction !== 'all' || auditSearchQuery) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuditFilterAction('all');
-                          setAuditSearchQuery('');
-                          fetchAuditLogs('all', '');
-                        }}
-                        className="px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface text-xs font-semibold transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Audit Logs Table */}
-                <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-surface-container-highest/60 text-on-surface-variant uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
-                        <tr>
-                          <th className="py-3 px-4">Waktu</th>
-                          <th className="py-3 px-4">Pelaksana / Admin</th>
-                          <th className="py-3 px-4">Kategori Aksi</th>
-                          <th className="py-3 px-4">Deskripsi Aktivitas</th>
-                          <th className="py-3 px-4 text-right">Alamat IP</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-                        {loadingAuditLogs ? (
-                          <tr>
-                            <td colSpan={5} className="py-12 text-center text-on-surface-variant">
-                              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
-                              <span>Memuat rekam jejak audit...</span>
-                            </td>
-                          </tr>
-                        ) : auditLogs.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="py-12 text-center text-on-surface-variant">
-                              <ShieldAlert className="w-8 h-8 mx-auto mb-2 text-on-surface-variant/40" />
-                              <p className="font-semibold text-sm text-on-surface">Tidak ada log audit yang cocok</p>
-                              <p className="text-xs text-on-surface-variant mt-1">Coba sesuaikan kata kunci pencarian atau kategori filter.</p>
-                            </td>
-                          </tr>
-                        ) : (
-                          auditLogs.map((log) => {
-                            const dateObj = new Date(log.timestamp);
-                            const formattedTime = !isNaN(dateObj.getTime())
-                              ? dateObj.toLocaleString('id-ID', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                })
-                              : log.timestamp;
-
-                            // Badge style per action type
-                            let badgeBg = 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30';
-                            let categoryLabel = log.action;
-                            if (log.action.startsWith('ELECTION_') || log.action.startsWith('MAINTENANCE_')) {
-                              badgeBg = 'bg-blue-500/10 text-blue-400 border-blue-500/30';
-                              categoryLabel = 'Konfigurasi';
-                            } else if (log.action.startsWith('CANDIDATE_') || log.action.startsWith('KOTAK_')) {
-                              badgeBg = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-                              categoryLabel = 'Kandidat';
-                            } else if (log.action.startsWith('DPT_')) {
-                              badgeBg = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-                              categoryLabel = 'DPT Pemilih';
-                            } else if (log.action.startsWith('BROADCAST_')) {
-                              badgeBg = 'bg-purple-500/10 text-purple-400 border-purple-500/30';
-                              categoryLabel = 'Broadcast';
-                            } else if (log.action.startsWith('ADMIN_')) {
-                              badgeBg = 'bg-primary/10 text-primary border-primary/30';
-                              categoryLabel = 'Akses Admin';
-                            } else if (log.action.startsWith('BALLOTS_')) {
-                              badgeBg = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
-                              categoryLabel = 'Reset Suara';
-                            }
-
-                            return (
-                              <tr key={log.id} className="hover:bg-surface-container-high/40 transition-colors">
-                                <td className="py-3.5 px-4 font-mono text-[11px] whitespace-nowrap text-on-surface-variant">
-                                  {formattedTime}
-                                </td>
-                                <td className="py-3.5 px-4">
-                                  <div className="font-semibold text-on-surface">{log.actor_name}</div>
-                                  <div className="text-[11px] text-on-surface-variant font-mono">{log.actor_email}</div>
-                                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container-highest text-on-surface-variant">
-                                    {log.actor_role.replace('_', ' ')}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-4 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold border ${badgeBg}`}>
-                                    {categoryLabel}
-                                  </span>
-                                  <span className="block text-[10px] text-on-surface-variant font-mono mt-1">
-                                    {log.action}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-4">
-                                  <div className="font-medium text-on-surface leading-relaxed max-w-lg">
-                                    {log.description}
-                                  </div>
-                                  {log.details && Object.keys(log.details).length > 0 && (
-                                    <details className="mt-1.5 text-[11px] text-on-surface-variant cursor-pointer">
-                                      <summary className="hover:text-primary transition-colors select-none font-semibold">
-                                        Rincian Parameter
-                                      </summary>
-                                      <pre className="mt-1.5 p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/20 font-mono text-[10px] text-on-surface overflow-x-auto max-w-md">
-                                        {JSON.stringify(log.details, null, 2)}
-                                      </pre>
-                                    </details>
-                                  )}
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-mono text-[11px] text-on-surface-variant whitespace-nowrap">
-                                  <span className="inline-flex items-center gap-1">
-                                    <Shield className="w-3 h-3 text-on-surface-variant/60" />
-                                    <span>{log.ip_address}</span>
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 8: MANAJEMEN ADMIN (SUPERADMIN ONLY) */}
-            {activeTab === 'admins' && (
-              <div className="space-y-6">
-                {userRole !== 'super_admin' ? (
-                  <div className="p-8 rounded-2xl bg-surface-container border border-error/30 text-center max-w-xl mx-auto space-y-3">
-                    <ShieldAlert className="w-12 h-12 text-error mx-auto" />
-                    <h3 className="text-base font-bold text-on-surface">Akses Dibatasi Khusus Superadmin</h3>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
-                      Wewenang penambahan panitia dan pembagian peran hanya dapat dikelola langsung oleh akun Superadmin utama (<span className="text-primary font-mono">marzhendogalangs@gmail.com</span>).
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Header Section */}
-                    <div className="rounded-2xl bg-surface-container p-6 sm:p-7 border border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
-                          <UserCog className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                          <h2 className="text-lg sm:text-xl font-bold text-on-surface flex items-center gap-2">
-                            Manajemen Administrator &amp; Panitia
-                          </h2>
-                          <p className="text-xs text-on-surface-variant mt-0.5">
-                            Kontrol otorisasi peran panitia Komisi Pemilihan Raya (KPR), Auditor Independen (DPM), dan Superadmin.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-start md:self-auto">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAdminErrorMessage(null);
-                            setAdminModalOpen(true);
-                          }}
-                          className="px-4 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                          <span>Tambah Admin Baru</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Feedback Messages */}
-                    {adminActionMessage && (
-                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between">
-                        <span>{adminActionMessage}</span>
-                        <button
-                          type="button"
-                          onClick={() => setAdminActionMessage(null)}
-                          className="text-emerald-400 hover:opacity-80 p-1"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Statistics Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Total Pengelola</span>
-                        <span className="text-2xl font-bold text-on-surface mt-2 block font-mono">
-                          {adminStats?.total || adminUsers.length}
-                        </span>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Superadmin</span>
-                        <span className="text-2xl font-bold text-primary mt-2 block font-mono">
-                          {adminStats?.superAdminCount || 0}
-                        </span>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Panitia KPR</span>
-                        <span className="text-2xl font-bold text-blue-400 mt-2 block font-mono">
-                          {adminStats?.kprAdminCount || 0}
-                        </span>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30">
-                        <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider block">Auditor Independen</span>
-                        <span className="text-2xl font-bold text-purple-400 mt-2 block font-mono">
-                          {adminStats?.auditorCount || 0}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Table of Admins */}
-                    <div className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-surface-container-highest/60 text-on-surface-variant uppercase font-semibold text-[10px] tracking-wider border-b border-outline-variant/20">
-                            <tr>
-                              <th className="py-3 px-4">Nama Lengkap &amp; NIM</th>
-                              <th className="py-3 px-4">Email SSO / Akun</th>
-                              <th className="py-3 px-4">Peran (Role)</th>
-                              <th className="py-3 px-4">Status Akun</th>
-                              <th className="py-3 px-4 text-right">Aksi</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-                            {loadingAdmins ? (
-                              <tr>
-                                <td colSpan={5} className="py-12 text-center text-on-surface-variant">
-                                  <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
-                                  <span>Memuat daftar administrator...</span>
-                                </td>
-                              </tr>
-                            ) : adminUsers.length === 0 ? (
-                              <tr>
-                                <td colSpan={5} className="py-8 text-center text-on-surface-variant">
-                                  Belum ada administrator terdaftar.
-                                </td>
-                              </tr>
-                            ) : (
-                              adminUsers.map((admin) => {
-                                const isPrimarySuperadmin = admin.email === 'marzhendogalangs@gmail.com';
-
-                                return (
-                                  <tr key={admin.id} className="hover:bg-surface-container-high/40 transition-colors">
-                                    <td className="py-3.5 px-4">
-                                      <div className="font-semibold text-on-surface flex items-center gap-2">
-                                        <span>{admin.name}</span>
-                                        {isPrimarySuperadmin && (
-                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/20 text-primary border border-primary/30">
-                                            Owner
-                                          </span>
-                                        )}
-                                      </div>
-                                      {admin.nim && (
-                                        <div className="text-[11px] text-on-surface-variant font-mono mt-0.5">
-                                          NIM: {admin.nim}
-                                        </div>
-                                      )}
-                                    </td>
-                                    <td className="py-3.5 px-4 font-mono text-[11px] text-on-surface">
-                                      {admin.email}
-                                    </td>
-                                    <td className="py-3.5 px-4">
-                                      {isPrimarySuperadmin ? (
-                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30 inline-block">
-                                          Superadmin
-                                        </span>
-                                      ) : (
-                                        <select
-                                          value={admin.role}
-                                          onChange={(e) =>
-                                            handleUpdateAdminRole(
-                                              admin.id,
-                                              e.target.value as 'super_admin' | 'kpr_admin' | 'auditor'
-                                            )
-                                          }
-                                          className="px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer font-medium"
-                                        >
-                                          <option value="kpr_admin">Panitia KPR</option>
-                                          <option value="auditor">Auditor Independen</option>
-                                          <option value="super_admin">Superadmin</option>
-                                        </select>
-                                      )}
-                                    </td>
-                                    <td className="py-3.5 px-4">
-                                      <button
-                                        type="button"
-                                        disabled={isPrimarySuperadmin}
-                                        onClick={() => handleToggleAdminStatus(admin)}
-                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                                          admin.is_active
-                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
-                                            : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high'
-                                        } ${isPrimarySuperadmin ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
-                                      >
-                                        <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-emerald-400' : 'bg-on-surface-variant'}`} />
-                                        <span>{admin.is_active ? 'Aktif' : 'Nonaktif'}</span>
-                                      </button>
-                                    </td>
-                                    <td className="py-3.5 px-4 text-right">
-                                      {!isPrimarySuperadmin && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteAdminUser(admin)}
-                                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                                          title="Cabut Akses Administrator"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-
-      {/* MODAL TAMBAH / EDIT PASANGAN CALON */}
-      {candidateModalOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !savingCandidate) {
-                setCandidateModalOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 max-h-[calc(100dvh-2rem)] min-h-0 overflow-y-auto my-auto animate-in zoom-in-95 duration-150"
-              >
-            <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
-              <div>
-                <h3 className="text-base font-bold text-on-surface">
-                  {editingCandidate ? 'Edit Pasangan Calon' : 'Tambah Pasangan Calon Baru'}
-                </h3>
-                <p className="text-xs text-on-surface-variant">
-                  Isi detail data pasangan calon peserta Pemira.
-                </p>
-              </div>
 
               <button
                 type="button"
-                onClick={() => setCandidateModalOpen(false)}
-                aria-label="Tutup formulir paslon"
-                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                onClick={() => {
+                  setActiveTab('candidates');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'candidates'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
               >
-                <X className="w-5 h-5" />
+                <Users className="w-4 h-4" />
+                <span>Kelola Pasangan Calon</span>
               </button>
-            </div>
 
-            <form onSubmit={handleSaveCandidate} className="flex flex-col gap-3.5 text-xs">
-              <div>
-                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
-                  Nomor Urut Paslon
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={candidateFormNumber}
-                  onChange={(e) => setCandidateFormNumber(Number(e.target.value))}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('dpt');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'dpt'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Manajemen DPT</span>
+              </button>
 
-              <div>
-                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
-                  Nama Calon Chairman
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Muhammad Farhan"
-                  value={candidateFormLeader}
-                  onChange={(e) => setCandidateFormLeader(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('tally');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'tally'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+              >
+                <PieChart className="w-4 h-4" />
+                <span>Rekapitulasi Suara</span>
+              </button>
 
-              <div>
-                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
-                  Nama Calon Vice Chairman
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Siti Aisyah"
-                  value={candidateFormViceLeader}
-                  onChange={(e) => setCandidateFormViceLeader(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('settings');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'settings'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                <span>Pengaturan Pemilihan</span>
+              </button>
 
-              {/* Banner Kesalahan Unggah Berkas */}
-              {uploadError && (
-                <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error text-xs flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed">{uploadError}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setUploadError(null)}
-                    aria-label="Tutup pesan error"
-                    className="text-error hover:opacity-80 p-1.5 -m-1 rounded-lg hover:bg-error/10 transition-colors cursor-pointer shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('emails');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'emails'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+              >
+                <Mail className="w-4 h-4" />
+                <span>Broadcast Email</span>
+              </button>
 
-              {/* FOTO PASLON DENGAN FITUR UNGGAH & HAPUS FOTO */}
-              <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-primary" />
-                    <span>Foto Pasangan Calon</span>
-                  </label>
-                  <span className="text-[11px] text-on-surface-variant">Maks. 5 MB (.png, .jpg, .webp)</span>
-                </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('audit');
+                  setIsSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'audit'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                <span>Audit Log</span>
+              </button>
 
-                <input
-                  ref={photoFileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      const objectUrl = URL.createObjectURL(f);
-                      setPhotoToFrame(objectUrl);
-                      setIsPhotoFrameModalOpen(true);
-                      e.target.value = '';
-                    }
-                  }}
-                />
-
-                {candidateFormPhotoUrl ? (
-                  <div className="flex items-center gap-3 bg-surface-container p-2.5 rounded-xl border border-outline-variant/20">
-                    <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-surface-container-highest shrink-0 border border-outline-variant/30">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={candidateFormPhotoUrl}
-                        alt="Preview Foto Paslon"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-on-surface block truncate">
-                        Foto Paslon Terpasang
-                      </span>
-                      <span className="text-[11px] text-on-surface-variant block truncate font-mono mt-0.5">
-                        {candidateFormPhotoUrl}
-                      </span>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPhotoToFrame(candidateFormPhotoUrl);
-                            setIsPhotoFrameModalOpen(true);
-                          }}
-                          className="text-[11px] font-semibold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <Crop className="w-3 h-3" />
-                          <span>Sesuaikan Frame (4:3)</span>
-                        </button>
-                        <span className="text-on-surface-variant text-[11px]">•</span>
-                        <button
-                          type="button"
-                          disabled={uploadingPhoto}
-                          onClick={() => photoFileInputRef.current?.click()}
-                          className="text-[11px] font-semibold text-on-surface hover:text-primary hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-50"
-                        >
-                          {uploadingPhoto ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              <span>Mengunggah...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-3 h-3" />
-                              <span>Ganti Foto</span>
-                            </>
-                          )}
-                        </button>
-                        <span className="text-on-surface-variant text-[11px]">•</span>
-                        <button
-                          type="button"
-                          onClick={() => setCandidateFormPhotoUrl('')}
-                          className="text-[11px] font-semibold text-error hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>Hapus Foto</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={uploadingPhoto}
-                      onClick={() => photoFileInputRef.current?.click()}
-                      className="flex-1 py-3 px-4 rounded-xl border border-dashed border-outline-variant hover:border-primary/60 bg-surface-container hover:bg-surface-bright transition-all text-center flex flex-col items-center justify-center gap-1 cursor-pointer group"
-                    >
-                      {uploadingPhoto ? (
-                        <div className="flex items-center gap-2 text-primary font-semibold text-xs">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Mengunggah foto...</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface group-hover:text-primary">
-                            <UploadCloud className="w-4 h-4 text-primary" />
-                            <span>Pilih / Unggah Berkas Foto Paslon</span>
-                          </div>
-                          <span className="text-[11px] text-on-surface-variant">
-                            Foto akan otomatis ditampilkan di bilik suara pemilih
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* BERKAS CV TERPISAH: CHAIRMAN & VICE CHAIRMAN (PDF) */}
-              <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-3">
-                <div className="flex items-center justify-between pb-1 border-b border-outline-variant/20">
-                  <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-primary" />
-                    <span>Berkas CV Pasangan Calon (PDF)</span>
-                  </label>
-                  <span className="text-[11px] text-on-surface-variant">Maks. 10 MB per berkas</span>
-                </div>
-
-                {/* CV Chairman */}
-                <input
-                  ref={chairmanCvFileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleUploadFile(f, 'cv', (url) => setCandidateFormChairmanCvUrl(url), setUploadingChairmanCv);
-                  }}
-                />
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container border border-outline-variant/20">
-                  <div>
-                    <span className="text-xs font-bold text-on-surface block">
-                      CV Calon Chairman
-                    </span>
-                    {candidateFormChairmanCvUrl ? (
-                      <span className="text-[11px] text-emerald-400 font-medium block truncate max-w-[220px]">
-                        ✓ Terunggah: {candidateFormChairmanCvUrl.split('/').pop()}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-on-surface-variant block">
-                        Belum ada berkas PDF CV Chairman
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                    {candidateFormChairmanCvUrl && (
-                      <>
-                        <a
-                          href={candidateFormChairmanCvUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
-                        >
-                          <Eye className="w-3 h-3 text-primary" />
-                          <span>Lihat</span>
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => setCandidateFormChairmanCvUrl(null)}
-                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-error/20 text-error text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
-                          title="Hapus CV Chairman"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>Hapus</span>
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      disabled={uploadingChairmanCv}
-                      onClick={() => chairmanCvFileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                    >
-                      {uploadingChairmanCv ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Mengunggah...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3 h-3" />
-                          <span>{candidateFormChairmanCvUrl ? 'Ganti CV' : 'Unggah CV Chairman'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* CV Vice Chairman */}
-                <input
-                  ref={viceChairmanCvFileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleUploadFile(f, 'cv', (url) => setCandidateFormViceChairmanCvUrl(url), setUploadingViceChairmanCv);
-                  }}
-                />
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container border border-outline-variant/20">
-                  <div>
-                    <span className="text-xs font-bold text-on-surface block">
-                      CV Calon Vice Chairman
-                    </span>
-                    {candidateFormViceChairmanCvUrl ? (
-                      <span className="text-[11px] text-emerald-400 font-medium block truncate max-w-[220px]">
-                        ✓ Terunggah: {candidateFormViceChairmanCvUrl.split('/').pop()}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-on-surface-variant block">
-                        Belum ada berkas PDF CV Vice Chairman
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                    {candidateFormViceChairmanCvUrl && (
-                      <>
-                        <a
-                          href={candidateFormViceChairmanCvUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
-                        >
-                          <Eye className="w-3 h-3 text-primary" />
-                          <span>Lihat</span>
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => setCandidateFormViceChairmanCvUrl(null)}
-                          className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-error/20 text-error text-[11px] font-semibold flex items-center gap-1 border border-outline-variant/30"
-                          title="Hapus CV Vice Chairman"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>Hapus</span>
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      disabled={uploadingViceChairmanCv}
-                      onClick={() => viceChairmanCvFileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                    >
-                      {uploadingViceChairmanCv ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Mengunggah...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3 h-3" />
-                          <span>{candidateFormViceChairmanCvUrl ? 'Ganti CV' : 'Unggah CV Vice Chairman'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
-                  Visi
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="Visi kepemimpinan pasangan calon..."
-                  value={candidateFormVision}
-                  onChange={(e) => setCandidateFormVision(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-on-surface-variant uppercase block mb-1">
-                  Misi (Satu butir per baris)
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Misi 1&#10;Misi 2&#10;Misi 3"
-                  value={candidateFormMission}
-                  onChange={(e) => setCandidateFormMission(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary placeholder:text-on-surface-variant/60 font-sans"
-                />
-              </div>
-
-              {/* Status Aktif Paslon */}
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30">
-                <input
-                  type="checkbox"
-                  id="candidate-is-active"
-                  checked={candidateFormIsActive}
-                  onChange={(e) => setCandidateFormIsActive(e.target.checked)}
-                  className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
-                />
-                <label htmlFor="candidate-is-active" className="text-xs font-semibold text-on-surface cursor-pointer select-none">
-                  Status Aktif (Pasangan calon dapat dipilih di bilik suara)
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
+              {userRole === 'super_admin' && (
                 <button
                   type="button"
-                  onClick={() => setCandidateModalOpen(false)}
-                  className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  onClick={() => {
+                    setActiveTab('admins');
+                    setIsSidebarOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    activeTab === 'admins'
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                  }`}
                 >
-                  Batal
+                  <UserCog className="w-4 h-4" />
+                  <span>Kelola Admin</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={savingCandidate}
-                  className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                >
-                  {savingCandidate ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    <span>Simpan Paslon</span>
-                  )}
-                </button>
-              </div>
-            </form>
+              )}
+            </nav>
           </div>
-        </div>
-      </div>
-    </Portal>
-    )}
 
-    {/* MODAL VISUAL FRAMING FOTO PASLON (4:3) */}
-    {isPhotoFrameModalOpen && photoToFrame && (
-      <Portal>
-        <CandidatePhotoFrameModal
-          isOpen={isPhotoFrameModalOpen}
-          onClose={() => {
+          {/* Bottom Actions */}
+          <div className="px-4 pt-4 border-t border-outline-variant/20 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => fetchTally()}
+              className="flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+            >
+              <RefreshCw className="w-4 h-4 text-primary" />
+              <span>Segarkan Data</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-error hover:bg-error/10 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-error focus-visible:outline-none"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Keluar Sesi</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* MAIN VIEWPORT CONTAINER */}
+        <div className="lg:pl-64 flex-1 flex flex-col min-h-screen">
+          {/* TOP HEADER BAR */}
+          <header className="fixed top-0 lg:left-64 left-0 right-0 h-16 bg-surface/90 backdrop-blur-md z-40 px-4 sm:px-8 flex items-center justify-between border-b border-outline-variant/20 shadow-sm">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-on-surface hover:bg-surface-container transition-colors -ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                aria-label="Buka menu navigasi"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold tracking-wide transition-colors ${systemStatus.badgeBg}`}
+                title={`Status Operasional: ${systemStatus.label}`}
+              >
+                <StatusIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">{systemStatus.label}</span>
+                <span className="sm:hidden">{systemStatus.shortLabel}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-xs font-bold text-on-surface">{userName}</span>
+                <span className="text-[11px] text-on-surface-variant uppercase font-medium">
+                  {userRole.replace('_', ' ')}
+                </span>
+              </div>
+            </div>
+          </header>
+
+          {/* MAIN BODY CONTENT */}
+          <main className="flex-1 pt-20 px-6 sm:px-8 pb-12">
+            <div className="max-w-6xl mx-auto flex flex-col gap-6">
+              {activeTab === 'overview' && (
+                <OverviewTab
+                  regularCount={regularCount}
+                  loadingTally={loadingTally}
+                  totalDpt={totalDpt}
+                  totalVotes={totalVotes}
+                  turnoutPercentage={turnoutPercentage}
+                  generationData={generationData}
+                  tallyData={tallyData}
+                  isTallyLocked={isTallyLocked}
+                  onRefreshTally={() => fetchTally()}
+                  onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+                />
+              )}
+
+              {activeTab === 'candidates' && (
+                <CandidatesTab
+                  regularCandidates={regularCandidates}
+                  regularCount={regularCount}
+                  loadingCandidates={loadingCandidates}
+                  candidateActionMessage={candidateActionMessage}
+                  allowKotakKosongMulti={allowKotakKosongMulti}
+                  togglingKotakKosong={togglingKotakKosong}
+                  onDismissMessage={() => setCandidateActionMessage(null)}
+                  onOpenAdd={handleOpenAddCandidate}
+                  onOpenEdit={handleOpenEditCandidate}
+                  onDelete={handleDeleteCandidate}
+                  onToggleActive={handleToggleCandidateActive}
+                  onToggleKotakKosong={handleToggleKotakKosong}
+                />
+              )}
+
+              {activeTab === 'dpt' && (
+                <DptTab
+                  userRole={userRole}
+                  fileInputRef={fileInputRef}
+                  importSuccessMessage={importSuccessMessage}
+                  dptActionMessage={dptActionMessage}
+                  dptErrorMessage={dptErrorMessage}
+                  importPreview={importPreview}
+                  stagedFile={stagedFile}
+                  isCommittingImport={isCommittingImport}
+                  searchQuery={searchQuery}
+                  selectedGeneration={selectedGeneration}
+                  selectedStatus={selectedStatus}
+                  availableGenerations={availableGenerations}
+                  voters={voters}
+                  loadingVoters={loadingVoters}
+                  selectedVoterIds={selectedVoterIds}
+                  isAllVisibleVotersSelected={isAllVisibleVotersSelected}
+                  dptPage={dptPage}
+                  dptPageSize={dptPageSize}
+                  dptTotalPages={dptTotalPages}
+                  voterTotalCount={voterTotalCount}
+                  onOpenQuickAddModal={() => setIsQuickAddModalOpen(true)}
+                  onDownloadTemplate={handleDownloadTemplate}
+                  onOpenResetDptModal={() => {
+                    setIsResetDptModalOpen(true);
+                    setResetDptConfirmText('');
+                    setDptErrorMessage(null);
+                  }}
+                  onFileChange={handleFileChange}
+                  onDismissImportSuccess={() => setImportSuccessMessage(null)}
+                  onDismissDptActionMessage={() => setDptActionMessage(null)}
+                  onDismissDptError={() => setDptErrorMessage(null)}
+                  onCancelImportPreview={() => {
+                    setStagedFile(null);
+                    setImportPreview(null);
+                  }}
+                  onCommitImport={handleCommitImport}
+                  onSearchChange={(value) => {
+                    setSearchQuery(value);
+                    setDptPage(1);
+                  }}
+                  onGenerationChange={(value) => {
+                    setSelectedGeneration(value);
+                    setDptPage(1);
+                  }}
+                  onStatusChange={(value) => {
+                    setSelectedStatus(value);
+                    setDptPage(1);
+                  }}
+                  onClearSelectedVoters={() => setSelectedVoterIds([])}
+                  onOpenBatchDeleteModal={() => setIsBatchDeleteModalOpen(true)}
+                  onToggleSelectAllVoters={toggleSelectAllVoters}
+                  onToggleSelectVoter={toggleSelectVoter}
+                  onRequestDeleteVoter={(v) => setVoterToDelete(v)}
+                  onPageSizeChange={(size) => {
+                    setDptPageSize(size);
+                    setDptPage(1);
+                  }}
+                  onPrevPage={() => setDptPage((p) => Math.max(p - 1, 1))}
+                  onNextPage={() => setDptPage((p) => Math.min(p + 1, dptTotalPages))}
+                />
+              )}
+
+              {activeTab === 'tally' && (
+                <TallyTab
+                  tallyData={tallyData}
+                  loadingTally={loadingTally}
+                  isTallyLocked={isTallyLocked}
+                  isResettingBallots={isResettingBallots}
+                  onRefresh={() => fetchTally()}
+                  onResetBallots={handleResetDevBallots}
+                  onOpenBastModal={() => setIsBastModalOpen(true)}
+                />
+              )}
+
+              {activeTab === 'settings' && (
+                <SettingsTab
+                  startTime={startTime}
+                  endTime={endTime}
+                  isVotingOpen={isVotingOpen}
+                  maintenanceMode={maintenanceMode}
+                  settingsReason={settingsReason}
+                  settingsSaving={settingsSaving}
+                  settingsMessage={settingsMessage}
+                  isScheduleDirty={isScheduleDirty}
+                  loadingSchedule={loadingSchedule}
+                  onStartTimeChange={setStartTime}
+                  onEndTimeChange={setEndTime}
+                  onReasonChange={setSettingsReason}
+                  onResetScheduleDraft={handleResetScheduleDraft}
+                  onOpenVotingToggleModal={handleOpenVotingToggleModal}
+                  onOpenMaintenanceToggleModal={handleOpenMaintenanceToggleModal}
+                  onSaveSettings={() =>
+                    handleSaveSettings(isVotingOpen, maintenanceMode, startTime, endTime, settingsReason)
+                  }
+                />
+              )}
+
+              {activeTab === 'emails' && (
+                <BroadcastTab
+                  totalDpt={totalDpt}
+                  totalVotes={totalVotes}
+                  broadcastResult={broadcastResult}
+                  broadcastError={broadcastError}
+                  broadcastTemplate={broadcastTemplate}
+                  broadcastTargetGroup={broadcastTargetGroup}
+                  broadcastGeneration={broadcastGeneration}
+                  availableGenerations={availableGenerations}
+                  loadingBroadcastCount={loadingBroadcastCount}
+                  broadcastTargetCount={broadcastTargetCount}
+                  broadcastSubject={broadcastSubject}
+                  broadcastHeadline={broadcastHeadline}
+                  broadcastBody={broadcastBody}
+                  broadcastCtaText={broadcastCtaText}
+                  broadcastCtaUrl={broadcastCtaUrl}
+                  isBroadcasting={isBroadcasting}
+                  onRefreshQuota={fetchBroadcastCount}
+                  onSelectTemplate={handleSelectTemplate}
+                  onTargetGroupChange={setBroadcastTargetGroup}
+                  onGenerationChange={setBroadcastGeneration}
+                  onSubjectChange={setBroadcastSubject}
+                  onHeadlineChange={setBroadcastHeadline}
+                  onBodyChange={setBroadcastBody}
+                  onCtaTextChange={setBroadcastCtaText}
+                  onCtaUrlChange={setBroadcastCtaUrl}
+                  onOpenConfirmBroadcast={() => setIsConfirmBroadcastOpen(true)}
+                />
+              )}
+
+              {activeTab === 'audit' && (
+                <AuditLogsTab
+                  auditLogs={auditLogs}
+                  auditStats={auditStats}
+                  loadingAuditLogs={loadingAuditLogs}
+                  auditFilterAction={auditFilterAction}
+                  auditSearchQuery={auditSearchQuery}
+                  onRefresh={() => fetchAuditLogs()}
+                  onSearchChange={setAuditSearchQuery}
+                  onFilterActionChange={setAuditFilterAction}
+                  onResetFilters={() => {
+                    setAuditFilterAction('all');
+                    setAuditSearchQuery('');
+                  }}
+                />
+              )}
+
+              {activeTab === 'admins' && (
+                <AdminsTab
+                  userRole={userRole}
+                  adminUsers={adminUsers}
+                  adminStats={adminStats}
+                  loadingAdmins={loadingAdmins}
+                  adminActionMessage={adminActionMessage}
+                  onDismissActionMessage={() => setAdminActionMessage(null)}
+                  onOpenAddAdmin={() => {
+                    setAdminModalOpen(true);
+                    setAdminErrorMessage(null);
+                  }}
+                  onUpdateRole={handleUpdateAdminRole}
+                  onToggleStatus={handleToggleAdminStatus}
+                  onDeleteAdmin={handleDeleteAdminUser}
+                />
+              )}
+            </div>
+          </main>
+        </div>
+
+        {/* MODALS */}
+        <CandidateFormModal
+          isOpen={candidateModalOpen}
+          editingCandidate={editingCandidate}
+          savingCandidate={savingCandidate}
+          candidateFormNumber={candidateFormNumber}
+          candidateFormLeader={candidateFormLeader}
+          candidateFormViceLeader={candidateFormViceLeader}
+          candidateFormPhotoUrl={candidateFormPhotoUrl}
+          candidateFormChairmanCvUrl={candidateFormChairmanCvUrl}
+          candidateFormViceChairmanCvUrl={candidateFormViceChairmanCvUrl}
+          candidateFormVision={candidateFormVision}
+          candidateFormMission={candidateFormMission}
+          candidateFormIsActive={candidateFormIsActive}
+          uploadingPhoto={uploadingPhoto}
+          uploadingChairmanCv={uploadingChairmanCv}
+          uploadingViceChairmanCv={uploadingViceChairmanCv}
+          uploadError={uploadError}
+          isPhotoFrameModalOpen={isPhotoFrameModalOpen}
+          photoToFrame={photoToFrame}
+          photoFileInputRef={photoFileInputRef}
+          chairmanCvFileInputRef={chairmanCvFileInputRef}
+          viceChairmanCvFileInputRef={viceChairmanCvFileInputRef}
+          onClose={() => setCandidateModalOpen(false)}
+          onSubmit={handleSaveCandidate}
+          onNumberChange={setCandidateFormNumber}
+          onLeaderChange={setCandidateFormLeader}
+          onViceLeaderChange={setCandidateFormViceLeader}
+          onPhotoUrlChange={setCandidateFormPhotoUrl}
+          onChairmanCvUrlChange={setCandidateFormChairmanCvUrl}
+          onViceChairmanCvUrlChange={setCandidateFormViceChairmanCvUrl}
+          onVisionChange={setCandidateFormVision}
+          onMissionChange={setCandidateFormMission}
+          onIsActiveChange={setCandidateFormIsActive}
+          onDismissUploadError={() => setUploadError(null)}
+          onOpenPhotoFrame={(url) => {
+            setPhotoToFrame(url);
+            setIsPhotoFrameModalOpen(true);
+          }}
+          onClosePhotoFrame={() => {
             setIsPhotoFrameModalOpen(false);
             setPhotoToFrame(null);
           }}
-          imageUrl={photoToFrame}
-          candidateNumber={candidateFormNumber}
-          candidateNames={
-            candidateFormLeader || candidateFormViceLeader
-              ? `${candidateFormLeader} & ${candidateFormViceLeader}`
-              : undefined
+          onFramedPhotoConfirm={handleFramedPhotoConfirm}
+          onUploadCvFile={(file, setter, loadingSetter) =>
+            handleUploadFile(file, 'cv', setter, loadingSetter)
           }
-          onConfirm={handleFramedPhotoConfirm}
-          isUploading={uploadingPhoto}
+          onSetUploadingChairmanCv={setUploadingChairmanCv}
+          onSetUploadingViceChairmanCv={setUploadingViceChairmanCv}
         />
-      </Portal>
-    )}
 
-      {/* MODAL KUNCI DARURAT */}
-      {isEmergencyModalOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="emergency-modal-title"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !settingsSaving) {
-                setIsEmergencyModalOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3 text-error">
-                <div className="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-error" />
-                </div>
-                <div>
-                  <h3 id="emergency-modal-title" className="text-sm font-bold text-on-surface">
-                    Kunci Darurat Bilik Suara
-                  </h3>
-                  <span className="text-[11px] text-on-surface-variant uppercase tracking-wider">
-                    Tindakan Darurat
-                  </span>
-                </div>
-              </div>
+        <EmergencyLockModal
+          isOpen={isEmergencyModalOpen}
+          emergencyReason={emergencyReason}
+          settingsSaving={settingsSaving}
+          onReasonChange={setEmergencyReason}
+          onClose={() => setIsEmergencyModalOpen(false)}
+          onConfirmLock={() =>
+            handleSaveSettings(isVotingOpen, true, startTime, endTime, emergencyReason)
+          }
+        />
 
-              <button
-                type="button"
-                onClick={() => setIsEmergencyModalOpen(false)}
-                aria-label="Tutup kunci darurat"
-                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <ToggleSettingConfirmModal
+          config={toggleModalConfig}
+          toggleReason={toggleReason}
+          settingsSaving={settingsSaving}
+          onReasonChange={setToggleReason}
+          onClose={() => setToggleModalConfig(null)}
+          onConfirm={handleConfirmToggle}
+        />
 
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Mengaktifkan kunci darurat akan menghentikan pengiriman suara sementara bagi seluruh pemilih.
-            </p>
+        <BroadcastConfirmModal
+          isOpen={isConfirmBroadcastOpen}
+          isBroadcasting={isBroadcasting}
+          broadcastTargetCount={broadcastTargetCount}
+          broadcastTargetGroup={broadcastTargetGroup}
+          broadcastGeneration={broadcastGeneration}
+          availableGenerations={availableGenerations}
+          broadcastSubject={broadcastSubject}
+          onClose={() => setIsConfirmBroadcastOpen(false)}
+          onExecute={handleExecuteBroadcast}
+        />
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase text-on-surface-variant font-semibold">
-                Alasan Penguncian:
-              </label>
-              <select
-                value={emergencyReason}
-                onChange={(e) => setEmergencyReason(e.target.value)}
-                className="w-full rounded-xl bg-surface-container-lowest px-3 py-2.5 min-h-[44px] text-xs text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-              >
-                <option value="Jeda Teknis Terjadwal">Jeda Teknis Terjadwal</option>
-                <option value="Keadaan Kahar Organisasi">Keadaan Kahar Organisasi</option>
-                <option value="Audit Keamanan Sistem">Audit Keamanan Sistem</option>
-                <option value="Keputusan Sidang Pleno KPR">Keputusan Sidang Pleno KPR</option>
-              </select>
-            </div>
+        <QuickAddVoterModal
+          isOpen={isQuickAddModalOpen}
+          quickAddLoading={quickAddLoading}
+          quickAddError={quickAddError}
+          quickAddNim={quickAddNim}
+          quickAddName={quickAddName}
+          quickAddEmail={quickAddEmail}
+          quickAddGeneration={quickAddGeneration}
+          availableGenerations={availableGenerations}
+          onNimChange={setQuickAddNim}
+          onNameChange={setQuickAddName}
+          onEmailChange={setQuickAddEmail}
+          onGenerationChange={setQuickAddGeneration}
+          onClose={() => setIsQuickAddModalOpen(false)}
+          onSubmit={handleQuickAddVoter}
+        />
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsEmergencyModalOpen(false)}
-                className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Batal
-              </button>
+        <AddAdminModal
+          isOpen={adminModalOpen}
+          adminSaving={adminSaving}
+          adminErrorMessage={adminErrorMessage}
+          adminFormName={adminFormName}
+          adminFormEmail={adminFormEmail}
+          adminFormNim={adminFormNim}
+          adminFormRole={adminFormRole}
+          onNameChange={setAdminFormName}
+          onEmailChange={setAdminFormEmail}
+          onNimChange={setAdminFormNim}
+          onRoleChange={setAdminFormRole}
+          onClose={() => setAdminModalOpen(false)}
+          onSubmit={handleSaveAdminUser}
+        />
 
-              <button
-                type="button"
-                disabled={settingsSaving}
-                onClick={() => handleSaveSettings(isVotingOpen, true, startTime, endTime, emergencyReason)}
-                className="px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span>Kunci Bilik Sekarang</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <BastPreviewModal
+          isOpen={isBastModalOpen}
+          totalDpt={totalDpt}
+          totalVotes={totalVotes}
+          turnoutPercentage={turnoutPercentage}
+          generationData={generationData}
+          tallyData={tallyData}
+          bastQrDataUrl={bastQrDataUrl}
+          bastIntegrityHash={bastIntegrityHash}
+          onClose={() => setIsBastModalOpen(false)}
+        />
+
+        <DeleteVoterModal
+          voterToDelete={voterToDelete}
+          isDeletingSingleVoter={isDeletingSingleVoter}
+          onClose={() => setVoterToDelete(null)}
+          onConfirm={handleConfirmDeleteSingle}
+        />
+
+        <BatchDeleteVotersModal
+          isOpen={isBatchDeleteModalOpen}
+          selectedCount={selectedVoterIds.length}
+          isDeletingBatchVoters={isDeletingBatchVoters}
+          onClose={() => setIsBatchDeleteModalOpen(false)}
+          onConfirm={handleConfirmDeleteBatch}
+        />
+
+        <ResetDptModal
+          isOpen={isResetDptModalOpen}
+          isResettingDpt={isResettingDpt}
+          resetDptMode={resetDptMode}
+          resetDptConfirmText={resetDptConfirmText}
+          onModeChange={setResetDptMode}
+          onConfirmTextChange={setResetDptConfirmText}
+          onClose={() => setIsResetDptModalOpen(false)}
+          onConfirm={handleConfirmResetDpt}
+        />
       </div>
-    </Portal>
-    )}
 
-      {/* MODAL KONFIRMASI SAKELAR BILIK SUARA / MAINTENANCE */}
-      {toggleModalConfig && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="toggle-modal-title"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !settingsSaving) {
-                setToggleModalConfig(null);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150 shadow-2xl"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        toggleModalConfig.isDanger
-                          ? 'bg-hmif-red/10 text-hmif-red border border-hmif-red/20'
-                          : 'bg-primary/10 text-primary border border-primary/20'
-                      }`}
-                    >
-                      {toggleModalConfig.type === 'maintenance_mode' ? (
-                        <AlertTriangle className="w-5 h-5" />
-                      ) : toggleModalConfig.targetValue ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : (
-                        <Lock className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 id="toggle-modal-title" className="text-sm font-bold text-on-surface">
-                        {toggleModalConfig.title}
-                      </h3>
-                      <span className="text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
-                        Konfirmasi Eksekutif
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={settingsSaving}
-                    onClick={() => setToggleModalConfig(null)}
-                    aria-label="Tutup modal konfirmasi"
-                    className="w-9 h-9 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:opacity-50"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  {toggleModalConfig.description}
-                </p>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase text-on-surface-variant font-semibold">
-                    Alasan Operasional / Catatan Audit:
-                  </label>
-                  <textarea
-                    value={toggleReason}
-                    onChange={(e) => setToggleReason(e.target.value)}
-                    placeholder={toggleModalConfig.defaultReason}
-                    rows={2}
-                    className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
-                  />
-                  <span className="text-[10px] text-on-surface-variant">
-                    Catatan ini akan direkam dalam Audit Log Pemira HMIF secara permanen.
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-                  <button
-                    type="button"
-                    disabled={settingsSaving}
-                    onClick={() => setToggleModalConfig(null)}
-                    className="px-4 py-2 min-h-[40px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-                  >
-                    Batal
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={settingsSaving}
-                    onClick={handleConfirmToggle}
-                    className={`px-5 py-2 min-h-[40px] rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                      toggleModalConfig.isDanger
-                        ? 'bg-hmif-red text-white hover:bg-red-700'
-                        : 'bg-primary text-on-primary hover:bg-secondary-fixed'
-                    }`}
-                  >
-                    {settingsSaving ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Menyimpan...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Konfirmasi & Simpan</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* MODAL KONFIRMASI BROADCAST EMAIL */}
-      {isConfirmBroadcastOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !isBroadcasting) {
-                setIsConfirmBroadcastOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
-                <Send className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-on-surface">
-                  Konfirmasi Broadcast Email
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Tinjau sebelum pesan dikirimkan ke server email kampus.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-high rounded-xl p-3.5 border border-outline-variant/20 text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Jumlah Penerima:</span>
-                <span className="font-bold text-primary font-mono">{broadcastTargetCount ?? '...'} Mahasiswa</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Kelompok Sasaran:</span>
-                <span className="font-semibold text-on-surface">
-                  {broadcastTargetGroup === 'not_voted' ? 'Khusus yang Belum Memilih' : broadcastTargetGroup === 'all' ? 'Seluruh DPT' : 'Khusus yang Sudah Memilih'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Filter Angkatan:</span>
-                <span className="font-semibold text-on-surface">
-                  {broadcastGeneration === 'all'
-                    ? `Semua Angkatan ${availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ''}`
-                    : `Angkatan ${broadcastGeneration}`}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-outline-variant/20">
-                <span className="text-on-surface-variant block mb-1">Subjek:</span>
-                <span className="font-medium text-on-surface truncate block">{broadcastSubject}</span>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              ⚠️ Sistem akan menggunakan mekanisme batching aman untuk menjaga deliverability SMTP dan reputasi domain di Microsoft Outlook Telkom University.
-            </p>
-
-            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3 pt-2">
-              <button
-                type="button"
-                disabled={isBroadcasting}
-                onClick={() => setIsConfirmBroadcastOpen(false)}
-                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center justify-center"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isBroadcasting}
-                onClick={handleExecuteBroadcast}
-                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isBroadcasting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Mengirim...</span>
-                  </>
-                ) : (
-                  <span>Ya, Kirim Sekarang</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Dokumen Bersih Khusus Cetak Kertas A4 (Print-Only) */}
+      <div className="hidden print:block bg-white text-black font-serif text-[12px] leading-relaxed p-6">
+        <BastPrintableReport
+          totalDpt={totalDpt}
+          totalVotes={totalVotes}
+          turnoutPercentage={turnoutPercentage}
+          generationData={generationData}
+          tallyData={tallyData}
+          bastQrDataUrl={bastQrDataUrl}
+          bastIntegrityHash={bastIntegrityHash}
+        />
       </div>
-    </Portal>
-    )}
-
-      {/* MODAL TAMBAH PEMILIH UJI COBA (EMAIL PENGUJIAN) */}
-      {isQuickAddModalOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !quickAddLoading) {
-                setIsQuickAddModalOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-                <div className="flex items-start justify-between pb-2 border-b border-outline-variant/20">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                      <UserPlus className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-on-surface">
-                        Tambah Pemilih Uji Coba
-                      </h3>
-                      <p className="text-[11px] text-on-surface-variant">
-                        Gunakan email aktif sendiri untuk menguji pengiriman OTP &amp; Broadcast.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsQuickAddModalOpen(false)}
-                    className="w-8 h-8 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {quickAddError && (
-                  <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs">
-                    {quickAddError}
-                  </div>
-                )}
-
-                <form onSubmit={handleQuickAddVoter} className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      NIM Mahasiswa <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: 103012399001"
-                      value={quickAddNim}
-                      onChange={(e) => setQuickAddNim(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      Nama Mahasiswa <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Penguji E-Voting"
-                      value={quickAddName}
-                      onChange={(e) => setQuickAddName(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      Email Tujuan (Email Pengujian Anda) <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="Contoh: namaanda@gmail.com / kampus"
-                      value={quickAddEmail}
-                      onChange={(e) => setQuickAddEmail(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
-                    />
-                    <span className="text-[10px] text-on-surface-variant mt-1 block">
-                      Masukkan email riil yang bisa Anda buka di inbox untuk memverifikasi penerimaan surat.
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      Angkatan
-                    </label>
-                    <select
-                      value={quickAddGeneration}
-                      onChange={(e) => setQuickAddGeneration(Number(e.target.value))}
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      {availableGenerations.map((gen) => (
-                        <option key={gen} value={gen}>
-                          {gen}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-                    <button
-                      type="button"
-                      disabled={quickAddLoading}
-                      onClick={() => setIsQuickAddModalOpen(false)}
-                      className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={quickAddLoading}
-                      className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
-                    >
-                      {quickAddLoading ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Menambahkan...</span>
-                        </>
-                      ) : (
-                        <span>Simpan &amp; Uji Coba</span>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* MODAL TAMBAH ADMINISTRATOR BARU */}
-      {adminModalOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !adminSaving) {
-                setAdminModalOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
-                      <UserPlus className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-on-surface">Tambah Administrator Baru</h3>
-                      <p className="text-xs text-on-surface-variant mt-0.5">Berikan hak akses panitia atau auditor Pemira.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAdminModalOpen(false)}
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {adminErrorMessage && (
-                  <div className="p-3 rounded-xl bg-error/10 border border-error/30 text-error text-xs flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>{adminErrorMessage}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleSaveAdminUser} className="space-y-4 text-xs">
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      Nama Lengkap Administrator <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Dimas Wahyu Pratama"
-                      value={adminFormName}
-                      onChange={(e) => setAdminFormName(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      Email SSO Kampus / Akun <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="Contoh: dimas@student.telkomuniversity.ac.id"
-                      value={adminFormEmail}
-                      onChange={(e) => setAdminFormEmail(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
-                    />
-                    <span className="text-[10px] text-on-surface-variant mt-1 block">
-                      Email ini digunakan untuk login SSO / OTP ke bilik dan dashboard.
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      NIM (Opsional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: 103012300088"
-                      value={adminFormNim}
-                      onChange={(e) => setAdminFormNim(e.target.value)}
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">
-                      Wewenang &amp; Peran (Role) <span className="text-error">*</span>
-                    </label>
-                    <select
-                      value={adminFormRole}
-                      onChange={(e) => setAdminFormRole(e.target.value as 'kpr_admin' | 'auditor' | 'super_admin')}
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-                    >
-                      <option value="kpr_admin">Panitia KPR (Hak operasional penuh, paslon, DPT &amp; broadcast)</option>
-                      <option value="auditor">Auditor Independen (Pengawas read-only &amp; rekapitulasi pasca pemilihan)</option>
-                      <option value="super_admin">Superadmin (Wewenang tertinggi &amp; manajemen admin)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-                    <button
-                      type="button"
-                      disabled={adminSaving}
-                      onClick={() => setAdminModalOpen(false)}
-                      className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={adminSaving}
-                      className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
-                    >
-                      {adminSaving ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Menyimpan...</span>
-                        </>
-                      ) : (
-                        <span>Simpan Administrator</span>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* Modal Pratinjau Dokumen Berita Acara (BAST) */}
-      {isBastModalOpen && (
-        <Portal>
-          <div
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center animate-in fade-in duration-200"
-            onClick={() => setIsBastModalOpen(false)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-4xl bg-white text-black rounded-2xl shadow-2xl overflow-hidden my-auto border border-gray-300 flex flex-col max-h-[90vh]"
-            >
-              {/* Controls Bar Atas */}
-              <div className="bg-gray-100 px-6 py-3.5 border-b border-gray-300 flex items-center justify-between text-gray-800 shrink-0">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-amber-600" />
-                  <span className="font-bold text-sm">Pratinjau Berita Acara Rekapitulasi Suara (BAST)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" />
-                    <span>Cetak / Simpan PDF</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsBastModalOpen(false)}
-                    className="p-2 rounded-lg hover:bg-gray-200 text-gray-600 transition-colors cursor-pointer"
-                    aria-label="Tutup"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Scrollable Dokumen Paper Preview */}
-              <div className="p-8 sm:p-12 overflow-y-auto font-serif text-[13px] leading-relaxed text-black bg-white">
-                {renderBeritaAcaraContent()}
-              </div>
-
-              {/* Controls Bar Bawah */}
-              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 shrink-0">
-                <span>Dokumen sah Komisi Pemilihan Raya HMIF Telkom University Purwokerto</span>
-                <button
-                  type="button"
-                  onClick={() => setIsBastModalOpen(false)}
-                  className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium cursor-pointer"
-                >
-                  Tutup Pratinjau
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* MODAL KONFIRMASI HAPUS 1 PEMILIH (KHUSUS SUPERADMIN) */}
-      {voterToDelete && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !isDeletingSingleVoter) {
-                setVoterToDelete(null);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error shrink-0">
-                      <Trash2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-on-surface">Konfirmasi Hapus Pemilih</h3>
-                      <p className="text-xs text-on-surface-variant mt-0.5">Penghapusan data pemilih dari Daftar Pemilih Tetap.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isDeletingSingleVoter}
-                    onClick={() => setVoterToDelete(null)}
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Nama Mahasiswa:</span>
-                      <span className="font-semibold text-on-surface">{voterToDelete.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">NIM:</span>
-                      <span className="font-mono font-semibold text-primary">{voterToDelete.nim}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Email SSO:</span>
-                      <span className="font-mono text-on-surface-variant">{voterToDelete.email}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Angkatan:</span>
-                      <span className="text-on-surface">{voterToDelete.generation}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Status Hak Suara:</span>
-                      <span>
-                        {voterToDelete.has_voted ? (
-                          <span className="text-emerald-400 font-semibold">Sudah Memilih</span>
-                        ) : (
-                          <span className="text-on-surface-variant">Belum Memilih</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  {voterToDelete.has_voted ? (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 space-y-1">
-                      <div className="flex items-center gap-2 font-bold text-[11px] uppercase tracking-wider">
-                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span>Peringatan Integritas Pemilu</span>
-                      </div>
-                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                        Mahasiswa ini tercatat sudah mencoblos. Menghapus akun ini <strong>tidak menghapus</strong> surat suara anonim di bilik suara (*Ballot Secrecy*), namun akan mengurangi total DPT terdaftar.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant leading-relaxed text-[11px]">
-                      Mahasiswa ini belum menggunakan hak suara. Penghapusan akan mencabut hak pilih akun ini secara permanen dari sistem.
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-                  <button
-                    type="button"
-                    disabled={isDeletingSingleVoter}
-                    onClick={() => setVoterToDelete(null)}
-                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isDeletingSingleVoter}
-                    onClick={handleConfirmDeleteSingle}
-                    className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {isDeletingSingleVoter ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Menghapus...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hapus Pemilih</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* MODAL KONFIRMASI HAPUS SELEKTIF BATCH (KHUSUS SUPERADMIN) */}
-      {isBatchDeleteModalOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !isDeletingBatchVoters) {
-                setIsBatchDeleteModalOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error shrink-0">
-                      <Trash2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-on-surface">Hapus Selektif ({selectedVoterIds.length} Pemilih)</h3>
-                      <p className="text-xs text-on-surface-variant mt-0.5">Penghapusan massal pemilih DPT yang dipilih.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isDeletingBatchVoters}
-                    onClick={() => setIsBatchDeleteModalOpen(false)}
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <p className="text-on-surface">
-                    Anda akan menghapus <strong>{selectedVoterIds.length} data pemilih</strong> terpilih dari Daftar Pemilih Tetap (DPT).
-                  </p>
-
-                  <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error space-y-1">
-                    <div className="flex items-center gap-2 font-bold text-[11px] uppercase tracking-wider">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>Konfirmasi Tindakan Eksekutif</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-error/90">
-                      Tindakan ini tidak dapat dibatalkan secara otomatis. Setiap akun yang dihapus akan kehilangan akses ke bilik suara. Catatan audit akan direkam atas nama Anda.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-                  <button
-                    type="button"
-                    disabled={isDeletingBatchVoters}
-                    onClick={() => setIsBatchDeleteModalOpen(false)}
-                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isDeletingBatchVoters}
-                    onClick={handleConfirmDeleteBatch}
-                    className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {isDeletingBatchVoters ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Menghapus...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hapus {selectedVoterIds.length} Pemilih</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* MODAL RESET DPT (KHUSUS SUPERADMIN) */}
-      {isResetDptModalOpen && (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !isResettingDpt) {
-                setIsResetDptModalOpen(false);
-              }
-            }}
-          >
-            <div className="flex min-h-full items-center justify-center p-4 text-left">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
-              >
-                <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-error/10 border border-error/20 flex items-center justify-center text-error shrink-0">
-                      <AlertTriangle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-on-surface">Reset &amp; Kosongkan DPT</h3>
-                      <p className="text-xs text-on-surface-variant mt-0.5">Operasi tingkat tinggi untuk mengelola database pemilih.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isResettingDpt}
-                    onClick={() => setIsResetDptModalOpen(false)}
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-4 text-xs">
-                  <div className="space-y-2">
-                    <label className="block text-on-surface-variant font-semibold">Pilih Mode Reset:</label>
-                    
-                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_to_default' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
-                      <input
-                        type="radio"
-                        name="resetDptMode"
-                        value="reset_to_default"
-                        checked={resetDptMode === 'reset_to_default'}
-                        onChange={() => setResetDptMode('reset_to_default')}
-                        className="mt-0.5 text-primary focus:ring-0"
-                      />
-                      <div>
-                        <span className="font-bold text-on-surface block">Kembalikan ke Default Sistem</span>
-                        <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                          Menghapus data pemilih baru yang diimpor dan mengembalikan daftar ke pemilih inisial sistem.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'clear_all' ? 'bg-error/10 border-error/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
-                      <input
-                        type="radio"
-                        name="resetDptMode"
-                        value="clear_all"
-                        checked={resetDptMode === 'clear_all'}
-                        onChange={() => setResetDptMode('clear_all')}
-                        className="mt-0.5 text-error focus:ring-0"
-                      />
-                      <div>
-                        <span className="font-bold text-error block">Kosongkan Seluruh Pemilih Mahasiswa (0 Pemilih)</span>
-                        <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                          Menghapus semua data mahasiswa dari DPT agar panitia dapat mengunggah berkas CSV resmi yang baru. Akun Superadmin tetap dipertahankan.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_vote_status' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
-                      <input
-                        type="radio"
-                        name="resetDptMode"
-                        value="reset_vote_status"
-                        checked={resetDptMode === 'reset_vote_status'}
-                        onChange={() => setResetDptMode('reset_vote_status')}
-                        className="mt-0.5 text-primary focus:ring-0"
-                      />
-                      <div>
-                        <span className="font-bold text-on-surface block">Reset Status Voting Saja (Simulasi)</span>
-                        <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                          Mengubah seluruh status pemilih menjadi Belum Memilih tanpa menghapus data pemilih. Cocok untuk mengulang gladi bersih.
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error space-y-2">
-                    <p className="font-bold text-[11px] uppercase tracking-wider">Ketik Konfirmasi:</p>
-                    <p className="text-[11px] leading-relaxed">
-                      Untuk mencegah reset yang tidak disengaja, ketik <strong>RESET DPT</strong> pada kolom di bawah ini:
-                    </p>
-                    <input
-                      type="text"
-                      placeholder="RESET DPT"
-                      value={resetDptConfirmText}
-                      onChange={(e) => setResetDptConfirmText(e.target.value)}
-                      className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-error/40 text-on-surface focus:outline-none focus:border-error focus-visible:ring-2 focus-visible:ring-error font-mono text-center uppercase tracking-widest font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-                  <button
-                    type="button"
-                    disabled={isResettingDpt}
-                    onClick={() => setIsResetDptModalOpen(false)}
-                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isResettingDpt || resetDptConfirmText.trim().toUpperCase() !== 'RESET DPT'}
-                    onClick={handleConfirmResetDpt}
-                    className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-40 cursor-pointer"
-                  >
-                    {isResettingDpt ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Mereset DPT...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Eksekusi Reset DPT</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-    </div>
-
-    {/* Dokumen Bersih Khusus Cetak Kertas A4 (Print-Only) */}
-    <div className="hidden print:block bg-white text-black font-serif text-[12px] leading-relaxed p-6">
-      {renderBeritaAcaraContent()}
-    </div>
-  </>
+    </>
   );
 }

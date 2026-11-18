@@ -4,11 +4,11 @@ import { verifyAdminAccess } from '@/lib/rbac/permissions';
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
-import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
-import { calculateLiveTally, resetBallotsStore } from '@/lib/ballots/store';
+import { isDevFallbackAllowed } from '@/lib/security/env';
+import { resetBallotsStore } from '@/lib/ballots/store';
+import { getElectionTallySnapshot } from '@/lib/ballots/tally-service';
 
 export async function GET() {
-  // 1. Verifikasi Otorisasi Sesi Pengguna
   const session = await getSession();
   const authCheck = verifyAdminAccess(session);
 
@@ -22,183 +22,11 @@ export async function GET() {
     );
   }
 
-  if (isSupabaseConfigured()) {
-    try {
-      const adminSupabase = createAdminClient();
+  try {
+    const snapshot = await getElectionTallySnapshot();
 
-      // Coba eksekusi Stored Procedure Agregasi Server-side (Ultra Cepat < 5ms)
-      const { data: rpcSummary, error: rpcError } = await adminSupabase.rpc('get_election_tally_summary');
-
-      if (!rpcError && rpcSummary && rpcSummary.success) {
-        const isClosed = rpcSummary.electionSettings.isClosed;
-
-        // Auditor hanya berhak melihat perolehan suara paslon jika pemungutan suara telah ditutup resmi
-        if (session?.role === 'auditor' && !isClosed) {
-          return NextResponse.json(
-            {
-              error: 'Akses Ditolak: Peran Auditor hanya diperbolehkan melihat tally suara setelah pemungutan suara resmi ditutup oleh KPR.',
-              code: 'AUDITOR_TALLY_LOCKED',
-            },
-            { status: 403 }
-          );
-        }
-
-        return NextResponse.json({
-          success: true,
-          timestamp: rpcSummary.timestamp || new Date().toISOString(),
-          electionSettings: rpcSummary.electionSettings,
-          turnout: rpcSummary.turnout,
-          tally: rpcSummary.tally,
-        });
-      }
-
-      if (rpcError) {
-        console.warn('[AdminTallyRoute] RPC get_election_tally_summary fallback:', rpcError.message);
-      }
-
-      // 2. Baca Pengaturan Pemilihan
-      const { data: settings, error: settingsError } = await adminSupabase
-        .from('election_settings')
-        .select('is_voting_open, start_time, end_time, maintenance_mode')
-        .eq('id', 1)
-        .single();
-
-      if (settingsError || !settings) {
-        return NextResponse.json(
-          { error: 'Gagal membaca status pengaturan pemilihan.' },
-          { status: 500 }
-        );
-      }
-
-      const isClosed = !settings.is_voting_open || new Date() > new Date(settings.end_time);
-
-      // Auditor hanya berhak melihat perolehan suara paslon jika pemungutan suara telah ditutup resmi
-      if (session?.role === 'auditor' && !isClosed) {
-        return NextResponse.json(
-          {
-            error: 'Akses Ditolak: Peran Auditor hanya diperbolehkan melihat tally suara setelah pemungutan suara resmi ditutup oleh KPR.',
-            code: 'AUDITOR_TALLY_LOCKED',
-          },
-          { status: 403 }
-        );
-      }
-
-      // 3. Baca Data Kandidat Aktif
-      const { data: candidates, error: candError } = await adminSupabase
-        .from('candidates')
-        .select('id, candidate_number, leader_name, vice_leader_name, is_active')
-        .order('candidate_number', { ascending: true });
-
-      if (candError || !candidates) {
-        return NextResponse.json(
-          { error: 'Gagal mengambil data kandidat pemilihan.' },
-          { status: 500 }
-        );
-      }
-
-      // 4. Hitung Agregasi Suara dari Tabel Ballots
-      // INVARIAN: Kueri ini murni menjumlahkan surat suara per kandidat tanpa melibatkan identitas pemilih
-      const { data: ballots, error: ballotError } = await adminSupabase
-        .from('ballots')
-        .select('candidate_id');
-
-      if (ballotError) {
-        return NextResponse.json(
-          { error: 'Gagal menghitung agregasi surat suara.' },
-          { status: 500 }
-        );
-      }
-
-      const totalVotes = ballots.length;
-      const voteCounts: Record<string, number> = {};
-      for (const b of ballots) {
-        voteCounts[b.candidate_id] = (voteCounts[b.candidate_id] || 0) + 1;
-      }
-
-      const tally = candidates.map((cand) => {
-        const count = voteCounts[cand.id] || 0;
-        const percentage = totalVotes > 0 ? Number(((count / totalVotes) * 100).toFixed(2)) : 0;
-        return {
-          candidateId: cand.id,
-          candidateNumber: cand.candidate_number,
-          leaderName: cand.leader_name,
-          viceLeaderName: cand.vice_leader_name,
-          voteCount: count,
-          percentage,
-        };
-      });
-
-      // 5. Hitung Metrik Partisipasi DPT & Per Angkatan
-      const { data: voters, error: voterError } = await adminSupabase
-        .from('voters_whitelist')
-        .select('generation, has_voted');
-
-      if (voterError || !voters) {
-        return NextResponse.json(
-          { error: 'Gagal mengambil data partisipasi DPT.' },
-          { status: 500 }
-        );
-      }
-
-      const totalDpt = voters.length;
-      const totalVotedDpt = voters.filter((v) => v.has_voted).length;
-      const overallTurnoutPercentage = totalDpt > 0 ? Number(((totalVotedDpt / totalDpt) * 100).toFixed(2)) : 0;
-
-      // Agregasi per angkatan (Cohorts)
-      const cohortMap: Record<number, { total: number; voted: number }> = {};
-      for (const v of voters) {
-        if (!cohortMap[v.generation]) {
-          cohortMap[v.generation] = { total: 0, voted: 0 };
-        }
-        cohortMap[v.generation].total += 1;
-        if (v.has_voted) {
-          cohortMap[v.generation].voted += 1;
-        }
-      }
-
-      const byGeneration = Object.entries(cohortMap)
-        .map(([genStr, counts]) => {
-          const generation = Number(genStr);
-          const percentage = counts.total > 0 ? Number(((counts.voted / counts.total) * 100).toFixed(2)) : 0;
-          return {
-            generation,
-            totalVoters: counts.total,
-            votedCount: counts.voted,
-            turnoutPercentage: percentage,
-          };
-        })
-        .sort((a, b) => a.generation - b.generation);
-
-      return NextResponse.json({
-        success: true,
-        timestamp: new Date().toISOString(),
-        electionSettings: {
-          isVotingOpen: settings.is_voting_open,
-          isClosed,
-          maintenanceMode: settings.maintenance_mode,
-          startTime: settings.start_time,
-          endTime: settings.end_time,
-        },
-        turnout: {
-          totalDpt,
-          totalVotesRecorded: totalVotes,
-          totalVotersParticipated: totalVotedDpt,
-          turnoutPercentage: overallTurnoutPercentage,
-          byGeneration,
-        },
-        tally,
-      });
-    } catch (error) {
-      console.warn('[AdminTallyRoute] Database offline, checking dev fallback:', error);
-    }
-  }
-
-  if (process.env.APP_ENV !== 'production') {
-    const devSettings = getDevElectionSettings();
-    const isClosed = !devSettings.is_voting_open || new Date() > new Date(devSettings.end_time);
-
-    // Auditor hanya berhak melihat perolehan suara jika pemilihan sudah ditutup
-    if (session?.role === 'auditor' && !isClosed) {
+    // Auditor hanya berhak melihat perolehan suara paslon jika pemungutan suara telah ditutup resmi
+    if (session?.role === 'auditor' && !snapshot.electionSettings.isClosed) {
       return NextResponse.json(
         {
           error: 'Akses Ditolak: Peran Auditor hanya diperbolehkan melihat tally suara setelah pemungutan suara resmi ditutup oleh KPR.',
@@ -208,34 +36,20 @@ export async function GET() {
       );
     }
 
-    const liveData = calculateLiveTally();
-
     return NextResponse.json({
       success: true,
-      timestamp: new Date().toISOString(),
-      electionSettings: {
-        isVotingOpen: devSettings.is_voting_open,
-        isClosed,
-        maintenanceMode: devSettings.maintenance_mode,
-        startTime: devSettings.start_time,
-        endTime: devSettings.end_time,
-        allowKotakKosongMulti: devSettings.allow_kotak_kosong_multi,
-      },
-      turnout: {
-        totalDpt: liveData.totalDpt,
-        totalVotesRecorded: liveData.totalVotesRecorded,
-        totalVotersParticipated: liveData.totalVotersParticipated,
-        turnoutPercentage: liveData.turnoutPercentage,
-        byGeneration: liveData.byGeneration,
-      },
-      tally: liveData.tally,
+      timestamp: snapshot.timestamp,
+      electionSettings: snapshot.electionSettings,
+      turnout: snapshot.turnout,
+      tally: snapshot.tally,
     });
+  } catch (error) {
+    console.error('[AdminTallyRoute] GET error:', error);
+    return NextResponse.json(
+      { error: 'Terjadi kegagalan server saat memproses rekapitulasi suara.' },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json(
-    { error: 'Terjadi kegagalan server saat memproses rekapitulasi suara.' },
-    { status: 500 }
-  );
 }
 
 /**
@@ -249,7 +63,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
 
-  // Wewenang reset suara dibatasi secara ketat hanya untuk super_admin
   if (session?.role !== 'super_admin') {
     return NextResponse.json(
       { error: 'Akses Ditolak: Fitur reset surat suara hanya dapat dieksekusi oleh Superadmin.' },
@@ -265,7 +78,6 @@ export async function DELETE(request: NextRequest) {
       const { data: rpcResult, error: rpcError } = await adminSupabase.rpc('reset_election_simulation_ballots');
 
       if (!rpcError && rpcResult?.success) {
-        // Sinkronkan store memori lokal dev juga
         resetBallotsStore();
 
         await recordAuditLog({
@@ -296,7 +108,7 @@ export async function DELETE(request: NextRequest) {
         );
       }
     } catch (err) {
-      console.warn('[AdminTallyRoute] Database error during ballots reset:', err);
+      console.error('[AdminTallyRoute] Database error during ballots reset:', err);
       return NextResponse.json(
         { error: 'Terjadi kegagalan server saat menghubungi database untuk mereset suara.' },
         { status: 500 }
@@ -304,7 +116,10 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  // Dev fallback jika Supabase tidak terkonfigurasi
+  if (!isDevFallbackAllowed(isSupabaseConfigured())) {
+    return NextResponse.json({ error: 'Basis data pemilihan tidak tersedia.' }, { status: 500 });
+  }
+
   resetBallotsStore();
 
   await recordAuditLog({

@@ -8,18 +8,23 @@ import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import type { Database } from '@/lib/supabase/types';
 
+const validDateStringSchema = z
+  .string()
+  .refine((val) => !isNaN(new Date(val).getTime()), 'Format waktu jadwal tidak valid.')
+  .optional();
+
 const updateSettingsSchema = z.object({
   is_voting_open: z.boolean().optional(),
   isVotingOpen: z.boolean().optional(),
   maintenance_mode: z.boolean().optional(),
   maintenanceMode: z.boolean().optional(),
-  start_time: z.string().optional(),
-  startTime: z.string().optional(),
-  end_time: z.string().optional(),
-  endTime: z.string().optional(),
+  start_time: validDateStringSchema,
+  startTime: validDateStringSchema,
+  end_time: validDateStringSchema,
+  endTime: validDateStringSchema,
   allow_kotak_kosong_multi: z.boolean().optional(),
   allowKotakKosongMulti: z.boolean().optional(),
-  reason: z.string().min(3, 'Alasan operasional wajib dicantumkan.'),
+  reason: z.string().trim().min(3, 'Alasan operasional minimal 3 karakter.').optional(),
 });
 
 export async function GET() {
@@ -88,27 +93,28 @@ export async function PATCH(request: NextRequest) {
     const start_time = parsed.data.start_time ?? parsed.data.startTime;
     const end_time = parsed.data.end_time ?? parsed.data.endTime;
     const allow_kotak_kosong_multi = parsed.data.allow_kotak_kosong_multi ?? parsed.data.allowKotakKosongMulti;
-    const reason = parsed.data.reason;
+    const reason = parsed.data.reason || 'Pembaruan pengaturan pemilihan via dashboard KPR';
 
     // Ambil setting aktif saat ini untuk memverifikasi apakah ada mutasi nyata
     let currentIsVotingOpen = true;
     let currentMaintenanceMode = false;
 
     if (isSupabaseConfigured()) {
-      try {
-        const curSupabase = createAdminClient();
-        const { data: cur } = await curSupabase
-          .from('election_settings')
-          .select('is_voting_open, maintenance_mode')
-          .eq('id', 1)
-          .single();
-        if (cur) {
-          currentIsVotingOpen = cur.is_voting_open;
-          currentMaintenanceMode = cur.maintenance_mode;
-        }
-      } catch (curErr) {
-        console.warn('[ElectionSettings] Error reading current settings for auth check:', curErr);
+      const curSupabase = createAdminClient();
+      const { data: cur, error: curErr } = await curSupabase
+        .from('election_settings')
+        .select('is_voting_open, maintenance_mode')
+        .eq('id', 1)
+        .single();
+      if (curErr || !cur) {
+        console.error('[ElectionSettings] Error reading current settings for auth check:', curErr);
+        return NextResponse.json(
+          { error: 'Gagal memverifikasi status pengaturan pemilihan saat ini dari database.' },
+          { status: 500 }
+        );
       }
+      currentIsVotingOpen = cur.is_voting_open;
+      currentMaintenanceMode = cur.maintenance_mode;
     } else {
       const cur = getDevElectionSettings();
       currentIsVotingOpen = cur.is_voting_open;
