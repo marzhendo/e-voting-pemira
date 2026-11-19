@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requestVoterOtp } from '@/lib/auth/otp';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { otpRequestRateLimiter } from '@/lib/security/rate-limit';
+import { getMaintenanceStatus, isDesignatedAdminIdentifier } from '@/lib/election/maintenance-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +62,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Pemeriksaan Status Mode Pemeliharaan Darurat (Emergency Maintenance)
+    const isMaintenance = await getMaintenanceStatus();
+    if (isMaintenance) {
+      const isAdmin = await isDesignatedAdminIdentifier(parsed.data.identifier);
+      if (!isAdmin) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'MAINTENANCE_MODE',
+            error:
+              'Bilik suara digital sedang dalam pemeliharaan teknis darurat demi menjaga integritas data pemungutan suara. Permintaan kode PIN ditangguhkan sementara.',
+          },
+          { status: 503 }
+        );
+      }
+    }
+
     const result = await requestVoterOtp(parsed.data.identifier);
 
     if (!result.success) {
@@ -69,6 +87,8 @@ export async function POST(req: NextRequest) {
           ? 404
           : result.code === 'ALREADY_VOTED'
           ? 403
+          : result.code === 'MAINTENANCE_MODE'
+          ? 503
           : result.code === 'RATE_LIMITED'
           ? 429
           : 500;

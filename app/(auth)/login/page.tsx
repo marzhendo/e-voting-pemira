@@ -1,9 +1,12 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { LoginForm } from '@/components/auth/login-form';
+import { getMaintenanceStatus } from '@/lib/election/maintenance-status';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'Masuk ke Bilik Suara',
@@ -14,7 +17,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  // Pre-fetch status pemeliharaan secara server-side untuk mengeliminasi flash of content (FOAC)
+  const initialMaintenance = await getMaintenanceStatus();
+  const adminParam = searchParams?.admin;
+  const initialAdmin = adminParam === '1' || adminParam === 'true';
+
   return (
     <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-between antialiased selection:bg-primary selection:text-on-primary">
       {/* Main Viewport Container */}
@@ -30,65 +42,20 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Focused Single-Column Card */}
-        <div className="w-full max-w-[440px] bg-surface-container border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-primary/5 transition-all duration-200 ease-out">
-          {/* Card Header: Brand Identity & Unified Headline */}
-          <div className="text-center flex flex-col items-center space-y-3 mb-6">
-            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
-              <Image
-                src="/assets/img/hmif-logo.png"
-                alt="Logo HMIF Telkom University Purwokerto"
-                width={56}
-                height={56}
-                priority
-                className="w-full h-full object-contain"
-              />
-            </div>
-
-            <div>
-              <p className="text-[11px] font-bold tracking-wider uppercase text-primary">
-                PEMIRA HMIF 2026/2027
-              </p>
-              <p className="text-[11px] font-medium text-on-surface-variant">
-                Telkom University Purwokerto
-              </p>
-            </div>
-
-            <div className="pt-1">
-              <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface leading-none">
-                Waktunya Memilih.
-              </h1>
-              <p className="text-xs text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto">
-                Ketik NIM kamu untuk menerima kode PIN verifikasi di email SSO kampus (@student.telkomuniversity.ac.id).
-              </p>
-            </div>
-          </div>
-
-          {/* Form Component */}
+        {/* Focused Single-Column Card (Fixed width & stable height locked against layout shifts) */}
+        <div className="w-full max-w-[440px] min-h-[460px] bg-surface-container border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-primary/5 flex flex-col justify-between">
           <Suspense
             fallback={
-              <div className="text-xs text-on-surface-variant py-8 text-center animate-pulse">
-                Memuat formulir login...
+              <div className="text-xs text-on-surface-variant py-16 text-center animate-pulse">
+                Memuat bilik suara...
               </div>
             }
           >
-            <LoginForm />
+            <LoginForm
+              initialMaintenance={initialMaintenance}
+              initialAdminMode={initialAdmin}
+            />
           </Suspense>
-
-          {/* Card Footer: Panitia Support */}
-          <div className="pt-5 border-t border-outline-variant/20 text-center mt-6">
-            <p className="text-xs text-on-surface-variant font-medium">
-              Butuh bantuan login atau verifikasi DPT?{' '}
-              <a
-                href="https://wa.me/6281809300406"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-primary hover:underline inline-flex items-center gap-1 min-h-[44px] px-2 py-1 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              >
-                Hubungi Panitia KPR
-              </a>
-            </p>
-          </div>
         </div>
       </main>
 

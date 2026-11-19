@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 export interface ElectionSettingsRecord {
   id: number;
   is_voting_open: boolean;
@@ -8,8 +11,21 @@ export interface ElectionSettingsRecord {
   updated_at?: string;
 }
 
+const DATA_DIR = path.join(process.cwd(), 'data');
+const SETTINGS_STORE_PATH = path.join(DATA_DIR, 'dev-settings.json');
+
+function ensureDataDir(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('[DevSettingsStore] Gagal membuat direktori data:', err);
+  }
+}
+
 // In-memory dev fallback when Supabase is not configured or in local development
-let DEV_SETTINGS: ElectionSettingsRecord = {
+const DEFAULT_SETTINGS: ElectionSettingsRecord = {
   id: 1,
   is_voting_open: true,
   maintenance_mode: false,
@@ -19,15 +35,45 @@ let DEV_SETTINGS: ElectionSettingsRecord = {
   updated_at: new Date().toISOString(),
 };
 
+let inMemorySettings: ElectionSettingsRecord | null = null;
+
 export function getDevElectionSettings(): ElectionSettingsRecord {
-  return DEV_SETTINGS;
+  ensureDataDir();
+  try {
+    if (fs.existsSync(SETTINGS_STORE_PATH)) {
+      const raw = fs.readFileSync(SETTINGS_STORE_PATH, 'utf-8');
+      inMemorySettings = JSON.parse(raw) as ElectionSettingsRecord;
+      return inMemorySettings;
+    }
+  } catch (err) {
+    console.warn('[DevSettingsStore] Gagal membaca dev-settings.json, menggunakan in-memory default:', err);
+  }
+
+  if (inMemorySettings !== null) {
+    return inMemorySettings;
+  }
+
+  inMemorySettings = { ...DEFAULT_SETTINGS };
+  saveDevSettings(inMemorySettings);
+  return inMemorySettings;
+}
+
+function saveDevSettings(settings: ElectionSettingsRecord): void {
+  ensureDataDir();
+  try {
+    fs.writeFileSync(SETTINGS_STORE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[DevSettingsStore] Gagal menyimpan dev-settings.json:', err);
+  }
 }
 
 export function updateDevElectionSettings(updates: Partial<ElectionSettingsRecord>): ElectionSettingsRecord {
-  DEV_SETTINGS = {
-    ...DEV_SETTINGS,
+  const current = getDevElectionSettings();
+  inMemorySettings = {
+    ...current,
     ...updates,
     updated_at: new Date().toISOString(),
   };
-  return DEV_SETTINGS;
+  saveDevSettings(inMemorySettings);
+  return inMemorySettings;
 }

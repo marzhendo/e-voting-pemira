@@ -25,6 +25,11 @@ const nextConfig = {
   output: process.platform === 'win32' && !process.env.BUILD_STANDALONE ? undefined : 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+    },
+  },
   async headers() {
     const securityHeaders = [
       { key: 'Content-Security-Policy', value: contentSecurityPolicy },

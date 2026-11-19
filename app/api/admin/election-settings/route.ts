@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth/session';
 import { verifyActiveAdminAccess } from '@/lib/rbac/active-admin';
@@ -184,6 +185,14 @@ export async function PATCH(request: NextRequest) {
         details: { updates: devUpdates, reason },
       });
 
+      try {
+        revalidatePath('/login');
+        revalidatePath('/');
+        revalidatePath('/vote');
+      } catch {
+        // Safe ignore in isolated non-Next test runners
+      }
+
       return NextResponse.json({
         success: true,
         message: 'Pengaturan pemilihan berhasil diperbarui (Dev Mode).',
@@ -236,6 +245,14 @@ export async function PATCH(request: NextRequest) {
       details: auditDetails,
       ip_address: clientIp,
     });
+
+    try {
+      revalidatePath('/login');
+      revalidatePath('/');
+      revalidatePath('/vote');
+    } catch {
+      // Safe ignore in isolated non-Next test runners
+    }
 
     return NextResponse.json({
       success: true,

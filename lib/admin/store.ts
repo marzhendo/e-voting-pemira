@@ -100,6 +100,18 @@ export function findAdminByEmail(email: string): AdminUserRecord | null {
   return all.find((a) => a.email.toLowerCase() === clean && a.is_active) || null;
 }
 
+export function findAdminByIdentifier(identifier: string): AdminUserRecord | null {
+  const all = getAllAdminUsers();
+  const clean = identifier.trim().toLowerCase();
+  return (
+    all.find(
+      (a) =>
+        a.is_active &&
+        (a.email.toLowerCase() === clean || (a.nim && a.nim.toLowerCase() === clean))
+    ) || null
+  );
+}
+
 export function addAdminUser(params: {
   name: string;
   email: string;

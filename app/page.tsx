@@ -79,6 +79,7 @@ export default function HomePage() {
             >
               <Link
                 href="/login"
+                prefetch={false}
                 className="w-full sm:w-auto min-h-[48px] px-8 py-3 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider transition-colors duration-150 inline-flex items-center justify-center gap-2.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
               >
                 <span>Masuk ke Bilik Suara</span>

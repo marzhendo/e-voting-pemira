@@ -21,6 +21,7 @@ import { ConfirmationModal } from '@/components/ballot/confirmation-modal';
 import { SessionExpiredModal } from '@/components/ballot/session-expired-modal';
 import { CandidateDetailModal } from '@/components/candidates/candidate-detail-modal';
 import { castBallotAction } from '@/lib/actions/ballot';
+import { MaintenanceBooth } from '@/components/maintenance/maintenance-booth';
 
 export default function VotePage() {
   const router = useRouter();
@@ -39,6 +40,37 @@ export default function VotePage() {
 
   // Sisa waktu sesi (15 menit countdown)
   const [secondsLeft, setSecondsLeft] = useState(15 * 60);
+  const [isCheckingMaintenance, setIsCheckingMaintenance] = useState(false);
+  const [lastCheckedMaintenance, setLastCheckedMaintenance] = useState<string | null>(null);
+
+  const checkElectionStatus = async () => {
+    setIsCheckingMaintenance(true);
+    try {
+      const res = await fetch('/api/election', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success && data.electionStatus) {
+        setVotingActive(data.electionStatus.isVotingActive);
+        setMaintenanceMode(data.electionStatus.maintenanceMode);
+        if (data.electionStatus.startTime && data.electionStatus.endTime) {
+          setElectionSchedule({
+            start: data.electionStatus.startTime,
+            end: data.electionStatus.endTime,
+          });
+        }
+        if (data.candidates) {
+          setCandidates(data.candidates);
+        }
+        const now = new Date();
+        setLastCheckedMaintenance(
+          now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB'
+        );
+      }
+    } catch {
+      // Abaikan gangguan koneksi sesaat
+    } finally {
+      setIsCheckingMaintenance(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -175,6 +207,17 @@ export default function VotePage() {
     }
   };
 
+  // Fullscreen Interstitial View saat mode pemeliharaan sistem aktif
+  if (maintenanceMode) {
+    return (
+      <MaintenanceBooth
+        onRefresh={checkElectionStatus}
+        isChecking={isCheckingMaintenance}
+        lastCheckedTime={lastCheckedMaintenance}
+      />
+    );
+  }
+
   const regularCandidates = candidates.filter((c) => c.candidate_number > 0);
   const kotakKosongCandidate = candidates.find((c) => c.candidate_number === 0);
   const isSingleCandidate = regularCandidates.length === 1;
@@ -259,20 +302,16 @@ export default function VotePage() {
             )}
           </div>
 
-          {/* Maintenance / Closed Notice */}
-          {(!votingActive || maintenanceMode) && (
+          {/* Closed Notice */}
+          {!votingActive && (
             <div className="mb-6 rounded-xl border border-error/40 bg-surface-container p-4 text-on-surface flex items-start gap-3.5">
               <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-sm text-on-surface">
-                  {maintenanceMode
-                    ? 'Bilik Suara Sedang Disiapkan Panitia'
-                    : 'Pemungutan Suara Sedang Ditutup'}
+                  Pemungutan Suara Sedang Ditutup
                 </h4>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                  {maintenanceMode
-                    ? 'Sistem sedang dalam penyesuaian teknis berkala. Silakan segarkan halaman dalam beberapa saat atau hubungi Panitia KPR.'
-                    : electionSchedule
+                  {electionSchedule
                     ? `Bilik suara dibuka sesuai jadwal resmi: ${new Date(
                         electionSchedule.start
                       ).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} s/d ${new Date(

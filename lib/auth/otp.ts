@@ -14,7 +14,7 @@ export interface OtpRequestResult {
   success: boolean;
   maskedEmail?: string;
   cooldownSeconds?: number;
-  code?: 'NIM_NOT_IN_DPT' | 'ALREADY_VOTED' | 'RATE_LIMITED' | 'MAIL_ERROR' | 'SERVER_ERROR';
+  code?: 'NIM_NOT_IN_DPT' | 'ALREADY_VOTED' | 'RATE_LIMITED' | 'MAIL_ERROR' | 'SERVER_ERROR' | 'MAINTENANCE_MODE';
   error?: string;
 }
 
