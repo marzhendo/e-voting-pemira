@@ -231,12 +231,9 @@ export function LoginForm({
           setSuccessNotice('Pemeliharaan sistem telah selesai. Silakan masukkan NIM kamu.');
         } else {
           const now = new Date();
-          const timeStr = now.toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
-          setCheckStatusNotice(`Status diperiksa (${timeStr} WIB): Pemeliharaan masih berlangsung.`);
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          setCheckStatusNotice(`Status per ${timeStr} WIB: Pemeliharaan masih berlangsung.`);
         }
       }
     } catch {
