@@ -1,15 +1,9 @@
-'use client';
+"use client";
 
-import type { FormEvent } from 'react';
-import {
-  AlertTriangle,
-  Loader2,
-  Trash2,
-  UserPlus,
-  X,
-} from 'lucide-react';
-import { Portal } from '@/components/ui/portal';
-import type { VoterRow } from '../types';
+import type { FormEvent } from "react";
+import { AlertTriangle, Loader2, Trash2, UserPlus, X } from "lucide-react";
+import { Portal } from "@/components/ui/portal";
+import type { VoterRow } from "../types";
 
 export interface QuickAddVoterModalProps {
   isOpen: boolean;
@@ -73,7 +67,8 @@ export function QuickAddVoterModal({
                     Tambah Pemilih Uji Coba
                   </h3>
                   <p className="text-[11px] text-on-surface-variant">
-                    Gunakan email aktif sendiri untuk menguji pengiriman OTP &amp; Broadcast.
+                    Gunakan email aktif sendiri untuk menguji pengiriman OTP
+                    &amp; Broadcast.
                   </p>
                 </div>
               </div>
@@ -123,7 +118,8 @@ export function QuickAddVoterModal({
 
               <div>
                 <label className="block text-on-surface-variant font-semibold mb-1">
-                  Email Tujuan (Email Pengujian Anda) <span className="text-error">*</span>
+                  Email Tujuan (Email Pengujian Anda){" "}
+                  <span className="text-error">*</span>
                 </label>
                 <input
                   type="email"
@@ -134,7 +130,8 @@ export function QuickAddVoterModal({
                   className="w-full px-3 py-2 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary font-mono"
                 />
                 <span className="text-[10px] text-on-surface-variant mt-1 block">
-                  Masukkan email riil yang bisa Anda buka di inbox untuk memverifikasi penerimaan surat.
+                  Masukkan email riil yang bisa Anda buka di inbox untuk
+                  memverifikasi penerimaan surat.
                 </span>
               </div>
 
@@ -225,8 +222,12 @@ export function DeleteVoterModal({
                   <Trash2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-on-surface">Konfirmasi Hapus Pemilih</h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">Penghapusan data pemilih dari Daftar Pemilih Tetap.</p>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Konfirmasi Hapus Pemilih
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Penghapusan data pemilih dari Daftar Pemilih Tetap.
+                  </p>
                 </div>
               </div>
               <button
@@ -242,28 +243,44 @@ export function DeleteVoterModal({
             <div className="space-y-3 text-xs">
               <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Nama Mahasiswa:</span>
-                  <span className="font-semibold text-on-surface">{voterToDelete.name}</span>
+                  <span className="text-on-surface-variant">
+                    Nama Mahasiswa:
+                  </span>
+                  <span className="font-semibold text-on-surface">
+                    {voterToDelete.name}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-on-surface-variant">NIM:</span>
-                  <span className="font-mono font-semibold text-primary">{voterToDelete.nim}</span>
+                  <span className="font-mono font-semibold text-primary">
+                    {voterToDelete.nim}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-on-surface-variant">Email SSO:</span>
-                  <span className="font-mono text-on-surface-variant">{voterToDelete.email}</span>
+                  <span className="font-mono text-on-surface-variant">
+                    {voterToDelete.email}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-on-surface-variant">Angkatan:</span>
-                  <span className="text-on-surface">{voterToDelete.generation}</span>
+                  <span className="text-on-surface">
+                    {voterToDelete.generation}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Status Hak Suara:</span>
+                  <span className="text-on-surface-variant">
+                    Status Hak Suara:
+                  </span>
                   <span>
                     {voterToDelete.has_voted ? (
-                      <span className="text-emerald-400 font-semibold">Sudah Memilih</span>
+                      <span className="text-emerald-400 font-semibold">
+                        Sudah Memilih
+                      </span>
                     ) : (
-                      <span className="text-on-surface-variant">Belum Memilih</span>
+                      <span className="text-on-surface-variant">
+                        Belum Memilih
+                      </span>
                     )}
                   </span>
                 </div>
@@ -276,12 +293,16 @@ export function DeleteVoterModal({
                     <span>Peringatan Integritas Pemilu</span>
                   </div>
                   <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                    Mahasiswa ini tercatat sudah mencoblos. Menghapus akun ini <strong>tidak menghapus</strong> surat suara anonim di bilik suara (*Ballot Secrecy*), namun akan mengurangi total DPT terdaftar.
+                    Mahasiswa ini tercatat sudah mencoblos. Menghapus akun ini{" "}
+                    <strong>tidak menghapus</strong> surat suara anonim di bilik
+                    suara (*Ballot Secrecy*), namun akan mengurangi total DPT
+                    terdaftar.
                   </p>
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant leading-relaxed text-[11px]">
-                  Mahasiswa ini belum menggunakan hak suara. Penghapusan akan mencabut hak pilih akun ini secara permanen dari sistem.
+                  Mahasiswa ini belum menggunakan hak suara. Penghapusan akan
+                  mencabut hak pilih akun ini secara permanen dari sistem.
                 </div>
               )}
             </div>
@@ -299,7 +320,7 @@ export function DeleteVoterModal({
                 type="button"
                 disabled={isDeletingSingleVoter}
                 onClick={onConfirm}
-                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error-solid hover:bg-error-solid/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {isDeletingSingleVoter ? (
                   <>
@@ -361,8 +382,12 @@ export function BatchDeleteVotersModal({
                   <Trash2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-on-surface">Hapus Selektif ({selectedCount} Pemilih)</h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">Penghapusan massal pemilih DPT yang dipilih.</p>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Hapus Selektif ({selectedCount} Pemilih)
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Penghapusan massal pemilih DPT yang dipilih.
+                  </p>
                 </div>
               </div>
               <button
@@ -377,7 +402,9 @@ export function BatchDeleteVotersModal({
 
             <div className="space-y-3 text-xs">
               <p className="text-on-surface">
-                Anda akan menghapus <strong>{selectedCount} data pemilih</strong> terpilih dari Daftar Pemilih Tetap (DPT).
+                Anda akan menghapus{" "}
+                <strong>{selectedCount} data pemilih</strong> terpilih dari
+                Daftar Pemilih Tetap (DPT).
               </p>
 
               <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error space-y-1">
@@ -386,7 +413,9 @@ export function BatchDeleteVotersModal({
                   <span>Konfirmasi Tindakan Eksekutif</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-error/90">
-                  Tindakan ini tidak dapat dibatalkan secara otomatis. Setiap akun yang dihapus akan kehilangan akses ke bilik suara. Catatan audit akan direkam atas nama Anda.
+                  Tindakan ini tidak dapat dibatalkan secara otomatis. Setiap
+                  akun yang dihapus akan kehilangan akses ke bilik suara.
+                  Catatan audit akan direkam atas nama Anda.
                 </p>
               </div>
             </div>
@@ -404,7 +433,7 @@ export function BatchDeleteVotersModal({
                 type="button"
                 disabled={isDeletingBatchVoters}
                 onClick={onConfirm}
-                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error-solid hover:bg-error-solid/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {isDeletingBatchVoters ? (
                   <>
@@ -426,7 +455,8 @@ export function BatchDeleteVotersModal({
   );
 }
 
-export type ResetDptMode = 'reset_to_default' | 'clear_all' | 'reset_vote_status';
+export type ResetDptMode =
+  "reset_to_default" | "clear_all" | "reset_vote_status";
 
 export interface ResetDptModalProps {
   isOpen: boolean;
@@ -474,8 +504,12 @@ export function ResetDptModal({
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-on-surface">Reset &amp; Kosongkan DPT</h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">Operasi tingkat tinggi untuk mengelola database pemilih.</p>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Reset &amp; Kosongkan DPT
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Operasi tingkat tinggi untuk mengelola database pemilih.
+                  </p>
                 </div>
               </div>
               <button
@@ -490,64 +524,86 @@ export function ResetDptModal({
 
             <div className="space-y-4 text-xs">
               <div className="space-y-2">
-                <label className="block text-on-surface-variant font-semibold">Pilih Mode Reset:</label>
+                <label className="block text-on-surface-variant font-semibold">
+                  Pilih Mode Reset:
+                </label>
 
-                <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_to_default' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === "reset_to_default" ? "bg-primary/10 border-primary/40" : "bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30"}`}
+                >
                   <input
                     type="radio"
                     name="resetDptMode"
                     value="reset_to_default"
-                    checked={resetDptMode === 'reset_to_default'}
-                    onChange={() => onModeChange('reset_to_default')}
+                    checked={resetDptMode === "reset_to_default"}
+                    onChange={() => onModeChange("reset_to_default")}
                     className="mt-0.5 text-primary focus:ring-0"
                   />
                   <div>
-                    <span className="font-bold text-on-surface block">Kembalikan ke Default Sistem</span>
+                    <span className="font-bold text-on-surface block">
+                      Kembalikan ke Default Sistem
+                    </span>
                     <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                      Menghapus data pemilih baru yang diimpor dan mengembalikan daftar ke pemilih inisial sistem.
+                      Menghapus data pemilih baru yang diimpor dan mengembalikan
+                      daftar ke pemilih inisial sistem.
                     </span>
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'clear_all' ? 'bg-error/10 border-error/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === "clear_all" ? "bg-error/10 border-error/40" : "bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30"}`}
+                >
                   <input
                     type="radio"
                     name="resetDptMode"
                     value="clear_all"
-                    checked={resetDptMode === 'clear_all'}
-                    onChange={() => onModeChange('clear_all')}
+                    checked={resetDptMode === "clear_all"}
+                    onChange={() => onModeChange("clear_all")}
                     className="mt-0.5 text-error focus:ring-0"
                   />
                   <div>
-                    <span className="font-bold text-error block">Kosongkan Seluruh Pemilih Mahasiswa (0 Pemilih)</span>
+                    <span className="font-bold text-error block">
+                      Kosongkan Seluruh Pemilih Mahasiswa (0 Pemilih)
+                    </span>
                     <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                      Menghapus semua data mahasiswa dari DPT agar panitia dapat mengunggah berkas CSV resmi yang baru. Akun Superadmin tetap dipertahankan.
+                      Menghapus semua data mahasiswa dari DPT agar panitia dapat
+                      mengunggah berkas CSV resmi yang baru. Akun Superadmin
+                      tetap dipertahankan.
                     </span>
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === 'reset_vote_status' ? 'bg-primary/10 border-primary/40' : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30'}`}>
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${resetDptMode === "reset_vote_status" ? "bg-primary/10 border-primary/40" : "bg-surface-container-lowest border-outline-variant/30 hover:bg-surface-container-high/30"}`}
+                >
                   <input
                     type="radio"
                     name="resetDptMode"
                     value="reset_vote_status"
-                    checked={resetDptMode === 'reset_vote_status'}
-                    onChange={() => onModeChange('reset_vote_status')}
+                    checked={resetDptMode === "reset_vote_status"}
+                    onChange={() => onModeChange("reset_vote_status")}
                     className="mt-0.5 text-primary focus:ring-0"
                   />
                   <div>
-                    <span className="font-bold text-on-surface block">Reset Status Voting Saja (Simulasi)</span>
+                    <span className="font-bold text-on-surface block">
+                      Reset Status Voting Saja (Simulasi)
+                    </span>
                     <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                      Mengubah seluruh status pemilih menjadi Belum Memilih tanpa menghapus data pemilih. Cocok untuk mengulang gladi bersih.
+                      Mengubah seluruh status pemilih menjadi Belum Memilih
+                      tanpa menghapus data pemilih. Cocok untuk mengulang gladi
+                      bersih.
                     </span>
                   </div>
                 </label>
               </div>
 
               <div className="p-3.5 rounded-xl bg-error/10 border border-error/30 text-error space-y-2">
-                <p className="font-bold text-[11px] uppercase tracking-wider">Ketik Konfirmasi:</p>
+                <p className="font-bold text-[11px] uppercase tracking-wider">
+                  Ketik Konfirmasi:
+                </p>
                 <p className="text-[11px] leading-relaxed">
-                  Untuk mencegah reset yang tidak disengaja, ketik <strong>RESET DPT</strong> pada kolom di bawah ini:
+                  Untuk mencegah reset yang tidak disengaja, ketik{" "}
+                  <strong>RESET DPT</strong> pada kolom di bawah ini:
                 </p>
                 <input
                   type="text"
@@ -570,9 +626,12 @@ export function ResetDptModal({
               </button>
               <button
                 type="button"
-                disabled={isResettingDpt || resetDptConfirmText.trim().toUpperCase() !== 'RESET DPT'}
+                disabled={
+                  isResettingDpt ||
+                  resetDptConfirmText.trim().toUpperCase() !== "RESET DPT"
+                }
                 onClick={onConfirm}
-                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-40 cursor-pointer"
+                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-error-solid hover:bg-error-solid/80 text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-40 cursor-pointer"
               >
                 {isResettingDpt ? (
                   <>

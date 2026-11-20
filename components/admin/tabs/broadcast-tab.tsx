@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   AlertTriangle,
@@ -7,7 +7,7 @@ import {
   Mail,
   RefreshCw,
   Send,
-} from 'lucide-react';
+} from "lucide-react";
 
 export interface BroadcastResultSummary {
   sentCount: number;
@@ -20,8 +20,8 @@ export interface BroadcastTabProps {
   totalVotes: number;
   broadcastResult: BroadcastResultSummary | null;
   broadcastError: string | null;
-  broadcastTemplate: 'reminder' | 'invitation' | 'custom';
-  broadcastTargetGroup: 'not_voted' | 'all' | 'voted';
+  broadcastTemplate: "reminder" | "invitation" | "custom";
+  broadcastTargetGroup: "not_voted" | "all" | "voted";
   broadcastGeneration: string;
   availableGenerations: number[];
   loadingBroadcastCount: boolean;
@@ -33,8 +33,8 @@ export interface BroadcastTabProps {
   broadcastCtaUrl: string;
   isBroadcasting: boolean;
   onRefreshQuota: () => void;
-  onSelectTemplate: (template: 'reminder' | 'invitation' | 'custom') => void;
-  onTargetGroupChange: (group: 'not_voted' | 'all' | 'voted') => void;
+  onSelectTemplate: (template: "reminder" | "invitation" | "custom") => void;
+  onTargetGroupChange: (group: "not_voted" | "all" | "voted") => void;
   onGenerationChange: (generation: string) => void;
   onSubjectChange: (subject: string) => void;
   onHeadlineChange: (headline: string) => void;
@@ -81,7 +81,8 @@ export function BroadcastTab({
             <span>Broadcast Email Pemira HMIF</span>
           </h1>
           <p className="text-xs text-on-surface-variant mt-0.5">
-            Kirim email pengumuman resmi dan pengingat hak suara ke mahasiswa Telkom University.
+            Kirim email pengumuman resmi dan pengingat hak suara ke mahasiswa
+            Telkom University.
           </p>
         </div>
 
@@ -98,16 +99,28 @@ export function BroadcastTab({
       {/* Metrics Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-          <span className="text-[11px] font-semibold uppercase text-on-surface-variant block">Total DPT Resmi</span>
-          <span className="text-xl font-bold text-on-surface font-mono">{totalDpt} Mahasiswa</span>
+          <span className="text-[11px] font-semibold uppercase text-on-surface-variant block">
+            Total DPT Resmi
+          </span>
+          <span className="text-xl font-bold text-on-surface font-mono">
+            {totalDpt} Mahasiswa
+          </span>
         </div>
         <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-          <span className="text-[11px] font-semibold uppercase text-emerald-400 block">Sudah Menggunakan Hak Suara</span>
-          <span className="text-xl font-bold text-emerald-400 font-mono">{totalVotes} Mahasiswa</span>
+          <span className="text-[11px] font-semibold uppercase text-emerald-400 block">
+            Sudah Menggunakan Hak Suara
+          </span>
+          <span className="text-xl font-bold text-emerald-400 font-mono">
+            {totalVotes} Mahasiswa
+          </span>
         </div>
         <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/30">
-          <span className="text-[11px] font-semibold uppercase text-amber-400 block">Belum Menggunakan Hak Suara</span>
-          <span className="text-xl font-bold text-amber-400 font-mono">{Math.max(0, totalDpt - totalVotes)} Mahasiswa</span>
+          <span className="text-[11px] font-semibold uppercase text-amber-400 block">
+            Belum Menggunakan Hak Suara
+          </span>
+          <span className="text-xl font-bold text-amber-400 font-mono">
+            {Math.max(0, totalDpt - totalVotes)} Mahasiswa
+          </span>
         </div>
       </div>
 
@@ -118,14 +131,16 @@ export function BroadcastTab({
           <div>
             <span className="font-bold block">Broadcast terkirim.</span>
             <span className="text-emerald-300 block mt-0.5">
-              Total {broadcastResult.sentCount} email berhasil terkirim ke mahasiswa ({broadcastResult.failedCount} gagal) dari total target {broadcastResult.totalTarget} penerima.
+              Total {broadcastResult.sentCount} email berhasil terkirim ke
+              mahasiswa ({broadcastResult.failedCount} gagal) dari total target{" "}
+              {broadcastResult.totalTarget} penerima.
             </span>
           </div>
         </div>
       )}
 
       {broadcastError && (
-        <div className="rounded-2xl border border-hmif-red/30 bg-hmif-red/10 p-4 text-xs text-hmif-red flex items-start gap-3">
+        <div className="rounded-2xl border border-error/30 bg-error/10 p-4 text-xs text-error flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <div>
             <span className="font-bold block">Gagal Mengirim Broadcast</span>
@@ -146,41 +161,47 @@ export function BroadcastTab({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => onSelectTemplate('reminder')}
+                onClick={() => onSelectTemplate("reminder")}
                 className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
-                  broadcastTemplate === 'reminder'
-                    ? 'bg-primary text-on-primary border-primary shadow-sm'
-                    : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
+                  broadcastTemplate === "reminder"
+                    ? "bg-primary text-on-primary border-primary shadow-sm"
+                    : "bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant"
                 }`}
               >
                 <span className="block">⏳ Pengingat (Nudge)</span>
-                <span className="text-[11px] opacity-80 block mt-0.5">Khusus belum memilih</span>
+                <span className="text-[11px] opacity-80 block mt-0.5">
+                  Khusus belum memilih
+                </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => onSelectTemplate('invitation')}
+                onClick={() => onSelectTemplate("invitation")}
                 className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
-                  broadcastTemplate === 'invitation'
-                    ? 'bg-primary text-on-primary border-primary shadow-sm'
-                    : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
+                  broadcastTemplate === "invitation"
+                    ? "bg-primary text-on-primary border-primary shadow-sm"
+                    : "bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant"
                 }`}
               >
                 <span className="block">📢 Undangan Buka</span>
-                <span className="text-[11px] opacity-80 block mt-0.5">Untuk semua DPT</span>
+                <span className="text-[11px] opacity-80 block mt-0.5">
+                  Untuk semua DPT
+                </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => onSelectTemplate('custom')}
+                onClick={() => onSelectTemplate("custom")}
                 className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border text-left cursor-pointer ${
-                  broadcastTemplate === 'custom'
-                    ? 'bg-primary text-on-primary border-primary shadow-sm'
-                    : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant'
+                  broadcastTemplate === "custom"
+                    ? "bg-primary text-on-primary border-primary shadow-sm"
+                    : "bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-outline-variant"
                 }`}
               >
                 <span className="block">✍️ Pesan Kustom</span>
-                <span className="text-[11px] opacity-80 block mt-0.5">Tulis bebas</span>
+                <span className="text-[11px] opacity-80 block mt-0.5">
+                  Tulis bebas
+                </span>
               </button>
             </div>
           </div>
@@ -193,10 +214,16 @@ export function BroadcastTab({
               </label>
               <select
                 value={broadcastTargetGroup}
-                onChange={(e) => onTargetGroupChange(e.target.value as 'not_voted' | 'all' | 'voted')}
+                onChange={(e) =>
+                  onTargetGroupChange(
+                    e.target.value as "not_voted" | "all" | "voted",
+                  )
+                }
                 className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
               >
-                <option value="not_voted">🔴 Khusus yang Belum Memilih (Rekomendasi)</option>
+                <option value="not_voted">
+                  🔴 Khusus yang Belum Memilih (Rekomendasi)
+                </option>
                 <option value="all">👥 Seluruh Mahasiswa di DPT</option>
                 <option value="voted">🟢 Khusus yang Sudah Memilih</option>
               </select>
@@ -212,7 +239,10 @@ export function BroadcastTab({
                 className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
               >
                 <option value="all">
-                  Semua Angkatan {availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ''}
+                  Semua Angkatan{" "}
+                  {availableGenerations.length > 0
+                    ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})`
+                    : ""}
                 </option>
                 {availableGenerations.map((gen) => (
                   <option key={gen} value={gen.toString()}>
@@ -225,12 +255,14 @@ export function BroadcastTab({
 
           {/* Target Counter Badge */}
           <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/20 flex items-center justify-between text-xs">
-            <span className="text-on-surface-variant">Jumlah Penerima Sasaran:</span>
+            <span className="text-on-surface-variant">
+              Jumlah Penerima Sasaran:
+            </span>
             <span className="font-bold text-primary font-mono text-sm">
               {loadingBroadcastCount ? (
                 <Loader2 className="w-4 h-4 animate-spin inline" />
               ) : (
-                `${broadcastTargetCount ?? '...'} Mahasiswa`
+                `${broadcastTargetCount ?? "..."} Mahasiswa`
               )}
             </span>
           </div>
@@ -298,7 +330,8 @@ export function BroadcastTab({
                   className="w-full bg-surface-container-lowest text-xs rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary"
                 />
                 <span className="text-[11px] text-on-surface-variant block">
-                  Tautan relatif (contoh: /login) akan otomatis dikonversi sistem ke alamat domain resmi Pemira.
+                  Tautan relatif (contoh: /login) akan otomatis dikonversi
+                  sistem ke alamat domain resmi Pemira.
                 </span>
               </div>
             </div>
@@ -307,12 +340,17 @@ export function BroadcastTab({
           {/* Submit Action */}
           <button
             type="button"
-            disabled={isBroadcasting || (broadcastTargetCount !== null && broadcastTargetCount === 0)}
+            disabled={
+              isBroadcasting ||
+              (broadcastTargetCount !== null && broadcastTargetCount === 0)
+            }
             onClick={onOpenConfirmBroadcast}
             className="w-full h-12 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer mt-4"
           >
             <Send className="w-4 h-4" />
-            <span>Kirim Broadcast Email ({broadcastTargetCount ?? '...'} Penerima)</span>
+            <span>
+              Kirim Broadcast Email ({broadcastTargetCount ?? "..."} Penerima)
+            </span>
           </button>
         </div>
 
@@ -331,9 +369,24 @@ export function BroadcastTab({
           <div className="bg-[#181818] rounded-2xl border border-neutral-800 p-5 space-y-4 text-xs font-sans">
             {/* Email Meta Headers */}
             <div className="pb-3 border-b border-neutral-800 space-y-1 text-[11px]">
-              <div><strong className="text-neutral-400">Dari:</strong> <span className="text-neutral-200">Panitia Pemira HMIF &lt;noreply@pemirahmif.com&gt;</span></div>
-              <div><strong className="text-neutral-400">Kepada:</strong> <span className="text-neutral-200 font-mono">103012300001@student.telkomuniversity.ac.id</span></div>
-              <div><strong className="text-neutral-400">Subjek:</strong> <span className="text-primary font-medium">{broadcastSubject}</span></div>
+              <div>
+                <strong className="text-neutral-400">Dari:</strong>{" "}
+                <span className="text-neutral-200">
+                  Panitia Pemira HMIF &lt;noreply@pemirahmif.com&gt;
+                </span>
+              </div>
+              <div>
+                <strong className="text-neutral-400">Kepada:</strong>{" "}
+                <span className="text-neutral-200 font-mono">
+                  103012300001@student.telkomuniversity.ac.id
+                </span>
+              </div>
+              <div>
+                <strong className="text-neutral-400">Subjek:</strong>{" "}
+                <span className="text-primary font-medium">
+                  {broadcastSubject}
+                </span>
+              </div>
             </div>
 
             {/* Rendered Email Card */}
@@ -365,7 +418,8 @@ export function BroadcastTab({
               </div>
 
               <div className="p-2.5 rounded bg-neutral-900 border-l-2 border-hmif-gold text-[11px] text-neutral-400 leading-normal">
-                Pilihan suaramu bersifat rahasia dan disimpan secara anonim tanpa mencatat identitas pemilih pada surat suara.
+                Pilihan suaramu bersifat rahasia dan disimpan secara anonim
+                tanpa mencatat identitas pemilih pada surat suara.
               </div>
             </div>
           </div>

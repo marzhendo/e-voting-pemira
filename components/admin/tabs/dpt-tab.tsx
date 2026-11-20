@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import type { ChangeEvent, RefObject } from 'react';
+import type { ChangeEvent, RefObject } from "react";
 import {
   AlertTriangle,
   Check,
@@ -14,8 +14,8 @@ import {
   UploadCloud,
   UserPlus,
   X,
-} from 'lucide-react';
-import type { VoterRow } from '../types';
+} from "lucide-react";
+import type { VoterRow } from "../types";
 
 export interface ImportPreviewSummary {
   totalRows: number;
@@ -117,7 +117,8 @@ export function DptTab({
             Manajemen Daftar Pemilih Tetap (DPT)
           </h1>
           <p className="text-xs text-on-surface-variant mt-0.5">
-            Kelola hak pilih mahasiswa aktif Informatika Telkom University Purwokerto.
+            Kelola hak pilih mahasiswa aktif Informatika Telkom University
+            Purwokerto.
           </p>
         </div>
 
@@ -150,7 +151,7 @@ export function DptTab({
             <span>Upload DPT</span>
           </button>
 
-          {userRole === 'super_admin' && (
+          {userRole === "super_admin" && (
             <button
               type="button"
               onClick={onOpenResetDptModal}
@@ -177,7 +178,10 @@ export function DptTab({
             <Check className="w-4 h-4" />
             <span>{importSuccessMessage}</span>
           </div>
-          <button onClick={onDismissImportSuccess} className="text-emerald-400 hover:text-white cursor-pointer">
+          <button
+            onClick={onDismissImportSuccess}
+            className="text-emerald-400 hover:text-white cursor-pointer"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -189,7 +193,10 @@ export function DptTab({
             <Check className="w-4 h-4" />
             <span>{dptActionMessage}</span>
           </div>
-          <button onClick={onDismissDptActionMessage} className="text-emerald-400 hover:text-white cursor-pointer">
+          <button
+            onClick={onDismissDptActionMessage}
+            className="text-emerald-400 hover:text-white cursor-pointer"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -201,7 +208,10 @@ export function DptTab({
             <AlertTriangle className="w-4 h-4" />
             <span>{dptErrorMessage}</span>
           </div>
-          <button onClick={onDismissDptError} className="text-error hover:text-white cursor-pointer">
+          <button
+            onClick={onDismissDptError}
+            className="text-error hover:text-white cursor-pointer"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -217,7 +227,8 @@ export function DptTab({
                 <span>Pratinjau Berkas: {stagedFile?.name}</span>
               </h3>
               <span className="text-xs text-on-surface-variant">
-                Sistem memvalidasi kelengkapan data sebelum disimpan ke database.
+                Sistem memvalidasi kelengkapan data sebelum disimpan ke
+                database.
               </span>
             </div>
             <span className="px-2.5 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-bold">
@@ -227,20 +238,36 @@ export function DptTab({
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-              <span className="text-on-surface-variant text-[11px] block">Total Baris:</span>
-              <span className="font-bebas text-2xl text-on-surface">{importPreview.totalRows}</span>
+              <span className="text-on-surface-variant text-[11px] block">
+                Total Baris:
+              </span>
+              <span className="font-bebas text-2xl text-on-surface">
+                {importPreview.totalRows}
+              </span>
             </div>
             <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-              <span className="text-on-surface-variant text-[11px] block">Valid:</span>
-              <span className="font-bebas text-2xl text-secondary">{importPreview.validCount}</span>
+              <span className="text-on-surface-variant text-[11px] block">
+                Valid:
+              </span>
+              <span className="font-bebas text-2xl text-secondary">
+                {importPreview.validCount}
+              </span>
             </div>
             <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-              <span className="text-on-surface-variant text-[11px] block">Duplikat:</span>
-              <span className="font-bebas text-2xl text-hmif-yellow">{importPreview.duplicateCount}</span>
+              <span className="text-on-surface-variant text-[11px] block">
+                Duplikat:
+              </span>
+              <span className="font-bebas text-2xl text-hmif-yellow">
+                {importPreview.duplicateCount}
+              </span>
             </div>
             <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-              <span className="text-on-surface-variant text-[11px] block">Format Invalid:</span>
-              <span className="font-bebas text-2xl text-error">{importPreview.invalidCount}</span>
+              <span className="text-on-surface-variant text-[11px] block">
+                Format Invalid:
+              </span>
+              <span className="font-bebas text-2xl text-error">
+                {importPreview.invalidCount}
+              </span>
             </div>
           </div>
 
@@ -333,11 +360,11 @@ export function DptTab({
             >
               Batal
             </button>
-            {userRole === 'super_admin' && (
+            {userRole === "super_admin" && (
               <button
                 type="button"
                 onClick={onOpenBatchDeleteModal}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-error hover:bg-error/80 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-error-solid hover:bg-error-solid/80 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Hapus Terpilih ({selectedVoterIds.length})</span>
@@ -353,7 +380,7 @@ export function DptTab({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-surface-container-high/60 border-b border-outline-variant/30 text-on-surface-variant uppercase tracking-wider font-semibold">
-                {userRole === 'super_admin' && (
+                {userRole === "super_admin" && (
                   <th className="py-3 px-4 w-10 text-center">
                     <input
                       type="checkbox"
@@ -369,7 +396,7 @@ export function DptTab({
                 <th className="py-3 px-5">Email SSO</th>
                 <th className="py-3 px-5">Angkatan</th>
                 <th className="py-3 px-5">Status</th>
-                {userRole === 'super_admin' && (
+                {userRole === "super_admin" && (
                   <th className="py-3 px-5 text-right w-20">Aksi</th>
                 )}
               </tr>
@@ -377,20 +404,29 @@ export function DptTab({
             <tbody className="divide-y divide-outline-variant/20">
               {loadingVoters ? (
                 <tr>
-                  <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-on-surface-variant">
+                  <td
+                    colSpan={userRole === "super_admin" ? 7 : 5}
+                    className="py-8 text-center text-on-surface-variant"
+                  >
                     Memuat data pemilih...
                   </td>
                 </tr>
               ) : voters.length === 0 ? (
                 <tr>
-                  <td colSpan={userRole === 'super_admin' ? 7 : 5} className="py-8 text-center text-on-surface-variant">
+                  <td
+                    colSpan={userRole === "super_admin" ? 7 : 5}
+                    className="py-8 text-center text-on-surface-variant"
+                  >
                     Tidak ada data yang cocok dengan pencarian.
                   </td>
                 </tr>
               ) : (
                 voters.map((v) => (
-                  <tr key={v.id} className="hover:bg-surface-container-high/40 transition-colors">
-                    {userRole === 'super_admin' && (
+                  <tr
+                    key={v.id}
+                    className="hover:bg-surface-container-high/40 transition-colors"
+                  >
+                    {userRole === "super_admin" && (
                       <td className="py-3 px-4 text-center">
                         <input
                           type="checkbox"
@@ -400,9 +436,15 @@ export function DptTab({
                         />
                       </td>
                     )}
-                    <td className="py-3 px-5 font-mono font-semibold text-primary">{v.nim}</td>
-                    <td className="py-3 px-5 font-medium text-on-surface">{v.name}</td>
-                    <td className="py-3 px-5 font-mono text-[11px] text-on-surface-variant">{v.email}</td>
+                    <td className="py-3 px-5 font-mono font-semibold text-primary">
+                      {v.nim}
+                    </td>
+                    <td className="py-3 px-5 font-medium text-on-surface">
+                      {v.name}
+                    </td>
+                    <td className="py-3 px-5 font-mono text-[11px] text-on-surface-variant">
+                      {v.email}
+                    </td>
                     <td className="py-3 px-5">
                       <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[11px]">
                         {v.generation}
@@ -421,10 +463,14 @@ export function DptTab({
                         </span>
                       )}
                     </td>
-                    {userRole === 'super_admin' && (
+                    {userRole === "super_admin" && (
                       <td className="py-3 px-5 text-right">
-                        {v.email?.toLowerCase() === 'marzhendogalangs@gmail.com' ? (
-                          <span className="text-[10px] text-primary/70 font-mono italic" title="Akun Superadmin Utama (Dilindungi)">
+                        {v.email?.toLowerCase() ===
+                        "marzhendogalangs@gmail.com" ? (
+                          <span
+                            className="text-[10px] text-primary/70 font-mono italic"
+                            title="Akun Superadmin Utama (Dilindungi)"
+                          >
                             Utama
                           </span>
                         ) : (
@@ -450,16 +496,20 @@ export function DptTab({
         <div className="p-4 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
           <div className="flex flex-wrap items-center gap-3">
             <span>
-              Menampilkan{' '}
+              Menampilkan{" "}
               <strong className="text-on-surface">
-                {voterTotalCount > 0 ? (dptPage - 1) * dptPageSize + 1 : 0} -{' '}
+                {voterTotalCount > 0 ? (dptPage - 1) * dptPageSize + 1 : 0} -{" "}
                 {Math.min(dptPage * dptPageSize, voterTotalCount)}
-              </strong>{' '}
-              dari <strong className="text-on-surface">{voterTotalCount}</strong> pemilih terdaftar
+              </strong>{" "}
+              dari{" "}
+              <strong className="text-on-surface">{voterTotalCount}</strong>{" "}
+              pemilih terdaftar
             </span>
 
             <div className="flex items-center gap-1.5 ml-2">
-              <span className="text-[11px] text-on-surface-variant/70">Baris:</span>
+              <span className="text-[11px] text-on-surface-variant/70">
+                Baris:
+              </span>
               <select
                 value={dptPageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
@@ -485,7 +535,9 @@ export function DptTab({
             </button>
 
             <div className="px-3 py-1.5 min-h-[36px] flex items-center font-mono text-xs text-on-surface font-semibold bg-surface-container-high rounded-xl border border-outline-variant/30">
-              <span>Halaman {dptPage} / {dptTotalPages}</span>
+              <span>
+                Halaman {dptPage} / {dptTotalPages}
+              </span>
             </div>
 
             <button

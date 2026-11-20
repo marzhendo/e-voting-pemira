@@ -1,19 +1,19 @@
-import { Suspense } from 'react';
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { LoginForm } from '@/components/auth/login-form';
-import { getMaintenanceStatus } from '@/lib/election/maintenance-status';
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { LoginForm } from "@/components/auth/login-form";
+import { getMaintenanceStatus } from "@/lib/election/maintenance-status";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'Masuk ke Bilik Suara',
+  title: "Masuk ke Bilik Suara",
   description:
-    'Verifikasi identitas NIM mahasiswa aktif Informatika Telkom University Purwokerto untuk mengakses bilik suara Pemira HMIF 2026/2027.',
+    "Verifikasi identitas NIM mahasiswa aktif Informatika Telkom University Purwokerto untuk mengakses bilik suara Pemira HMIF 2026/2027.",
   alternates: {
-    canonical: '/login',
+    canonical: "/login",
   },
 };
 
@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   // Pre-fetch status pemeliharaan secara server-side untuk mengeliminasi flash of content (FOAC)
   const initialMaintenance = await getMaintenanceStatus();
   const adminParam = searchParams?.admin;
-  const initialAdmin = adminParam === '1' || adminParam === 'true';
+  const initialAdmin = adminParam === "1" || adminParam === "true";
 
   return (
     <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-between antialiased selection:bg-primary selection:text-on-primary">
@@ -35,7 +35,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="w-full max-w-[440px] mb-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-medium text-on-surface-variant hover:text-primary transition-colors min-h-[44px] px-2 py-1 -ml-2 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+            className="inline-flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors min-h-[44px] px-2 py-1 -ml-2 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Kembali ke Beranda</span>
@@ -43,7 +43,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         {/* Focused Single-Column Card (Fixed width & stable height locked against layout shifts) */}
-        <div className="w-full max-w-[440px] min-h-[460px] bg-surface-container border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-primary/5 flex flex-col justify-between">
+        <div className="w-full max-w-[440px] min-h-[460px] bg-surface-container border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-lg shadow-black/30 flex flex-col justify-between">
           <Suspense
             fallback={
               <div className="text-xs text-on-surface-variant py-16 text-center animate-pulse">
@@ -60,9 +60,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </main>
 
       {/* Footer */}
-      <footer className="w-full py-6 text-center text-[11px] text-on-surface-variant border-t border-outline-variant/15">
+      <footer className="w-full py-6 text-center text-xs text-on-surface-variant border-t border-outline-variant/15">
         <p className="max-w-4xl mx-auto px-4">
-          &copy; 2026 HMIF Telkom University Purwokerto. &bull; Komisi Pemilihan Raya. Seluruh hak cipta dilindungi.
+          &copy; 2026 HMIF Telkom University Purwokerto. &bull; Komisi Pemilihan
+          Raya. Seluruh hak cipta dilindungi.
         </p>
       </footer>
     </div>

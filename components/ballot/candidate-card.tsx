@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Users, Check, FileText, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Users, Check, FileText, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
 
 export interface CandidateItem {
   id: string;
@@ -28,7 +28,7 @@ export function CandidateCard({
   onSelect,
   onOpenDetail,
 }: CandidateCardProps) {
-  const numberStr = candidate.candidate_number.toString().padStart(2, '0');
+  const numberStr = candidate.candidate_number.toString().padStart(2, "0");
 
   return (
     <div
@@ -37,15 +37,18 @@ export function CandidateCard({
       aria-label={`Pasangan Calon Nomor Urut ${numberStr}: ${candidate.leader_name} dan ${candidate.vice_leader_name}`}
       onClick={() => onSelect(candidate)}
       onKeyDown={(e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+        if (
+          (e.key === "Enter" || e.key === " ") &&
+          e.target === e.currentTarget
+        ) {
           e.preventDefault();
           onSelect(candidate);
         }
       }}
       className={`group relative rounded-2xl p-6 flex flex-col justify-between transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
         isSelected
-          ? 'bg-surface-container-high border-2 border-primary ring-1 ring-primary/30'
-          : 'bg-surface-container border border-outline-variant/30 hover:border-outline hover:bg-surface-container-high'
+          ? "bg-surface-container-high border-2 border-primary ring-1 ring-primary/30"
+          : "bg-surface-container border border-outline-variant/30 hover:border-outline hover:bg-surface-container-high"
       }`}
     >
       <div className="flex flex-col gap-4">
@@ -58,7 +61,7 @@ export function CandidateCard({
               </span>
             </div>
             <div>
-              <span className="text-[11px] text-on-surface-variant uppercase tracking-wider block font-semibold">
+              <span className="text-xs text-on-surface-variant uppercase tracking-wider block font-semibold">
                 Pasangan Calon
               </span>
               <h3 className="text-base text-on-surface font-bold">
@@ -70,13 +73,16 @@ export function CandidateCard({
           <div
             className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-150 ${
               isSelected
-                ? 'bg-primary border-primary text-on-primary'
-                : 'border-outline/40 bg-surface-container-highest text-transparent'
+                ? "bg-primary border-primary text-on-primary"
+                : "border-outline/40 bg-surface-container-highest text-transparent"
             }`}
           >
             <motion.div
-              animate={{ scale: isSelected ? 1 : 0.7, opacity: isSelected ? 1 : 0 }}
-              transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+              animate={{
+                scale: isSelected ? 1 : 0.7,
+                opacity: isSelected ? 1 : 0,
+              }}
+              transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
             >
               <Check className="w-3.5 h-3.5 stroke-[3]" />
             </motion.div>
@@ -94,14 +100,14 @@ export function CandidateCard({
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-2.5 p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center border border-outline-variant/30 text-primary/80">
+              <div className="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center border border-outline-variant/30 text-on-surface-variant">
                 <Users className="w-7 h-7" />
               </div>
               <div>
-                <span className="text-xs font-semibold text-on-surface block">
+                <span className="text-sm font-semibold text-on-surface block">
                   Foto Resmi Paslon {numberStr}
                 </span>
-                <span className="text-[11px] text-on-surface-variant mt-0.5 block">
+                <span className="text-xs text-on-surface-variant mt-0.5 block">
                   Chairman &amp; Vice Chairman
                 </span>
               </div>
@@ -120,11 +126,11 @@ export function CandidateCard({
         </div>
 
         {/* Visi Utama */}
-        <div className="bg-surface-container-low rounded-xl p-3 text-xs text-on-surface-variant">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-primary block mb-1">
+        <div className="bg-surface-container-low rounded-xl p-3.5 border border-outline-variant/30">
+          <span className="text-xs font-bold uppercase tracking-wider text-primary block mb-1">
             Visi Utama
           </span>
-          <p className="line-clamp-2 text-xs leading-relaxed text-on-surface/90">
+          <p className="line-clamp-3 text-sm leading-relaxed text-on-surface">
             &ldquo;{candidate.vision}&rdquo;
           </p>
         </div>
@@ -132,20 +138,20 @@ export function CandidateCard({
         {/* Tombol Masuk ke Halaman Detail & Unduh CV */}
         <motion.button
           whileTap={{ scale: 0.97 }}
-          transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+          transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onOpenDetail?.(candidate);
           }}
           aria-label={`Detail Visi Misi & CV Paslon nomor urut ${numberStr}`}
-          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-primary/50 text-xs font-semibold flex items-center justify-between gap-2 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          className="w-full h-11 min-h-[44px] px-3.5 rounded-xl bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant/40 hover:border-outline text-sm font-semibold flex items-center justify-between gap-2 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           <span className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-primary" />
+            <FileText className="w-4 h-4 text-on-surface-variant" />
             <span>Detail Visi Misi &amp; CV Paslon</span>
           </span>
-          <ChevronRight className="w-4 h-4 text-primary shrink-0" />
+          <ChevronRight className="w-4 h-4 text-on-surface-variant shrink-0" />
         </motion.button>
       </div>
 
@@ -153,18 +159,22 @@ export function CandidateCard({
       <div className="pt-4 mt-4 border-t border-outline-variant/20">
         <motion.button
           whileTap={{ scale: 0.98 }}
-          transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+          transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
           type="button"
           aria-pressed={isSelected}
-          aria-label={isSelected ? `Paslon ${numberStr} terpilih` : `Pilih Paslon ${numberStr}`}
+          aria-label={
+            isSelected
+              ? `Paslon ${numberStr} terpilih`
+              : `Pilih Paslon ${numberStr}`
+          }
           onClick={(e) => {
             e.stopPropagation();
             onSelect(candidate);
           }}
           className={`w-full h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
             isSelected
-              ? 'bg-primary text-on-primary shadow-sm shadow-primary/20'
-              : 'bg-surface-container-high text-on-surface hover:bg-surface-bright'
+              ? "bg-primary text-on-primary shadow-sm shadow-primary/20"
+              : "bg-surface-container-high text-on-surface hover:bg-surface-bright"
           }`}
         >
           {isSelected ? (

@@ -1,7 +1,14 @@
-'use client';
+"use client";
 
-import { Calendar, Clock, AlertTriangle, Loader2, RotateCcw, Check } from 'lucide-react';
-import { getElectionSystemStatus } from '../election-status-helper';
+import {
+  Calendar,
+  Clock,
+  AlertTriangle,
+  Loader2,
+  RotateCcw,
+  Check,
+} from "lucide-react";
+import { getElectionSystemStatus } from "../election-status-helper";
 
 interface SettingsTabProps {
   startTime: string;
@@ -49,7 +56,8 @@ export function SettingsTab({
   const StatusIcon = status.icon;
 
   const trimmedReason = settingsReason.trim();
-  const hasInvalidCustomReason = trimmedReason.length > 0 && trimmedReason.length < 3;
+  const hasInvalidCustomReason =
+    trimmedReason.length > 0 && trimmedReason.length < 3;
   const hasMissingDates = !startTime || !endTime;
 
   return (
@@ -59,7 +67,8 @@ export function SettingsTab({
           Pengaturan Pemilihan &amp; Jadwal Pemira
         </h1>
         <p className="text-xs text-on-surface-variant mt-0.5">
-          Atur jadwal resmi pelaksanaan, kendali pembukaan bilik suara, dan sakelar darurat teknis.
+          Atur jadwal resmi pelaksanaan, kendali pembukaan bilik suara, dan
+          sakelar darurat teknis.
         </p>
       </div>
 
@@ -67,9 +76,9 @@ export function SettingsTab({
         <div
           role="status"
           className={`rounded-xl border p-3.5 text-xs ${
-            settingsMessage.startsWith('❌')
-              ? 'border-error/40 bg-error/10 text-error'
-              : 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300'
+            settingsMessage.startsWith("❌")
+              ? "border-error/40 bg-error/10 text-error"
+              : "border-emerald-500/30 bg-emerald-950/30 text-emerald-300"
           }`}
         >
           {settingsMessage}
@@ -145,7 +154,9 @@ export function SettingsTab({
         </div>
 
         <p className="text-[11px] text-on-surface-variant leading-relaxed bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
-          ℹ️ Sistem akan mengizinkan pengiriman suara hanya ketika waktu saat ini berada di antara waktu mulai dan penutupan. Di luar rentang waktu tersebut, bilik suara otomatis terkunci secara aman.
+          ℹ️ Sistem akan mengizinkan pengiriman suara hanya ketika waktu saat
+          ini berada di antara waktu mulai dan penutupan. Di luar rentang waktu
+          tersebut, bilik suara otomatis terkunci secara aman.
         </p>
 
         <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2.5 pt-1">
@@ -162,7 +173,9 @@ export function SettingsTab({
           )}
           <button
             type="button"
-            disabled={settingsSaving || hasMissingDates || hasInvalidCustomReason}
+            disabled={
+              settingsSaving || hasMissingDates || hasInvalidCustomReason
+            }
             onClick={onSaveSettings}
             className="px-5 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-wider hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
           >
@@ -193,7 +206,8 @@ export function SettingsTab({
               Buka Pemungutan Suara
             </h4>
             <p className="text-xs text-on-surface-variant mt-0.5">
-              Sakelar utama izin pengiriman suara pemilih di bilik suara digital.
+              Sakelar utama izin pengiriman suara pemilih di bilik suara
+              digital.
             </p>
           </div>
           <button
@@ -204,13 +218,13 @@ export function SettingsTab({
             onClick={onOpenVotingToggleModal}
             className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] ${
               isVotingOpen
-                ? 'bg-primary border-primary'
-                : 'bg-surface-container-highest border-outline-variant/40'
+                ? "bg-primary border-primary"
+                : "bg-surface-container-highest border-outline-variant/40"
             }`}
           >
             <span
               className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
-                isVotingOpen ? 'translate-x-6' : 'translate-x-0'
+                isVotingOpen ? "translate-x-6" : "translate-x-0"
               }`}
             />
           </button>
@@ -219,11 +233,12 @@ export function SettingsTab({
         <div className="flex items-center justify-between gap-4 pt-4 border-t border-outline-variant/20">
           <div>
             <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-hmif-red" />
+              <AlertTriangle className="w-4 h-4 text-error" />
               Mode Pemeliharaan Darurat
             </h4>
             <p className="text-xs text-on-surface-variant mt-0.5">
-              Nonaktifkan sementara pengiriman suara, bisa diaktifkan kembali kapan saja.
+              Nonaktifkan sementara pengiriman suara, bisa diaktifkan kembali
+              kapan saja.
             </p>
           </div>
           <button
@@ -234,13 +249,13 @@ export function SettingsTab({
             onClick={onOpenMaintenanceToggleModal}
             className={`w-12 h-6 rounded-full relative p-0.5 cursor-pointer border transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-[0.96] ${
               maintenanceMode
-                ? 'bg-hmif-red border-hmif-red'
-                : 'bg-surface-container-highest border-outline-variant/40'
+                ? "bg-error-solid border-error-solid"
+                : "bg-surface-container-highest border-outline-variant/40"
             }`}
           >
             <span
               className={`w-5 h-5 rounded-full bg-white shadow-sm block transition-transform duration-200 ease-out will-change-transform ${
-                maintenanceMode ? 'translate-x-6' : 'translate-x-0'
+                maintenanceMode ? "translate-x-6" : "translate-x-0"
               }`}
             />
           </button>
