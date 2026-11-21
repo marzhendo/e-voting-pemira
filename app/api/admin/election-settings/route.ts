@@ -186,6 +186,7 @@ export async function PATCH(request: NextRequest) {
       });
 
       try {
+        revalidatePath('/api/election');
         revalidatePath('/login');
         revalidatePath('/');
         revalidatePath('/vote');
@@ -247,6 +248,7 @@ export async function PATCH(request: NextRequest) {
     });
 
     try {
+      revalidatePath('/api/election');
       revalidatePath('/login');
       revalidatePath('/');
       revalidatePath('/vote');

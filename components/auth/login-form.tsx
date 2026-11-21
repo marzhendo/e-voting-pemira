@@ -308,6 +308,9 @@ export function LoginForm({
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (data?.code === "MAINTENANCE_MODE") {
+          setIsMaintenance(true);
+        }
         setErrorMessage(data.error || "Gagal mengirim kode PIN verifikasi.");
         if (data.cooldownSeconds) {
           setCooldown(data.cooldownSeconds);
