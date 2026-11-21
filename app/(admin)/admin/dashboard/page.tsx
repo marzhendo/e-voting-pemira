@@ -542,7 +542,7 @@ export default function AdminDashboardPage() {
     const generateBastVerification = async () => {
       try {
         if (!window.crypto?.subtle) return;
-        const sortedByNumber = [...tallyData].sort((a, b) => a.candidateNumber - b.candidateNumber);
+        const sortedByNumber = tallyData.toSorted((a, b) => a.candidateNumber - b.candidateNumber);
         const payload = JSON.stringify({
           totalDpt,
           totalVotes,

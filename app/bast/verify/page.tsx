@@ -176,9 +176,10 @@ function BastVerificationContent() {
                   <button
                     type="button"
                     onClick={handleCopyHash}
-                    className="hover:text-on-surface transition-colors flex items-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none rounded px-1"
+                    aria-label={copied ? 'Kode hash berhasil disalin' : 'Salin kode hash integritas'}
+                    className="hover:text-on-surface transition-colors flex items-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none rounded px-1 min-h-[32px]"
                   >
-                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    {copied ? <Check className="w-3 h-3 text-emerald-400" aria-hidden="true" /> : <Copy className="w-3 h-3" aria-hidden="true" />}
                     <span>{copied ? 'Tersalin' : 'Salin'}</span>
                   </button>
                 </div>

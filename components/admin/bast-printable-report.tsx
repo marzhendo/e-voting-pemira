@@ -33,7 +33,7 @@ export function BastPrintableReport({
       timeZone: 'Asia/Jakarta',
     }).format(new Date()) + ' WIB';
 
-  const sortedCandidates = [...tallyData].sort((a, b) => b.voteCount - a.voteCount);
+  const sortedCandidates = tallyData.toSorted((a, b) => b.voteCount - a.voteCount);
   const leadingCandidate = sortedCandidates[0];
 
   return (

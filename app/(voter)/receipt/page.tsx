@@ -174,14 +174,18 @@ export default function ReceiptPage() {
                     transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
                     type="button"
                     onClick={handleCopy}
+                    aria-label={copied ? "Token berhasil disalin" : "Salin token bukti pemilihan"}
                     className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-surface-container hover:bg-surface text-on-surface transition-colors flex items-center justify-center shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                    title="Salin Token"
+                    title={copied ? "Tersalin!" : "Salin Token"}
                   >
                     {copied ? (
-                      <Check className="w-4 h-4 text-emerald-400" />
+                      <Check className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                     ) : (
-                      <Copy className="w-4 h-4 text-on-surface-variant" />
+                      <Copy className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
                     )}
+                    <span className="sr-only" role="status" aria-live="polite">
+                      {copied ? "Token berhasil disalin ke papan klip" : ""}
+                    </span>
                   </motion.button>
                 </div>
               </div>

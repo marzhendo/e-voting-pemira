@@ -70,6 +70,7 @@ export default function HomePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Bantuan KPR via WhatsApp"
               className="text-xs sm:text-sm text-on-surface-variant hover:text-on-surface transition-colors min-h-[40px] sm:min-h-[44px] inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/30 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none whitespace-nowrap"
             >
               <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" aria-hidden="true" />
@@ -110,7 +111,7 @@ export default function HomePage() {
                 className="w-full sm:w-auto min-h-[48px] px-7 sm:px-8 py-3 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors duration-150 inline-flex items-center justify-center gap-2.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer shadow-lg shadow-primary/10"
               >
                 <span>Masuk ke Bilik Suara</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </Link>
             </motion.div>
           </div>

@@ -281,9 +281,10 @@ export default function VotePage() {
               href="https://wa.me/6281809300406"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Bantuan KPR via WhatsApp"
               className="text-on-surface-variant hover:text-on-surface text-sm font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
-              <HelpCircle className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4" aria-hidden="true" />
               <span className="hidden sm:inline">Bantuan KPR</span>
             </a>
           </div>

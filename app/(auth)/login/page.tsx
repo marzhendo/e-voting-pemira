@@ -37,7 +37,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             href="/"
             className="inline-flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors min-h-[44px] px-2 py-1 -ml-2 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Kembali ke Beranda</span>
           </Link>
         </div>

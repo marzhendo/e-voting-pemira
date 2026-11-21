@@ -70,9 +70,10 @@ export function MaintenanceBooth({
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Pusat Bantuan KPR via WhatsApp"
             className="text-on-surface-variant hover:text-primary text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           >
-            <MessageCircle className="w-3.5 h-3.5 text-primary" />
+            <MessageCircle className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
             <span className="hidden sm:inline">Pusat Bantuan KPR</span>
           </a>
         </div>
