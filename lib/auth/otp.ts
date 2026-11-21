@@ -16,6 +16,7 @@ export interface OtpRequestResult {
   cooldownSeconds?: number;
   code?: 'NIM_NOT_IN_DPT' | 'ALREADY_VOTED' | 'RATE_LIMITED' | 'MAIL_ERROR' | 'SERVER_ERROR' | 'MAINTENANCE_MODE';
   error?: string;
+  hasVoted?: boolean;
 }
 
 export interface OtpVerifyResult {
@@ -252,14 +253,6 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         };
       }
 
-      if (voter.has_voted) {
-        return {
-          success: false,
-          code: 'ALREADY_VOTED',
-          error: 'Hak suara kamu telah digunakan pada pemilihan ini.',
-        };
-      }
-
       // Periksa Cooldown Rate Limit 60 Detik
       if (voter.otp_last_sent_at) {
         const lastSent = new Date(voter.otp_last_sent_at).getTime();
@@ -314,6 +307,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
         success: true,
         maskedEmail: maskEmail(voter.email),
         cooldownSeconds: 60,
+        hasVoted: Boolean(voter.has_voted),
       };
     } catch (err) {
       console.error('[OtpService] Exception saat request OTP:', err);
@@ -401,14 +395,6 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
     };
   }
 
-  if (voterState.hasVoted) {
-    return {
-      success: false,
-      code: 'ALREADY_VOTED',
-      error: 'Hak suara kamu telah digunakan pada pemilihan ini.',
-    };
-  }
-
   // Cek Cooldown
   if (voterState.otpLastSentAt) {
     const diff = now - voterState.otpLastSentAt;
@@ -443,6 +429,7 @@ export async function requestVoterOtp(rawIdentifier: string): Promise<OtpRequest
     success: true,
     maskedEmail: maskEmail(voterState.email),
     cooldownSeconds: 60,
+    hasVoted: Boolean(voterState.hasVoted),
   };
 }
 
@@ -541,14 +528,6 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
           success: false,
           code: 'NIM_NOT_IN_DPT',
           error: 'Data mahasiswa tidak ditemukan di DPT.',
-        };
-      }
-
-      if (voter.has_voted) {
-        return {
-          success: false,
-          code: 'ALREADY_VOTED',
-          error: 'Hak suara kamu telah digunakan sebelumnya.',
         };
       }
 
@@ -718,14 +697,6 @@ export async function verifyVoterOtp(rawIdentifier: string, inputPin: string): P
       success: false,
       code: 'NIM_NOT_IN_DPT',
       error: 'Data mahasiswa tidak ditemukan di DPT.',
-    };
-  }
-
-  if (voterState.hasVoted) {
-    return {
-      success: false,
-      code: 'ALREADY_VOTED',
-      error: 'Hak suara kamu telah digunakan sebelumnya.',
     };
   }
 

@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
       success: true,
       maskedEmail: result.maskedEmail,
       cooldownSeconds: result.cooldownSeconds || 60,
+      hasVoted: result.hasVoted,
     });
   } catch (err) {
     console.error('[ApiRequestOtp] Unexpected error:', err);

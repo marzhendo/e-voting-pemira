@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Shield,
   Loader2,
+  LogOut,
 } from "lucide-react";
 import {
   CandidateCard,
@@ -19,6 +20,7 @@ import {
 import { KotakKosongCard } from "@/components/ballot/kotak-kosong-card";
 import { ConfirmationModal } from "@/components/ballot/confirmation-modal";
 import { SessionExpiredModal } from "@/components/ballot/session-expired-modal";
+import { LogoutModal } from "@/components/ballot/logout-modal";
 import { CandidateDetailModal } from "@/components/candidates/candidate-detail-modal";
 import { castBallotAction } from "@/lib/actions/ballot";
 import { MaintenanceBooth } from "@/components/maintenance/maintenance-booth";
@@ -34,6 +36,8 @@ export default function VotePage() {
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingElection, setLoadingElection] = useState(true);
   const [electionError, setElectionError] = useState<string | null>(null);
@@ -191,6 +195,17 @@ export default function VotePage() {
     setSelectedCandidate(null);
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Abaikan gangguan koneksi sesaat saat logout
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
   const handleConfirmVote = async () => {
     if (!selectedCandidate) return;
 
@@ -287,6 +302,16 @@ export default function VotePage() {
               <HelpCircle className="w-4 h-4" aria-hidden="true" />
               <span className="hidden sm:inline">Bantuan KPR</span>
             </a>
+
+            <button
+              type="button"
+              onClick={() => setIsLogoutModalOpen(true)}
+              aria-label="Keluar dari Bilik Suara"
+              className="text-on-surface-variant hover:text-error hover:bg-error/10 text-sm font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-surface-container/60 hover:border-error/30 border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-error focus-visible:outline-none cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
           </div>
         </div>
       </header>
@@ -522,6 +547,14 @@ export default function VotePage() {
         onLoginRedirect={() => {
           window.location.href = "/login";
         }}
+      />
+
+      {/* Modal Konfirmasi Keluar Bilik Suara */}
+      <LogoutModal
+        isOpen={isLogoutModalOpen}
+        isLoggingOut={isLoggingOut}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirmLogout={handleLogout}
       />
 
       {/* Modal Detail Paslon & Unduh CV */}

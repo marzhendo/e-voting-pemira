@@ -321,7 +321,9 @@ export function LoginForm({
       setMaskedEmail(data.maskedEmail || "email SSO kampus");
       setCooldown(data.cooldownSeconds || 60);
       setSuccessNotice(
-        `Kode PIN 6-digit dikirim ke ${data.maskedEmail || "email SSO kampus"}.`,
+        data.hasVoted
+          ? `Hak suara kamu sudah digunakan. Kode PIN verifikasi tanda terima dikirim ke ${data.maskedEmail || "email SSO kampus"}.`
+          : `Kode PIN 6-digit dikirim ke ${data.maskedEmail || "email SSO kampus"}.`,
       );
       setStep("pin");
       setPin("");
@@ -367,14 +369,17 @@ export function LoginForm({
       }
 
       const isStaff = data.user?.role && data.user.role !== "voter";
+      const hasVoted = Boolean(data.user?.hasVoted);
       setSuccessNotice(
         isStaff
           ? "Terverifikasi sebagai Administrator. Membuka dashboard..."
+          : hasVoted
+          ? "Terverifikasi. Membuka tanda terima pemilihan..."
           : "Terverifikasi. Membuka bilik suara...",
       );
       setTimeout(() => {
         window.location.href =
-          data.redirectTo || (isStaff ? "/admin/dashboard" : "/vote");
+          data.redirectTo || (isStaff ? "/admin/dashboard" : hasVoted ? "/receipt" : "/vote");
       }, 600);
     } catch {
       setErrorMessage("Terjadi gangguan jaringan saat memverifikasi kode PIN.");

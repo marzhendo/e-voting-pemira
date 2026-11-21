@@ -13,7 +13,31 @@ import {
   LogOut,
   Calendar,
   Printer,
+  BarChart3,
+  Users,
+  Clock,
+  ShieldAlert,
 } from 'lucide-react';
+
+interface TallyResultItem {
+  candidateId: string;
+  candidateNumber: number;
+  leaderName: string;
+  viceLeaderName: string;
+  voteCount: number;
+  percentage: number;
+}
+
+interface TallyData {
+  isClosed: boolean;
+  turnout: {
+    totalDpt: number;
+    totalVotes: number;
+    turnoutPercentage: number;
+  };
+  message?: string;
+  results?: TallyResultItem[];
+}
 
 export default function ReceiptPage() {
   const [receiptToken, setReceiptToken] = useState<string>('HMIF-PEMIRA-MEMUAT-TOKEN');
@@ -21,6 +45,31 @@ export default function ReceiptPage() {
   const [copied, setCopied] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [tallyData, setTallyData] = useState<TallyData | null>(null);
+  const [loadingTally, setLoadingTally] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchTally() {
+      try {
+        const res = await fetch('/api/election/tally', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setTallyData(data);
+          }
+        }
+      } catch {
+        // Fallback gracefully if network drops
+      } finally {
+        if (isMounted) setLoadingTally(false);
+      }
+    }
+    fetchTally();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -278,6 +327,142 @@ export default function ReceiptPage() {
                 </motion.div>
               </div>
             </div>
+          </div>
+
+          {/* Rekapitulasi & Partisipasi Card */}
+          <div className="bg-surface-container rounded-2xl border border-outline-variant/30 p-5 sm:p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                  <BarChart3 className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-on-surface">Partisipasi & Rekapitulasi</h2>
+                  <p className="text-[11px] text-on-surface-variant">Statistik pemungutan suara resmi</p>
+                </div>
+              </div>
+              <div>
+                {loadingTally ? (
+                  <span className="text-xs text-on-surface-variant animate-pulse">Memuat data...</span>
+                ) : tallyData?.isClosed ? (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Pemilihan Selesai
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" aria-hidden="true" />
+                    Bilik Suara Aktif
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Turnout Numbers */}
+            <div className="grid grid-cols-3 gap-2 py-1 text-center">
+              <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col justify-center">
+                <span className="text-[11px] text-on-surface-variant font-medium">Total DPT</span>
+                <span className="font-mono text-base sm:text-lg font-bold text-on-surface mt-0.5">
+                  {loadingTally ? '...' : (tallyData?.turnout?.totalDpt ?? 0).toLocaleString('id-ID')}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col justify-center">
+                <span className="text-[11px] text-on-surface-variant font-medium">Suara Masuk</span>
+                <span className="font-mono text-base sm:text-lg font-bold text-primary mt-0.5">
+                  {loadingTally ? '...' : (tallyData?.turnout?.totalVotes ?? 0).toLocaleString('id-ID')}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col justify-center">
+                <span className="text-[11px] text-on-surface-variant font-medium">Partisipasi</span>
+                <span className="font-mono text-base sm:text-lg font-bold text-emerald-400 mt-0.5">
+                  {loadingTally ? '...' : `${tallyData?.turnout?.turnoutPercentage ?? 0}%`}
+                </span>
+              </div>
+            </div>
+
+            {/* Turnout Progress Bar */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs text-on-surface-variant">
+                <span>Tingkat Partisipasi Pemilih</span>
+                <span className="font-mono font-semibold text-on-surface">{tallyData?.turnout?.turnoutPercentage ?? 0}%</span>
+              </div>
+              <div className="w-full bg-surface-container-highest rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${Math.min(100, tallyData?.turnout?.turnoutPercentage ?? 0)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Confidentiality Notice when open, or Head-to-Head results when closed */}
+            {!loadingTally && tallyData && (
+              tallyData.isClosed && tallyData.results ? (
+                <div className="pt-3 border-t border-outline-variant/20 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase font-bold tracking-wider text-on-surface">
+                      Hasil Akhir Rekapitulasi Suara
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant">Data Sah KPR</span>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5">
+                    {tallyData.results.map((item) => {
+                      const isKotakKosong = item.candidateNumber === 0;
+                      return (
+                        <div
+                          key={item.candidateId}
+                          className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                isKotakKosong ? 'bg-surface-container-highest text-on-surface-variant' : 'bg-primary/20 text-primary'
+                              }`}>
+                                {isKotakKosong ? '00' : String(item.candidateNumber).padStart(2, '0')}
+                              </span>
+                              <span className="font-semibold text-on-surface">
+                                {isKotakKosong
+                                  ? 'Kotak Kosong'
+                                  : `${item.leaderName} & ${item.viceLeaderName}`}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-mono font-bold text-on-surface">
+                                {item.voteCount.toLocaleString('id-ID')} Suara
+                              </span>
+                              <span className="font-mono text-on-surface-variant ml-1.5 font-medium">
+                                ({item.percentage}%)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Horizontal Comparison Bar */}
+                          <div className="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-500 ease-out ${
+                                isKotakKosong ? 'bg-on-surface-variant/40' : 'bg-primary'
+                              }`}
+                              style={{ width: `${Math.min(100, item.percentage)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-start gap-3 text-xs text-on-surface-variant leading-relaxed">
+                    <Clock className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <p className="font-semibold text-on-surface mb-0.5">Penghitungan Suara Dirahasiakan</p>
+                      <p>
+                        Rekapitulasi perolehan suara per calon akan dipublikasikan secara terbuka setelah waktu pemungutan suara resmi ditutup oleh Panitia KPR demi menjaga integritas dan kerahasiaan pemilihan.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </div>
       </motion.main>
