@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import type { MailService, SendPinPayload, SendBroadcastPayload, SendVoterPasswordPayload, MailDeliveryResult } from './types';
+import type { MailService, SendPinPayload, SendBroadcastPayload, SendVoterPasswordPayload, MailDeliveryResult } from './types.ts';
 import {
   generatePinEmailHtml,
   generatePinEmailText,
@@ -8,7 +8,7 @@ import {
   generateBroadcastEmailText,
   generateVoterPasswordEmailHtml,
   generateVoterPasswordEmailText,
-} from './template';
+} from './template.ts';
 
 export class SmtpMailService implements MailService {
   private transporter: Transporter | null = null;

@@ -1,4 +1,4 @@
-import type { SendPinPayload } from './types';
+import type { SendPinPayload } from './types.ts';
 import { resolveSafeEmailCtaUrl } from '../security/url-validation.ts';
 
 /**
