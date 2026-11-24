@@ -22,13 +22,10 @@ export function getRootSuperadminEmail(): string {
 }
 
 /**
- * Checks if the given email matches the root superadmin email.
+ * Checks if the given email matches the authoritative root superadmin email.
  */
 export function isRootSuperadminEmail(email?: string | null): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  return (
-    normalized === getRootSuperadminEmail() ||
-    normalized === DEFAULT_ROOT_SUPERADMIN_EMAIL.toLowerCase()
-  );
+  return normalized === getRootSuperadminEmail();
 }

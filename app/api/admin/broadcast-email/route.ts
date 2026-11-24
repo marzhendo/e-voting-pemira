@@ -21,16 +21,6 @@ const broadcastRequestSchema = z.object({
   ctaUrl: z.string().default('/login'),
 });
 
-// Mock DPT untuk pengujian di dev mode
-const MOCK_DEV_VOTERS = [
-  { nim: '103012300001', name: 'Ahmad Rizky Pratama', email: '103012300001@student.telkomuniversity.ac.id', generation: 2023, has_voted: false },
-  { nim: '103012300002', name: 'Budi Santoso', email: '103012300002@student.telkomuniversity.ac.id', generation: 2023, has_voted: true },
-  { nim: '103012400015', name: 'Siti Nurhaliza', email: '103012400015@student.telkomuniversity.ac.id', generation: 2024, has_voted: false },
-  { nim: '103012400022', name: 'Farhan Maulana', email: '103012400022@student.telkomuniversity.ac.id', generation: 2024, has_voted: true },
-  { nim: '103012500033', name: 'Nadia Putri', email: '103012500033@student.telkomuniversity.ac.id', generation: 2025, has_voted: false },
-  { nim: '103012600044', name: 'Kevin Ardiansyah', email: '103012600044@student.telkomuniversity.ac.id', generation: 2026, has_voted: false },
-];
-
 /**
  * GET: Mengambil ringkasan jumlah calon penerima broadcast berdasarkan filter
  */
