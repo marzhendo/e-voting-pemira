@@ -276,6 +276,8 @@ export interface VoterPasswordTemplateOptions {
   nim: string;
   password: string;
   loginUrl?: string;
+  headline?: string;
+  bodyText?: string;
 }
 
 export function generateVoterPasswordEmailHtml({
@@ -283,11 +285,22 @@ export function generateVoterPasswordEmailHtml({
   nim,
   password,
   loginUrl = '/login',
+  headline,
+  bodyText,
 }: VoterPasswordTemplateOptions): string {
   const safeName = escapeHtml(voterName);
   const safeNim = escapeHtml(nim);
   const safePassword = escapeHtml(password);
   const safeUrl = resolveSafeCtaUrl(loginUrl);
+  const safeHeadline = escapeHtml(headline || 'Kredensial Bilik Suara Pemilih');
+
+  const formattedBody = bodyText
+    ? bodyText
+        .split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => `<p style="margin: 0 0 14px 0; font-size: 14px; color: #CCCCCC; line-height: 1.65;">${escapeHtml(line)}</p>`)
+        .join('')
+    : `<p style="margin: 0 0 24px 0; font-size: 14px; color: #CCCCCC; line-height: 1.65;">Berikut adalah kata sandi unik kamu untuk masuk dan memberikan suara di bilik suara digital Pemira HMIF:</p>`;
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -297,7 +310,7 @@ export function generateVoterPasswordEmailHtml({
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="color-scheme" content="dark light">
   <meta name="supported-color-schemes" content="dark light">
-  <title>Kata Sandi Masuk Bilik Suara Pemira HMIF</title>
+  <title>${safeHeadline}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #121212; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #FFFFFF; -webkit-font-smoothing: antialiased;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #121212; padding: 36px 16px;">
@@ -312,7 +325,7 @@ export function generateVoterPasswordEmailHtml({
                 PEMIRA HMIF 2026/2027
               </span>
               <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.2px;">
-                Kredensial Bilik Suara Pemilih
+                ${safeHeadline}
               </h1>
               <p style="margin: 6px 0 0 0; font-size: 13px; color: #A3A3A3;">
                 Himpunan Mahasiswa Informatika &bull; Telkom University Purwokerto
@@ -326,12 +339,10 @@ export function generateVoterPasswordEmailHtml({
               <p style="margin: 0 0 16px 0; font-size: 15px; color: #FFFFFF; line-height: 1.6;">
                 Halo <strong>${safeName}</strong> (NIM: <strong>${safeNim}</strong>),
               </p>
-              <p style="margin: 0 0 24px 0; font-size: 14px; color: #CCCCCC; line-height: 1.65;">
-                Berikut adalah kata sandi unik kamu untuk masuk dan memberikan suara di bilik suara digital Pemira HMIF:
-              </p>
+              ${formattedBody}
 
               <!-- Password Display Box -->
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 20px 0 24px 0;">
                 <tr>
                   <td align="center" style="background-color: #242424; border: 1px solid #3A3A3A; border-radius: 14px; padding: 24px 16px;">
                     <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #A8A8A8; display: block; margin-bottom: 8px;">
@@ -410,19 +421,25 @@ export function generateVoterPasswordEmailText({
   nim,
   password,
   loginUrl = '/login',
+  headline,
+  bodyText,
 }: VoterPasswordTemplateOptions): string {
   const resolvedUrl = resolveSafeCtaUrl(loginUrl);
+  const resolvedHeadline = headline || 'Kredensial Bilik Suara Pemilih';
+  const defaultBody = 'Berikut adalah kata sandi unik kamu untuk masuk ke bilik suara digital Pemira HMIF:';
 
-  return `[PEMIRA HMIF 2026/2027] Kredensial Bilik Suara Pemilih
+  return `[PEMIRA HMIF 2026/2027] ${resolvedHeadline}
 
 Halo ${voterName} (NIM: ${nim}),
 
-Berikut adalah kata sandi unik kamu untuk masuk ke bilik suara digital Pemira HMIF:
+${bodyText || defaultBody}
 
-KATA SANDI PEMILIH: ${password}
+KATA SANDI PEMILIH:
+${password}
+Format: 8 karakter unik
 
 Cara Masuk:
-1. Buka website: ${resolvedUrl}
+1. Buka tautan bilik suara: ${resolvedUrl}
 2. Masukkan NIM kamu (${nim})
 3. Masukkan kata sandi unik di atas
 4. Tentukan pilihanmu di bilik suara digital

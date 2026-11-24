@@ -22,7 +22,7 @@ export interface BroadcastTabProps {
   totalVotes: number;
   broadcastResult: BroadcastResultSummary | null;
   broadcastError: string | null;
-  broadcastTemplate: "reminder" | "invitation" | "custom";
+  broadcastTemplate: "credentials" | "reminder" | "invitation" | "custom";
   broadcastTargetGroup: "not_voted" | "all" | "voted";
   broadcastGeneration: string;
   availableGenerations: number[];
@@ -35,7 +35,7 @@ export interface BroadcastTabProps {
   broadcastCtaUrl: string;
   isBroadcasting: boolean;
   onRefreshQuota: () => void;
-  onSelectTemplate: (template: "reminder" | "invitation" | "custom") => void;
+  onSelectTemplate: (template: "credentials" | "reminder" | "invitation" | "custom") => void;
   onTargetGroupChange: (group: "not_voted" | "all" | "voted") => void;
   onGenerationChange: (generation: string) => void;
   onSubjectChange: (subject: string) => void;
@@ -197,7 +197,27 @@ export function BroadcastTab({
             <label className="text-xs font-semibold text-on-surface block mb-2.5">
               Pilih format pesan
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+              <button
+                type="button"
+                onClick={() => onSelectTemplate("credentials")}
+                className={`p-3 rounded-xl text-left border cursor-pointer transition-all active:scale-[0.98] relative ${
+                  broadcastTemplate === "credentials"
+                    ? "bg-primary/10 border-primary text-on-surface shadow-sm ring-1 ring-primary/30"
+                    : "bg-surface-container-high/60 text-on-surface-variant border-outline-variant/30 hover:border-outline-variant/60 hover:text-on-surface hover:bg-surface-container-high"
+                }`}
+              >
+                <span className="inline-block px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[9px] font-bold uppercase tracking-wider mb-1.5">
+                  Malam H-1
+                </span>
+                <span className="text-xs font-bold block text-primary">
+                  Sandi &amp; Pengingat
+                </span>
+                <span className="text-[11px] text-on-surface-variant block mt-1 leading-snug">
+                  Reminder besok pemilihan + bagikan kata sandi unik
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => onSelectTemplate("reminder")}
@@ -208,10 +228,10 @@ export function BroadcastTab({
                 }`}
               >
                 <span className="text-xs font-bold block text-primary">
-                  Pengingat Memilih
+                  Pengingat Hari H
                 </span>
                 <span className="text-[11px] text-on-surface-variant block mt-1 leading-snug">
-                  Khusus pemilih yang belum menggunakan hak suara
+                  Khusus mahasiswa yang belum menggunakan hak suara
                 </span>
               </button>
 
@@ -228,7 +248,7 @@ export function BroadcastTab({
                   Undangan Pembukaan
                 </span>
                 <span className="text-[11px] text-on-surface-variant block mt-1 leading-snug">
-                  Pengumuman pembukaan bilik ke semua DPT
+                  Pengumuman resmi pembukaan bilik ke semua DPT
                 </span>
               </button>
 
@@ -472,22 +492,59 @@ export function BroadcastTab({
                 </div>
 
                 <p className="text-neutral-300 text-[11px]">
-                  Halo <strong>Ahmad Rizky Pratama</strong>,
+                  Halo <strong>Ahmad Rizky Pratama</strong>
+                  {broadcastTemplate === "credentials" ? " (NIM: 103012300001)" : ""},
                 </p>
 
                 <div className="text-neutral-300 text-[11px] whitespace-pre-line leading-relaxed space-y-2">
                   {broadcastBody || "Isi pesan pengumuman akan tampil di sini..."}
                 </div>
 
+                {broadcastTemplate === "credentials" && (
+                  <>
+                    {/* Kotak Sandi Pemilih */}
+                    <div className="bg-[#242424] border border-[#3A3A3A] rounded-xl p-3 text-center my-3 shadow-inner">
+                      <span className="text-[10px] font-bold tracking-wider text-hmif-gold uppercase block">
+                        KATA SANDI PEMILIH
+                      </span>
+                      <span className="font-mono text-xl font-extrabold text-hmif-gold tracking-widest block mt-1">
+                        7K9P-2M4X
+                      </span>
+                      <span className="text-[10px] text-neutral-400 block mt-1">
+                        Format: 8 karakter unik (dapat diketik tanpa tanda strip)
+                      </span>
+                    </div>
+
+                    {/* Panduan Masuk */}
+                    <div className="bg-[#222222] rounded-lg p-2.5 text-[11px] text-neutral-300 space-y-1 my-2">
+                      <p className="font-bold text-white text-[11px]">Cara Masuk ke Bilik Suara:</p>
+                      <ol className="list-decimal pl-4 space-y-0.5 text-[10px] text-neutral-400">
+                        <li>Buka website pemilihan melalui tombol di bawah.</li>
+                        <li>Ketik NIM kamu (<strong>103012300001</strong>).</li>
+                        <li>Masukkan kata sandi unik di atas.</li>
+                        <li>Tentukan pilihan pasangan calon dan kirimkan suara.</li>
+                      </ol>
+                    </div>
+                  </>
+                )}
+
                 <div className="pt-2 text-center">
-                  <span className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-lg bg-hmif-blue text-white text-xs font-semibold shadow-sm">
+                  <span
+                    className={`inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-semibold shadow-sm ${
+                      broadcastTemplate === "credentials"
+                        ? "bg-hmif-gold text-neutral-900 font-bold"
+                        : "bg-hmif-blue text-white"
+                    }`}
+                  >
                     <span>{broadcastCtaText || "Buka Bilik Suara"}</span>
                     <ExternalLink className="w-3 h-3 opacity-80" />
                   </span>
                 </div>
 
                 <div className="p-2.5 rounded-lg bg-black/40 border-l-2 border-hmif-gold text-[10px] text-neutral-400 leading-normal">
-                  Pilihan suaramu bersifat rahasia dan disimpan secara anonim tanpa mencatat identitas pemilih pada surat suara.
+                  {broadcastTemplate === "credentials"
+                    ? "Simpan kata sandi ini dengan baik. Satu kata sandi hanya berlaku untuk satu kali pemungutan suara."
+                    : "Pilihan suaramu bersifat rahasia dan disimpan secara anonim tanpa mencatat identitas pemilih pada surat suara."}
                 </div>
               </div>
 

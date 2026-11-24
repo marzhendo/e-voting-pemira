@@ -11,6 +11,9 @@ export interface SendVoterPasswordPayload {
   nim: string;
   password: string;
   loginUrl?: string;
+  subject?: string;
+  headline?: string;
+  bodyText?: string;
 }
 
 export interface SendBroadcastPayload {

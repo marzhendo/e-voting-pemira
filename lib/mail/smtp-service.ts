@@ -165,6 +165,9 @@ export class SmtpMailService implements MailService {
     nim,
     password,
     loginUrl,
+    subject,
+    headline,
+    bodyText,
   }: SendVoterPasswordPayload): Promise<MailDeliveryResult> {
     const transporter = this.getTransporter();
 
@@ -174,6 +177,8 @@ export class SmtpMailService implements MailService {
       console.log(`📧 [DEV EMAIL FALLBACK] Kata Sandi Pemilih Dikirim`);
       console.log(`Penerima  : ${to} (${voterName} - NIM: ${nim})`);
       console.log(`SANDI     : [ ${password} ]`);
+      console.log(`Subjek    : ${subject || `[PEMIRA HMIF] Kata Sandi Bilik Suara Pemilih: ${nim}`}`);
+      console.log(`Headline  : ${headline || 'Kredensial Bilik Suara Pemilih'}`);
       console.log(`Login URL : ${loginUrl || '/login'}`);
       console.log(`Status    : SMTP tidak aktif / dev mode, kata sandi dicetak di console.`);
       console.log(`======================================================\n`);
@@ -190,15 +195,15 @@ export class SmtpMailService implements MailService {
     const fromEmail = process.env.SMTP_FROM_EMAIL || `noreply@${domain}`;
     const replyTo = process.env.SMTP_REPLY_TO || fromEmail;
 
-    const html = generateVoterPasswordEmailHtml({ voterName, nim, password, loginUrl });
-    const text = generateVoterPasswordEmailText({ voterName, nim, password, loginUrl });
+    const html = generateVoterPasswordEmailHtml({ voterName, nim, password, loginUrl, headline, bodyText });
+    const text = generateVoterPasswordEmailText({ voterName, nim, password, loginUrl, headline, bodyText });
 
     try {
       const info = await transporter.sendMail({
         from: `"${fromName}" <${fromEmail}>`,
         to,
         replyTo,
-        subject: `[PEMIRA HMIF] Kata Sandi Bilik Suara Pemilih: ${nim}`,
+        subject: subject || `[PEMIRA HMIF] Kata Sandi Bilik Suara Pemilih: ${nim}`,
         text,
         html,
         headers: {

@@ -6,7 +6,8 @@ import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { smtpMailService } from '@/lib/mail/smtp-service';
-import { getAllVoters } from '@/lib/dpt/store';
+import { getAllVoters, setVoterPasswordHash } from '@/lib/dpt/store';
+import { generateVoterPassword, hashVoterPassword } from '@/lib/auth/password-service';
 import { isDevFallbackAllowed } from '@/lib/security/env';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,8 @@ export const dynamic = 'force-dynamic';
 const broadcastRequestSchema = z.object({
   targetGroup: z.enum(['all', 'not_voted', 'voted']),
   generation: z.string().default('all'),
+  template: z.enum(['credentials', 'reminder', 'invitation', 'custom']).default('reminder'),
+  includeCredentials: z.boolean().default(false),
   subject: z.string().min(5, 'Subjek wajib minimal 5 karakter.'),
   headline: z.string().min(5, 'Judul pengumuman wajib minimal 5 karakter.'),
   bodyText: z.string().min(10, 'Isi pesan pengumuman wajib minimal 10 karakter.'),
@@ -131,7 +134,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { targetGroup, generation, subject, headline, bodyText, ctaText, ctaUrl } = parsed.data;
+    const {
+      targetGroup,
+      generation,
+      template,
+      includeCredentials,
+      subject,
+      headline,
+      bodyText,
+      ctaText,
+      ctaUrl,
+    } = parsed.data;
+
+    const isCredentialsMode = includeCredentials || template === 'credentials';
 
     // Ambil daftar penerima
     let recipients: Array<{ nim: string; name: string; email: string }> = [];
@@ -178,24 +193,82 @@ export async function POST(request: NextRequest) {
     const CHUNK_SIZE = 5;
     let sentCount = 0;
     let failedCount = 0;
+    let isUsingLegacyCols = false;
 
     for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
       const chunk = recipients.slice(i, i + CHUNK_SIZE);
       const results = await Promise.all(
-        chunk.map((voter) =>
-          smtpMailService
-            .sendBroadcastEmail({
-              to: voter.email,
-              voterName: voter.name,
-              nim: voter.nim,
-              subject,
-              headline,
-              bodyText,
-              ctaText,
-              ctaUrl,
-            })
-            .catch(() => ({ success: false }))
-        )
+        chunk.map(async (voter) => {
+          if (isCredentialsMode) {
+            const { rawPassword, formattedPassword } = generateVoterPassword();
+            const passwordHash = hashVoterPassword(rawPassword);
+            const nowIso = new Date().toISOString();
+
+            if (isSupabaseConfigured()) {
+              const adminSupabase = createAdminClient();
+              if (isUsingLegacyCols) {
+                await adminSupabase
+                  .from('voters_whitelist')
+                  .update({
+                    otp_hash: passwordHash,
+                    otp_last_sent_at: nowIso,
+                    otp_attempts: 0,
+                  })
+                  .eq('nim', voter.nim);
+              } else {
+                const { error: updateError } = await adminSupabase
+                  .from('voters_whitelist')
+                  .update({
+                    password_hash: passwordHash,
+                    password_created_at: nowIso,
+                    login_attempts: 0,
+                    locked_until: null,
+                  })
+                  .eq('nim', voter.nim);
+
+                if (updateError && (updateError.code === '42703' || updateError.message?.includes('does not exist'))) {
+                  isUsingLegacyCols = true;
+                  await adminSupabase
+                    .from('voters_whitelist')
+                    .update({
+                      otp_hash: passwordHash,
+                      otp_last_sent_at: nowIso,
+                      otp_attempts: 0,
+                    })
+                    .eq('nim', voter.nim);
+                }
+              }
+            } else {
+              setVoterPasswordHash(voter.nim, passwordHash);
+            }
+
+            return smtpMailService
+              .sendVoterPassword({
+                to: voter.email,
+                voterName: voter.name,
+                nim: voter.nim,
+                password: formattedPassword,
+                loginUrl: ctaUrl || '/login',
+                subject,
+                headline,
+                bodyText,
+              })
+              .catch(() => ({ success: false }));
+          } else {
+            return smtpMailService
+              .sendBroadcastEmail({
+                to: voter.email,
+                voterName: voter.name,
+                nim: voter.nim,
+                subject,
+                headline,
+                bodyText,
+                ctaText,
+                ctaUrl,
+              })
+              .catch(() => ({ success: false }));
+          }
+        })
       );
 
       for (const res of results) {
@@ -214,11 +287,13 @@ export async function POST(request: NextRequest) {
       actorName: session?.name || 'Panitia KPR',
       actorRole: session?.role || 'kpr_admin',
       action: 'BROADCAST_EMAIL_SENT',
-      description: `Mengirim broadcast email "${subject}" ke target ${targetGroup} (${sentCount} terkirim, ${failedCount} gagal).`,
+      description: `Mengirim broadcast email "${subject}" ke target ${targetGroup} (Angkatan: ${generation}, sandi disertakan: ${isCredentialsMode}, ${sentCount} terkirim, ${failedCount} gagal).`,
       ipAddress: clientIp,
       details: {
         targetGroup,
         generation,
+        template,
+        isCredentialsMode,
         totalTarget: recipients.length,
         sentCount,
         failedCount,

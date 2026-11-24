@@ -137,13 +137,13 @@ export default function AdminDashboardPage() {
   // Broadcast Email State
   const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted'>('not_voted');
   const [broadcastGeneration, setBroadcastGeneration] = useState('all');
-  const [broadcastTemplate, setBroadcastTemplate] = useState<'invitation' | 'reminder' | 'custom'>('reminder');
-  const [broadcastSubject, setBroadcastSubject] = useState('[Pengingat] Waktu pemungutan suara Pemira HMIF akan segera berakhir');
-  const [broadcastHeadline, setBroadcastHeadline] = useState('Gunakan Hak Suaramu Sebelum Ditutup');
+  const [broadcastTemplate, setBroadcastTemplate] = useState<'credentials' | 'reminder' | 'invitation' | 'custom'>('credentials');
+  const [broadcastSubject, setBroadcastSubject] = useState('[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi Pemilih');
+  const [broadcastHeadline, setBroadcastHeadline] = useState('Pemira HMIF Dimulai Besok: Simpan Sandi Pemilihmu');
   const [broadcastBody, setBroadcastBody] = useState(
-    'Waktu pemungutan suara Pemira HMIF 2026/2027 akan segera berakhir sesuai jadwal yang telah ditentukan panitia.\n\nBerdasarkan data DPT, kamu tercatat belum menggunakan hak suara. Pemilihan hanya memerlukan waktu 1 sampai 2 menit secara online.\n\nYuk luangkan waktu sebentar untuk memberikan suaramu sebelum bilik suara digital resmi ditutup.'
+    'Pemilihan Raya (Pemira) Ketua dan Wakil Ketua HMIF periode 2026/2027 dilaksanakan besok.\n\nGunakan NIM dan kata sandi unik di bawah ini untuk mengakses bilik suara digital. Hak suaramu menentukan kepemimpinan himpunan kita selama satu periode ke depan.\n\nSimpan kata sandi ini dengan baik. Satu kata sandi hanya berlaku untuk satu kali pemungutan suara.'
   );
-  const [broadcastCtaText, setBroadcastCtaText] = useState('Beri Suara Sekarang');
+  const [broadcastCtaText, setBroadcastCtaText] = useState('Buka Bilik Suara');
   const [broadcastCtaUrl, setBroadcastCtaUrl] = useState('/login');
   const [broadcastTargetCount, setBroadcastTargetCount] = useState<number | null>(null);
   const [loadingBroadcastCount, setLoadingBroadcastCount] = useState(false);
@@ -1087,32 +1087,44 @@ export default function AdminDashboardPage() {
   };
 
   // Broadcast Email Handlers
-  const handleSelectTemplate = (templateKey: 'invitation' | 'reminder' | 'custom') => {
+  const handleSelectTemplate = (templateKey: 'credentials' | 'reminder' | 'invitation' | 'custom') => {
     setBroadcastTemplate(templateKey);
     setBroadcastResult(null);
     setBroadcastError(null);
 
-    if (templateKey === 'invitation') {
-      setBroadcastTargetGroup('all');
-      setBroadcastSubject('[Pemira HMIF 2026/2027] Bilik Suara Telah Dibuka, Gunakan Hak Pilihmu');
-      setBroadcastHeadline('Bilik Suara Pemira HMIF Resmi Dibuka');
+    if (templateKey === 'credentials') {
+      setBroadcastTargetGroup('not_voted');
+      setBroadcastSubject('[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi Pemilih');
+      setBroadcastHeadline('Pemira HMIF Dimulai Besok: Simpan Sandi Pemilihmu');
       setBroadcastBody(
-        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 telah dibuka.\n\nSebagai mahasiswa aktif Informatika Telkom University Purwokerto, kamu memiliki hak suara untuk menentukan kepemimpinan himpunan kita selama satu periode ke depan.\n\nSilakan masuk ke bilik suara menggunakan NIM, lalu verifikasi dengan kode PIN 6 digit yang dikirimkan ke email kampusmu.'
+        'Pemilihan Raya (Pemira) Ketua dan Wakil Ketua HMIF periode 2026/2027 dilaksanakan besok.\n\nGunakan NIM dan kata sandi unik di bawah ini untuk mengakses bilik suara digital. Hak suaramu menentukan kepemimpinan himpunan kita selama satu periode ke depan.\n\nSimpan kata sandi ini dengan baik. Satu kata sandi hanya berlaku untuk satu kali pemungutan suara.'
       );
-      setBroadcastCtaText('Masuk ke Bilik Suara');
+      setBroadcastCtaText('Buka Bilik Suara');
+      setBroadcastCtaUrl('/login');
     } else if (templateKey === 'reminder') {
       setBroadcastTargetGroup('not_voted');
-      setBroadcastSubject('[Pengingat] Waktu pemungutan suara Pemira HMIF akan segera berakhir');
-      setBroadcastHeadline('Gunakan Hak Suaramu Sebelum Ditutup');
+      setBroadcastSubject('[Pengingat] Gunakan Hak Suaramu di Pemira HMIF 2026/2027');
+      setBroadcastHeadline('Bilik Suara Digital Sedang Dibuka');
       setBroadcastBody(
-        'Waktu pemungutan suara Pemira HMIF 2026/2027 akan segera berakhir sesuai jadwal yang telah ditentukan panitia.\n\nBerdasarkan data DPT, kamu tercatat belum menggunakan hak suara. Pemilihan hanya memerlukan waktu 1 sampai 2 menit secara online.\n\nYuk luangkan waktu sebentar untuk memberikan suaramu sebelum bilik suara digital resmi ditutup.'
+        'Pemungutan suara Pemira HMIF 2026/2027 sedang berlangsung.\n\nBerdasarkan data DPT, kamu tercatat belum menggunakan hak suara. Pemilihan hanya membutuhkan waktu 1 menit melalui bilik suara digital.\n\nGunakan NIM dan kata sandi yang telah dikirimkan ke email kampusmu untuk memilih pasangan calon.'
       );
-      setBroadcastCtaText('Beri Suara Sekarang');
+      setBroadcastCtaText('Masuk ke Bilik Suara');
+      setBroadcastCtaUrl('/login');
+    } else if (templateKey === 'invitation') {
+      setBroadcastTargetGroup('all');
+      setBroadcastSubject('[Pemira HMIF 2026/2027] Bilik Suara Resmi Dibuka');
+      setBroadcastHeadline('Bilik Suara Pemira HMIF Resmi Dibuka');
+      setBroadcastBody(
+        'Pemilihan Raya Ketua dan Wakil Ketua HMIF periode 2026/2027 resmi dibuka.\n\nSebagai mahasiswa aktif Informatika Telkom University Purwokerto, kamu memiliki hak suara untuk menentukan kepemimpinan himpunan kita.\n\nSilakan masuk ke bilik suara menggunakan NIM dan kata sandi pemilih yang telah diterbitkan.'
+      );
+      setBroadcastCtaText('Masuk ke Bilik Suara');
+      setBroadcastCtaUrl('/login');
     } else {
-      setBroadcastSubject('[Pengumuman Resmi] Pemira HMIF 2026/2027');
-      setBroadcastHeadline('Informasi dari Panitia Pemira HMIF');
+      setBroadcastSubject('[Pengumuman] Pemira HMIF 2026/2027');
+      setBroadcastHeadline('Informasi Panitia Pemira HMIF');
       setBroadcastBody('Tuliskan isi pengumuman atau instruksi resmi Panitia KPR di sini...');
       setBroadcastCtaText('Buka Bilik Suara');
+      setBroadcastCtaUrl('/login');
     }
   };
 
@@ -1147,6 +1159,8 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({
           targetGroup: broadcastTargetGroup,
           generation: broadcastGeneration,
+          template: broadcastTemplate,
+          includeCredentials: broadcastTemplate === 'credentials',
           subject: broadcastSubject,
           headline: broadcastHeadline,
           bodyText: broadcastBody,
@@ -2225,6 +2239,7 @@ export default function AdminDashboardPage() {
           broadcastGeneration={broadcastGeneration}
           availableGenerations={availableGenerations}
           broadcastSubject={broadcastSubject}
+          broadcastTemplate={broadcastTemplate}
           onClose={() => setIsConfirmBroadcastOpen(false)}
           onExecute={handleExecuteBroadcast}
         />

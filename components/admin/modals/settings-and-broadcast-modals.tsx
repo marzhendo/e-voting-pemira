@@ -279,6 +279,7 @@ export interface BroadcastConfirmModalProps {
   broadcastGeneration: string;
   availableGenerations: number[];
   broadcastSubject: string;
+  broadcastTemplate?: "credentials" | "reminder" | "invitation" | "custom";
   onClose: () => void;
   onExecute: () => void;
 }
@@ -291,10 +292,13 @@ export function BroadcastConfirmModal({
   broadcastGeneration,
   availableGenerations,
   broadcastSubject,
+  broadcastTemplate = "credentials",
   onClose,
   onExecute,
 }: BroadcastConfirmModalProps) {
   if (!isOpen) return null;
+
+  const isCredentials = broadcastTemplate === "credentials";
 
   return (
     <Portal>
@@ -328,6 +332,14 @@ export function BroadcastConfirmModal({
             </div>
 
             <div className="bg-surface-container-high rounded-xl p-3.5 border border-outline-variant/20 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-on-surface-variant">
+                  Format Pesan:
+                </span>
+                <span className="font-semibold text-primary">
+                  {isCredentials ? "Sandi & Pengingat H-1" : "Pengumuman / Pengingat"}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-on-surface-variant">
                   Jumlah Penerima:
@@ -368,8 +380,17 @@ export function BroadcastConfirmModal({
               </div>
             </div>
 
+            {isCredentials && (
+              <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-[11px] text-on-surface-variant leading-relaxed">
+                <span className="font-bold text-primary block mb-0.5">
+                  🔑 Sertakan Kata Sandi Pemilih:
+                </span>
+                Sistem akan secara otomatis menyertakan kata sandi unik dan memperbarui data sandi untuk setiap mahasiswa yang menerima email ini.
+              </div>
+            )}
+
             <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              ⚠️ Sistem akan menggunakan mekanisme batching aman untuk menjaga
+              ⚠️ Sistem menggunakan mekanisme batching paralel aman untuk menjaga
               deliverability SMTP dan reputasi domain di Microsoft Outlook
               Telkom University.
             </p>
