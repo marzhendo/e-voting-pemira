@@ -282,6 +282,7 @@ export interface BroadcastProgressState {
   percentage: number;
   statusText?: string;
   isComplete: boolean;
+  lastError?: string;
 }
 
 export interface BroadcastConfirmModalProps {
@@ -429,11 +430,38 @@ export function BroadcastConfirmModal({
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs leading-relaxed">
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>
-                      Terdapat <strong>{failedCount} email</strong> yang gagal dikirim (kemungkinan alamat mailbox tidak aktif atau ditolak server kampus).
-                    </span>
+                  <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-error/10 border border-error/20 text-error text-xs leading-relaxed">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        Terdapat <strong>{failedCount} email</strong> yang gagal dikirim.
+                      </span>
+                    </div>
+                    {broadcastProgress?.lastError?.includes("limit exceeded") || broadcastProgress?.lastError?.includes("550-5.4.5") ? (
+                      <div className="mt-1 p-2.5 rounded-lg bg-surface-container border border-error/30 text-on-surface text-[11px] space-y-1">
+                        <strong className="text-error block">Penyebab: Kuota Harian SMTP Gmail Terlampaui (550 Daily Limit)</strong>
+                        <p className="text-on-surface-variant">
+                          Akun Gmail pengirim telah mencapai batas maksimum pengiriman Google (500 email per 24 jam).
+                        </p>
+                        <p className="text-primary font-medium">
+                          Solusi: Ganti kredensial akun Gmail baru di file .env server, lalu klik tombol &quot;Kirim Ulang Email Gagal&quot; di bawah.
+                        </p>
+                      </div>
+                    ) : broadcastProgress?.lastError?.includes("Too many login attempts") || broadcastProgress?.lastError?.includes("454-4.7.0") ? (
+                      <div className="mt-1 p-2.5 rounded-lg bg-surface-container border border-error/30 text-on-surface text-[11px] space-y-1">
+                        <strong className="text-error block">Penyebab: Pembatasan Koneksi Sementara (Too Many Logins)</strong>
+                        <p className="text-on-surface-variant">
+                          Server Google membatasi sementara koneksi SMTP karena terlalu banyak autentikasi serentak.
+                        </p>
+                        <p className="text-primary font-medium">
+                          Solusi: Tunggu 5-15 menit agar cooling-down selesai, lalu coba kirim ulang email yang gagal.
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-error/80 pl-6">
+                        {broadcastProgress?.lastError ? `Keterangan: ${broadcastProgress.lastError.slice(0, 120)}` : "Kemungkinan alamat mailbox tidak aktif atau ditolak server kampus."}
+                      </span>
+                    )}
                   </div>
                 )}
 

@@ -1212,24 +1212,31 @@ export default function AdminDashboardPage() {
         actualTotal = data.stats.totalTarget;
         cumulativeSent += data.stats.chunkSent;
         cumulativeFailed += data.stats.chunkFailed;
-        const currentProcessed = offset + data.stats.processedCount;
+        const currentProcessed = Math.min(offset + data.stats.processedCount, actualTotal);
         const percent = actualTotal > 0 ? Math.min(100, Math.round((currentProcessed / actualTotal) * 100)) : 100;
 
         hasMore = data.stats.hasMore;
         offset = data.stats.nextOffset;
         currentLastNim = data.stats.lastNim || undefined;
 
-        setBroadcastProgress({
+        const nextBatchStart = Math.min(offset + 1, actualTotal);
+        const nextBatchEnd = Math.min(offset + CHUNK_LIMIT, actualTotal);
+        const chunkLastError = data.stats.failedRecipients?.length > 0
+          ? data.stats.failedRecipients[0].error
+          : undefined;
+
+        setBroadcastProgress((prev) => ({
           current: currentProcessed,
           total: actualTotal,
           sent: cumulativeSent,
           failed: cumulativeFailed,
           percentage: percent,
           statusText: hasMore
-            ? `Memproses batch penerima ${offset + 1}–${Math.min(offset + CHUNK_LIMIT, actualTotal)} dari ${actualTotal}...`
+            ? `Memproses batch penerima ${nextBatchStart}–${nextBatchEnd} dari ${actualTotal}...`
             : 'Seluruh batch pengiriman selesai diproses.',
           isComplete: !hasMore,
-        });
+          lastError: chunkLastError || prev?.lastError,
+        }));
 
         if (!hasMore) {
           break;
