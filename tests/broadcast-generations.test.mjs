@@ -96,7 +96,7 @@ test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
       generation: '2024',
       template: 'credentials',
       includeCredentials: true,
-      subject: '[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi',
+      subject: '[Pemira HMIF] Hari Pemilihan: Kata Sandi & Akses Bilik Suara',
       headline: 'Waktunya Memilih Pemimpin HMIF',
       bodyText: 'Berikut merupakan kredensial bilik suara digital Anda.',
       offset: 0,

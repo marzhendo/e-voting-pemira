@@ -551,7 +551,7 @@ export function BroadcastConfirmModal({
                       Format Pesan:
                     </span>
                     <span className="font-semibold text-primary">
-                      {isCredentials ? "Sandi & Pengingat H-1" : "Pengumuman / Pengingat"}
+                      {isCredentials ? "Sandi & Bilik Suara (Hari H)" : "Pengumuman / Pengingat"}
                     </span>
                   </div>
                   <div className="flex justify-between">

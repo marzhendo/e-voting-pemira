@@ -139,10 +139,10 @@ export default function AdminDashboardPage() {
   const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted' | 'failed_email' | 'uncontacted'>('not_voted');
   const [broadcastGeneration, setBroadcastGeneration] = useState('all');
   const [broadcastTemplate, setBroadcastTemplate] = useState<'credentials' | 'reminder' | 'invitation' | 'custom'>('credentials');
-  const [broadcastSubject, setBroadcastSubject] = useState('[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi Pemilih');
-  const [broadcastHeadline, setBroadcastHeadline] = useState('Pemira HMIF Dimulai Besok: Simpan Sandi Pemilihmu');
+  const [broadcastSubject, setBroadcastSubject] = useState('[Pemira HMIF] Hari Pemilihan: Kata Sandi & Akses Bilik Suara');
+  const [broadcastHeadline, setBroadcastHeadline] = useState('Bilik Suara Dibuka Hari Ini: Berikan Suaramu');
   const [broadcastBody, setBroadcastBody] = useState(
-    'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 dimulai besok.\n\nBerikut NIM dan kata sandi unik kamu untuk memberikan suara di website pemilihan. Satu kata sandi hanya berlaku untuk satu kali memilih.\n\nSimpan kata sandi ini dan jangan berikan kepada siapa pun.'
+    'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 resmi dibuka hari ini, Rabu, 25 November 2026.\n\nBilik suara digital dapat diakses mulai pukul 08.00 hingga 16.30 WIB. Gunakan NIM dan kata sandi unik di bawah untuk masuk ke bilik suara.\n\nSatu kata sandi hanya berlaku untuk satu kali memilih. Jaga kerahasiaan kata sandi ini dan jangan berikan kepada siapa pun.'
   );
   const [broadcastCtaText, setBroadcastCtaText] = useState('Buka Bilik Suara');
   const [broadcastCtaUrl, setBroadcastCtaUrl] = useState('/login');
@@ -1099,28 +1099,28 @@ export default function AdminDashboardPage() {
 
     if (templateKey === 'credentials') {
       setBroadcastTargetGroup('not_voted');
-      setBroadcastSubject('[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi Pemilih');
-      setBroadcastHeadline('Pemira HMIF Dimulai Besok: Simpan Sandi Pemilihmu');
+      setBroadcastSubject('[Pemira HMIF] Hari Pemilihan: Kata Sandi & Akses Bilik Suara');
+      setBroadcastHeadline('Bilik Suara Dibuka Hari Ini: Berikan Suaramu');
       setBroadcastBody(
-        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 dimulai besok.\n\nBerikut NIM dan kata sandi unik kamu untuk memberikan suara di website pemilihan. Satu kata sandi hanya berlaku untuk satu kali memilih.\n\nSimpan kata sandi ini dan jangan berikan kepada siapa pun.'
+        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 resmi dibuka hari ini, Rabu, 25 November 2026.\n\nBilik suara digital dapat diakses mulai pukul 08.00 hingga 16.30 WIB. Gunakan NIM dan kata sandi unik di bawah untuk masuk ke bilik suara.\n\nSatu kata sandi hanya berlaku untuk satu kali memilih. Jaga kerahasiaan kata sandi ini dan jangan berikan kepada siapa pun.'
       );
-      setBroadcastCtaText('Buka Bilik Suara');
+      setBroadcastCtaText('Buka Bilik Suara Digital');
       setBroadcastCtaUrl('/login');
     } else if (templateKey === 'reminder') {
       setBroadcastTargetGroup('not_voted');
-      setBroadcastSubject('[Pengingat] Hari Pemilihan Pemira HMIF 2026/2027');
-      setBroadcastHeadline('Gunakan Hak Suaramu Hari Ini');
+      setBroadcastSubject('[Pengingat] Pemungutan Suara Pemira HMIF Sedang Berlangsung');
+      setBroadcastHeadline('Gunakan Hak Suaramu Sebelum Pukul 16.30 WIB');
       setBroadcastBody(
-        'Pemilihan Raya Chairman dan Vice Chairman HMIF 2026/2027 sedang berlangsung.\n\nData DPT mencatat kamu belum memilih. Pemilihan hanya memerlukan waktu sekitar 1 menit.\n\nBuka website melalui tautan di bawah, lalu masuk menggunakan NIM dan kata sandi yang telah dikirimkan ke email kampusmu.'
+        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 sedang berlangsung hari ini.\n\nBerdasarkan data DPT, kamu tercatat belum menggunakan hak suara. Pemilihan dilakukan secara online dan hanya memerlukan waktu sekitar 1 menit.\n\nBuka bilik suara melalui tautan di bawah, lalu masuk menggunakan NIM dan kata sandi unik yang telah dikirimkan ke email kampusmu.'
       );
       setBroadcastCtaText('Masuk ke Bilik Suara');
       setBroadcastCtaUrl('/login');
     } else if (templateKey === 'invitation') {
       setBroadcastTargetGroup('all');
-      setBroadcastSubject('[Pemira HMIF 2026/2027] Pemilihan Resmi Dibuka');
-      setBroadcastHeadline('Pemira HMIF 2026/2027 Resmi Dibuka');
+      setBroadcastSubject('[Pemira HMIF 2026/2027] Bilik Suara Digital Resmi Dibuka');
+      setBroadcastHeadline('Pemungutan Suara Pemira HMIF Resmi Dibuka');
       setBroadcastBody(
-        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 resmi dibuka hari ini.\n\nSeluruh mahasiswa aktif Informatika Telkom University Purwokerto yang terdaftar di DPT berhak memberikan suara.\n\nMasuk ke website pemilihan menggunakan NIM dan kata sandi unik yang telah dikirimkan ke email kampusmu.'
+        'Pemilihan Raya Chairman dan Vice Chairman HMIF periode 2026/2027 resmi dibuka hari ini, Rabu, 25 November 2026.\n\nSeluruh mahasiswa aktif Informatika Telkom University Purwokerto yang terdaftar dalam DPT berhak memberikan suara. Bilik suara digital dibuka hingga pukul 16.30 WIB.\n\nSilakan masuk ke website pemilihan menggunakan NIM dan kata sandi unik yang telah dikirimkan ke email kampusmu.'
       );
       setBroadcastCtaText('Masuk ke Bilik Suara');
       setBroadcastCtaUrl('/login');

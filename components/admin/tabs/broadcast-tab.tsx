@@ -208,13 +208,13 @@ export function BroadcastTab({
                 }`}
               >
                 <span className="inline-block px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[9px] font-bold uppercase tracking-wider mb-1.5">
-                  Malam H-1
+                  Hari H
                 </span>
                 <span className="text-xs font-bold block text-primary">
-                  Sandi &amp; Pengingat
+                  Sandi &amp; Bilik Suara
                 </span>
                 <span className="text-[11px] text-on-surface-variant block mt-1 leading-snug">
-                  Reminder besok pemilihan + bagikan kata sandi unik
+                  Bagikan kata sandi pemilih + info bilik suara hari ini
                 </span>
               </button>
 
