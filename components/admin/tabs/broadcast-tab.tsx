@@ -522,7 +522,7 @@ export function BroadcastTab({
                         <li>Buka website pemilihan melalui tombol di bawah.</li>
                         <li>Ketik NIM kamu (<strong>103012300001</strong>).</li>
                         <li>Masukkan kata sandi unik di atas.</li>
-                        <li>Tentukan pilihan pasangan calon dan kirimkan suara.</li>
+                        <li>Pilih pasangan calon Chairman &amp; Vice Chairman, lalu kirimkan suara.</li>
                       </ol>
                     </div>
                   </>

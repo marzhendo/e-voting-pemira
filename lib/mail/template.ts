@@ -367,7 +367,7 @@ export function generateVoterPasswordEmailHtml({
                   <li>Buka website pemilihan melalui tautan di bawah ini.</li>
                   <li>Ketik NIM kamu (<strong>${safeNim}</strong>).</li>
                   <li>Masukkan kata sandi unik di atas.</li>
-                  <li>Pilih pasangan calon ketua & wakil ketua dan kirimkan suara.</li>
+                  <li>Pilih pasangan calon Chairman &amp; Vice Chairman, lalu kirimkan suara.</li>
                 </ol>
               </div>
 
@@ -442,7 +442,7 @@ Cara Masuk:
 1. Buka tautan bilik suara: ${resolvedUrl}
 2. Masukkan NIM kamu (${nim})
 3. Masukkan kata sandi unik di atas
-4. Tentukan pilihanmu di bilik suara digital
+4. Pilih pasangan calon Chairman & Vice Chairman, lalu kirimkan suara
 
 ---
 Demi kerahasiaan hak suara, jangan bagikan kata sandi ini kepada siapa pun.
