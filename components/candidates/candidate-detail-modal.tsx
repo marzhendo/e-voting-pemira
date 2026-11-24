@@ -184,21 +184,15 @@ export function CandidateDetailModal({
                         <Users className="w-4 h-4 text-primary" />
                         <span>Profil Kandidat &amp; CV</span>
                       </h2>
-                      <span className="text-[11px] text-on-surface-variant hidden sm:inline">
-                        Klik tombol masing-masing untuk mengunduh dokumen CV
-                      </span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       {/* CARD CHAIRMAN */}
                       <div className="bg-surface-container-high rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between gap-5 relative overflow-hidden group">
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center">
                             <span className="px-2.5 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 text-[11px] font-extrabold tracking-wider uppercase">
                               Calon Chairman
-                            </span>
-                            <span className="text-xs text-on-surface-variant font-mono">
-                              Informatika
                             </span>
                           </div>
 
@@ -230,12 +224,9 @@ export function CandidateDetailModal({
                       {/* CARD VICE CHAIRMAN */}
                       <div className="bg-surface-container-high rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between gap-5 relative overflow-hidden group">
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center">
                             <span className="px-2.5 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 text-[11px] font-extrabold tracking-wider uppercase">
                               Calon Vice Chairman
-                            </span>
-                            <span className="text-xs text-on-surface-variant font-mono">
-                              Informatika
                             </span>
                           </div>
 
