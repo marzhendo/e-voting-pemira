@@ -43,6 +43,7 @@ import { AdminsTab } from '@/components/admin/tabs/admins-tab';
 import { CandidateFormModal } from '@/components/admin/modals/candidate-form-modal';
 import {
   BroadcastConfirmModal,
+  type BroadcastProgressState,
   EmergencyLockModal,
   ToggleSettingConfirmModal,
 } from '@/components/admin/modals/settings-and-broadcast-modals';
@@ -151,6 +152,7 @@ export default function AdminDashboardPage() {
   const [broadcastResult, setBroadcastResult] = useState<{ totalTarget: number; sentCount: number; failedCount: number } | null>(null);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
   const [isConfirmBroadcastOpen, setIsConfirmBroadcastOpen] = useState(false);
+  const [broadcastProgress, setBroadcastProgress] = useState<BroadcastProgressState | null>(null);
 
   // DPT Management State
   const [voters, setVoters] = useState<VoterRow[]>([]);
@@ -290,7 +292,10 @@ export default function AdminDashboardPage() {
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
-          if (isConfirmBroadcastOpen && !isBroadcasting) setIsConfirmBroadcastOpen(false);
+          if (isConfirmBroadcastOpen && !isBroadcasting) {
+            setIsConfirmBroadcastOpen(false);
+            setBroadcastProgress(null);
+          }
           else if (toggleModalConfig && !settingsSaving) setToggleModalConfig(null);
           else if (isEmergencyModalOpen && !settingsSaving) setIsEmergencyModalOpen(false);
           else if (candidateModalOpen && !savingCandidate && !uploadingPhoto && !uploadingChairmanCv && !uploadingViceChairmanCv) setCandidateModalOpen(false);
@@ -1152,32 +1157,94 @@ export default function AdminDashboardPage() {
     setBroadcastError(null);
     setBroadcastResult(null);
 
+    const targetTotal = broadcastTargetCount || 0;
+    setBroadcastProgress({
+      current: 0,
+      total: targetTotal,
+      sent: 0,
+      failed: 0,
+      percentage: 0,
+      statusText: 'Mempersiapkan antrean pengiriman email...',
+      isComplete: false,
+    });
+
+    const CHUNK_LIMIT = 20;
+    let offset = 0;
+    let cumulativeSent = 0;
+    let cumulativeFailed = 0;
+    let hasMore = true;
+    let actualTotal = targetTotal;
+
     try {
-      const res = await fetch('/api/admin/broadcast-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetGroup: broadcastTargetGroup,
-          generation: broadcastGeneration,
-          template: broadcastTemplate,
-          includeCredentials: broadcastTemplate === 'credentials',
-          subject: broadcastSubject,
-          headline: broadcastHeadline,
-          bodyText: broadcastBody,
-          ctaText: broadcastCtaText,
-          ctaUrl: broadcastCtaUrl || '/login',
-        }),
+      while (hasMore) {
+        const isLast = actualTotal > 0 && offset + CHUNK_LIMIT >= actualTotal;
+        const res = await fetch('/api/admin/broadcast-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetGroup: broadcastTargetGroup,
+            generation: broadcastGeneration,
+            template: broadcastTemplate,
+            includeCredentials: broadcastTemplate === 'credentials',
+            subject: broadcastSubject,
+            headline: broadcastHeadline,
+            bodyText: broadcastBody,
+            ctaText: broadcastCtaText,
+            ctaUrl: broadcastCtaUrl || '/login',
+            offset,
+            limit: CHUNK_LIMIT,
+            isLastChunk: isLast,
+            accumulatedStats: {
+              sent: cumulativeSent,
+              failed: cumulativeFailed,
+            },
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Gagal memproses pengiriman batch email.');
+        }
+
+        actualTotal = data.stats.totalTarget;
+        cumulativeSent += data.stats.chunkSent;
+        cumulativeFailed += data.stats.chunkFailed;
+        const currentProcessed = offset + data.stats.processedCount;
+        const percent = actualTotal > 0 ? Math.min(100, Math.round((currentProcessed / actualTotal) * 100)) : 100;
+
+        hasMore = data.stats.hasMore;
+        offset = data.stats.nextOffset;
+
+        setBroadcastProgress({
+          current: currentProcessed,
+          total: actualTotal,
+          sent: cumulativeSent,
+          failed: cumulativeFailed,
+          percentage: percent,
+          statusText: hasMore
+            ? `Memproses batch penerima ${offset + 1}–${Math.min(offset + CHUNK_LIMIT, actualTotal)} dari ${actualTotal}...`
+            : 'Seluruh batch pengiriman selesai diproses.',
+          isComplete: !hasMore,
+        });
+
+        if (!hasMore) {
+          break;
+        }
+      }
+
+      setBroadcastResult({
+        totalTarget: actualTotal,
+        sentCount: cumulativeSent,
+        failedCount: cumulativeFailed,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setBroadcastError(data.error || 'Gagal memproses pengiriman email broadcast.');
-      } else {
-        setBroadcastResult(data.stats);
-        setIsConfirmBroadcastOpen(false);
+      if (broadcastTemplate === 'credentials') {
+        fetchVoters();
       }
-    } catch {
-      setBroadcastError('Terjadi kesalahan koneksi saat memproses broadcast email.');
+      fetchBroadcastCount();
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan koneksi saat memproses broadcast email.';
+      setBroadcastError(errorMessage);
     } finally {
       setIsBroadcasting(false);
     }
@@ -2234,13 +2301,19 @@ export default function AdminDashboardPage() {
         <BroadcastConfirmModal
           isOpen={isConfirmBroadcastOpen}
           isBroadcasting={isBroadcasting}
+          broadcastProgress={broadcastProgress}
           broadcastTargetCount={broadcastTargetCount}
           broadcastTargetGroup={broadcastTargetGroup}
           broadcastGeneration={broadcastGeneration}
           availableGenerations={availableGenerations}
           broadcastSubject={broadcastSubject}
           broadcastTemplate={broadcastTemplate}
-          onClose={() => setIsConfirmBroadcastOpen(false)}
+          onClose={() => {
+            if (!isBroadcasting) {
+              setIsConfirmBroadcastOpen(false);
+              setBroadcastProgress(null);
+            }
+          }}
           onExecute={handleExecuteBroadcast}
         />
 

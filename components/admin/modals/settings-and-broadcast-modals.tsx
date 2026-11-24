@@ -2,11 +2,14 @@
 
 import {
   AlertTriangle,
+  AlertCircle,
   Check,
   CheckCircle2,
   Loader2,
   Lock,
+  Mail,
   Send,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Portal } from "@/components/ui/portal";
@@ -271,9 +274,20 @@ export function ToggleSettingConfirmModal({
   );
 }
 
+export interface BroadcastProgressState {
+  current: number;
+  total: number;
+  sent: number;
+  failed: number;
+  percentage: number;
+  statusText?: string;
+  isComplete: boolean;
+}
+
 export interface BroadcastConfirmModalProps {
   isOpen: boolean;
   isBroadcasting: boolean;
+  broadcastProgress?: BroadcastProgressState | null;
   broadcastTargetCount: number | null;
   broadcastTargetGroup: "not_voted" | "all" | "voted";
   broadcastGeneration: string;
@@ -287,6 +301,7 @@ export interface BroadcastConfirmModalProps {
 export function BroadcastConfirmModal({
   isOpen,
   isBroadcasting,
+  broadcastProgress,
   broadcastTargetCount,
   broadcastTargetGroup,
   broadcastGeneration,
@@ -299,6 +314,12 @@ export function BroadcastConfirmModal({
   if (!isOpen) return null;
 
   const isCredentials = broadcastTemplate === "credentials";
+  const isComplete = Boolean(broadcastProgress?.isComplete);
+  const totalCount = broadcastProgress?.total ?? broadcastTargetCount ?? 0;
+  const currentCount = broadcastProgress?.current ?? 0;
+  const sentCount = broadcastProgress?.sent ?? 0;
+  const failedCount = broadcastProgress?.failed ?? 0;
+  const percentage = broadcastProgress?.percentage ?? (totalCount > 0 ? Math.round((currentCount / totalCount) * 100) : 0);
 
   return (
     <Portal>
@@ -307,7 +328,7 @@ export function BroadcastConfirmModal({
         aria-modal="true"
         className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
         onClick={(e) => {
-          if (e.target === e.currentTarget && !isBroadcasting) {
+          if (e.target === e.currentTarget && (!isBroadcasting || isComplete)) {
             onClose();
           }
         }}
@@ -315,111 +336,282 @@ export function BroadcastConfirmModal({
         <div className="flex min-h-full items-center justify-center p-4 text-left">
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150 shadow-2xl"
           >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
-                <Send className="w-5 h-5" />
+            {/* Header: Dynamic per state */}
+            {isComplete ? (
+              <div className="flex items-start gap-3.5 pb-2 border-b border-outline-variant/20">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Broadcast Email Selesai!
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Seluruh antrean email mahasiswa telah berhasil diproses.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-on-surface">
-                  Konfirmasi Broadcast Email
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Tinjau sebelum pesan dikirimkan ke server email kampus.
-                </p>
+            ) : isBroadcasting ? (
+              <div className="flex items-start gap-3.5 pb-2 border-b border-outline-variant/20">
+                <div className="relative w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-sm">
+                  <Send className="w-5 h-5 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Mengirim Broadcast Email...
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Sedang mentransmisikan email secara bertahap via SMTP kampus.
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="bg-surface-container-high rounded-xl p-3.5 border border-outline-variant/20 text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">
-                  Format Pesan:
-                </span>
-                <span className="font-semibold text-primary">
-                  {isCredentials ? "Sandi & Pengingat H-1" : "Pengumuman / Pengingat"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">
-                  Jumlah Penerima:
-                </span>
-                <span className="font-bold text-primary font-mono">
-                  {broadcastTargetCount ?? "..."} Mahasiswa
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">
-                  Kelompok Sasaran:
-                </span>
-                <span className="font-semibold text-on-surface">
-                  {broadcastTargetGroup === "not_voted"
-                    ? "Khusus yang Belum Memilih"
-                    : broadcastTargetGroup === "all"
-                      ? "Seluruh DPT"
-                      : "Khusus yang Sudah Memilih"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">
-                  Filter Angkatan:
-                </span>
-                <span className="font-semibold text-on-surface">
-                  {broadcastGeneration === "all"
-                    ? `Semua Angkatan ${availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ""}`
-                    : `Angkatan ${broadcastGeneration}`}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-outline-variant/20">
-                <span className="text-on-surface-variant block mb-1">
-                  Subjek:
-                </span>
-                <span className="font-medium text-on-surface truncate block">
-                  {broadcastSubject}
-                </span>
-              </div>
-            </div>
-
-            {isCredentials && (
-              <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-[11px] text-on-surface-variant leading-relaxed">
-                <span className="font-bold text-primary block mb-0.5">
-                  🔑 Sertakan Kata Sandi Pemilih:
-                </span>
-                Sistem akan secara otomatis menyertakan kata sandi unik dan memperbarui data sandi untuk setiap mahasiswa yang menerima email ini.
+            ) : (
+              <div className="flex items-start gap-3.5 pb-2 border-b border-outline-variant/20">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-sm">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Konfirmasi Broadcast Email
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Tinjau sebelum pesan dikirimkan ke server email kampus.
+                  </p>
+                </div>
               </div>
             )}
 
-            <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              ⚠️ Sistem menggunakan mekanisme batching paralel aman untuk menjaga
-              deliverability SMTP dan reputasi domain di Microsoft Outlook
-              Telkom University.
-            </p>
+            {/* Body: Completion State */}
+            {isComplete ? (
+              <div className="space-y-4 py-1">
+                {/* Stat Grid */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-3 rounded-xl bg-surface-container-high border border-outline-variant/20">
+                    <p className="text-[10px] uppercase tracking-wider text-on-surface-variant font-medium">
+                      Total Target
+                    </p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-on-surface mt-1">
+                      {totalCount}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-medium">
+                      Terkirim
+                    </p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-emerald-400 mt-1">
+                      {sentCount}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl border ${failedCount > 0 ? "bg-error/10 border-error/20" : "bg-surface-container-high border-outline-variant/20"}`}>
+                    <p className={`text-[10px] uppercase tracking-wider font-medium ${failedCount > 0 ? "text-error" : "text-on-surface-variant"}`}>
+                      Gagal
+                    </p>
+                    <p className={`text-lg font-bold font-mono tabular-nums mt-1 ${failedCount > 0 ? "text-error" : "text-on-surface-variant"}`}>
+                      {failedCount}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3 pt-2">
-              <button
-                type="button"
-                disabled={isBroadcasting}
-                onClick={onClose}
-                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center justify-center"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isBroadcasting}
-                onClick={onExecute}
-                className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isBroadcasting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Mengirim...</span>
-                  </>
+                {/* Banner Keterangan */}
+                {failedCount === 0 ? (
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs leading-relaxed">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>
+                      Seluruh <strong>{sentCount} email</strong> berhasil disalurkan ke server email kampus mahasiswa tanpa kendala.
+                    </span>
+                  </div>
                 ) : (
-                  <span>Ya, Kirim Sekarang</span>
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs leading-relaxed">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      Terdapat <strong>{failedCount} email</strong> yang gagal dikirim (kemungkinan alamat mailbox tidak aktif atau ditolak server kampus).
+                    </span>
+                  </div>
                 )}
-              </button>
-            </div>
+
+                <div className="flex items-center justify-end pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full sm:w-auto h-11 px-6 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Selesai &amp; Tutup</span>
+                  </button>
+                </div>
+              </div>
+            ) : isBroadcasting ? (
+              /* Body: Active Progress State */
+              <div className="space-y-4 py-1">
+                {/* Progress Bar Card */}
+                <div className="p-4 rounded-xl bg-surface-container-high border border-outline-variant/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      <span className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
+                        Progres Pengiriman
+                      </span>
+                    </div>
+                    <span className="text-xl font-bold font-mono tabular-nums text-primary">
+                      {percentage}%
+                    </span>
+                  </div>
+
+                  {/* Progress Bar Track */}
+                  <div className="w-full h-3 bg-surface-container-lowest rounded-full overflow-hidden p-0.5 border border-outline-variant/30">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary via-primary to-secondary-fixed rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(235,189,28,0.4)]"
+                      style={{ width: `${Math.max(3, percentage)}%` }}
+                    />
+                  </div>
+
+                  {/* Counts Row */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                    <div className="text-on-surface-variant">
+                      <span className="font-bold text-on-surface font-mono tabular-nums">
+                        {currentCount}
+                      </span>{" "}
+                      dari{" "}
+                      <span className="font-bold text-on-surface font-mono tabular-nums">
+                        {totalCount}
+                      </span>{" "}
+                      Mahasiswa
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono text-[11px]">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold tabular-nums">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {sentCount} Terkirim
+                      </span>
+                      {failedCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-error/10 border border-error/20 text-error font-semibold tabular-nums">
+                          <AlertTriangle className="w-3 h-3" />
+                          {failedCount} Gagal
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Aktivitas Batch */}
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-xs text-on-surface-variant">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                  <span className="truncate font-medium">
+                    {broadcastProgress?.statusText || "Mengirimkan email batch ke server kampus..."}
+                  </span>
+                </div>
+
+                {/* Warning Tab */}
+                <p className="text-[11px] text-on-surface-variant/80 leading-relaxed">
+                  ⚠️ Mohon tidak menutup jendela atau menyegarkan halaman sampai seluruh antrean pengiriman selesai diproses.
+                </p>
+
+                {/* Disabled Action Button with Spinner */}
+                <div className="flex items-center justify-end pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-surface-container-highest text-on-surface-variant border border-outline-variant/30 flex items-center justify-center gap-2 opacity-80 cursor-not-allowed"
+                  >
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <span>
+                      Mengirim... ({currentCount}/{totalCount})
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Body: Confirmation / Review State */
+              <>
+                <div className="bg-surface-container-high rounded-xl p-3.5 border border-outline-variant/20 text-xs space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">
+                      Format Pesan:
+                    </span>
+                    <span className="font-semibold text-primary">
+                      {isCredentials ? "Sandi & Pengingat H-1" : "Pengumuman / Pengingat"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">
+                      Jumlah Penerima:
+                    </span>
+                    <span className="font-bold text-primary font-mono tabular-nums">
+                      {broadcastTargetCount ?? "..."} Mahasiswa
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">
+                      Kelompok Sasaran:
+                    </span>
+                    <span className="font-semibold text-on-surface">
+                      {broadcastTargetGroup === "not_voted"
+                        ? "Khusus yang Belum Memilih"
+                        : broadcastTargetGroup === "all"
+                          ? "Seluruh DPT"
+                          : "Khusus yang Sudah Memilih"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">
+                      Filter Angkatan:
+                    </span>
+                    <span className="font-semibold text-on-surface">
+                      {broadcastGeneration === "all"
+                        ? `Semua Angkatan ${availableGenerations.length > 0 ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})` : ""}`
+                        : `Angkatan ${broadcastGeneration}`}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-outline-variant/20">
+                    <span className="text-on-surface-variant block mb-1">
+                      Subjek:
+                    </span>
+                    <span className="font-medium text-on-surface truncate block">
+                      {broadcastSubject}
+                    </span>
+                  </div>
+                </div>
+
+                {isCredentials && (
+                  <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-[11px] text-on-surface-variant leading-relaxed">
+                    <span className="font-bold text-primary block mb-0.5">
+                      🔑 Sertakan Kata Sandi Pemilih:
+                    </span>
+                    Sistem akan secara otomatis menyertakan kata sandi unik dan memperbarui data sandi untuk setiap mahasiswa yang menerima email ini.
+                  </div>
+                )}
+
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  ⚠️ Sistem menggunakan transmisi batching paralel berprogres untuk menjaga
+                  deliverability SMTP dan mencegah batas waktu serverless (timeout).
+                </p>
+
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={isBroadcasting}
+                    onClick={onClose}
+                    className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center justify-center"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isBroadcasting}
+                    onClick={onExecute}
+                    className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <span>Ya, Kirim Sekarang</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

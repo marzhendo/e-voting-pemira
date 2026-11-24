@@ -22,6 +22,15 @@ const broadcastRequestSchema = z.object({
   bodyText: z.string().min(10, 'Isi pesan pengumuman wajib minimal 10 karakter.'),
   ctaText: z.string().default('Masuk ke Bilik Suara Digital'),
   ctaUrl: z.string().default('/login'),
+  offset: z.number().int().min(0).default(0),
+  limit: z.number().int().min(0).default(0),
+  isLastChunk: z.boolean().default(false),
+  accumulatedStats: z
+    .object({
+      sent: z.number().default(0),
+      failed: z.number().default(0),
+    })
+    .optional(),
 });
 
 /**
@@ -144,6 +153,10 @@ export async function POST(request: NextRequest) {
       bodyText,
       ctaText,
       ctaUrl,
+      offset,
+      limit,
+      isLastChunk,
+      accumulatedStats,
     } = parsed.data;
 
     const isCredentialsMode = includeCredentials || template === 'credentials';
@@ -165,6 +178,8 @@ export async function POST(request: NextRequest) {
         query = query.eq('generation', parsedGen);
       }
 
+      query = query.order('nim', { ascending: true });
+
       const { data, error } = await query;
       if (error) {
         return NextResponse.json({ error: 'Gagal mengambil data penerima DPT dari basis data.' }, { status: 500 });
@@ -178,25 +193,53 @@ export async function POST(request: NextRequest) {
       if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
       if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
       if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);
+      filtered.sort((a, b) => a.nim.localeCompare(b.nim));
       recipients = filtered;
     }
 
-    if (recipients.length === 0) {
+    const totalTarget = recipients.length;
+
+    if (totalTarget === 0) {
       return NextResponse.json(
         { error: 'Tidak ditemukan pemilih yang sesuai dengan kriteria filter yang dipilih.' },
         { status: 400 }
       );
     }
 
+    // Tentukan penerima untuk batch / chunk saat ini
+    const recipientsToProcess = limit > 0
+      ? recipients.slice(offset, offset + limit)
+      : recipients;
+
+    const hasMore = limit > 0 ? (offset + recipientsToProcess.length) < totalTarget : false;
+    const nextOffset = offset + recipientsToProcess.length;
+
+    if (recipientsToProcess.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'Semua target pemilih telah selesai diproses.',
+        stats: {
+          totalTarget,
+          offset,
+          limit,
+          processedCount: 0,
+          chunkSent: 0,
+          chunkFailed: 0,
+          hasMore: false,
+          nextOffset: offset,
+        },
+      });
+    }
+
     // Jalankan pengiriman dengan concurrent batching aman (anti-spam throttling)
     // CHUNK_SIZE = 5 menjaga efisiensi throughput tanpa membebani connection pool SMTP
     const CHUNK_SIZE = 5;
-    let sentCount = 0;
-    let failedCount = 0;
+    let chunkSent = 0;
+    let chunkFailed = 0;
     let isUsingLegacyCols = false;
 
-    for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
-      const chunk = recipients.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < recipientsToProcess.length; i += CHUNK_SIZE) {
+      const chunk = recipientsToProcess.slice(i, i + CHUNK_SIZE);
       const results = await Promise.all(
         chunk.map(async (voter) => {
           if (isCredentialsMode) {
@@ -273,41 +316,54 @@ export async function POST(request: NextRequest) {
 
       for (const res of results) {
         if (res.success) {
-          sentCount++;
+          chunkSent++;
         } else {
-          failedCount++;
+          chunkFailed++;
         }
       }
     }
 
-    // Catat ke Audit Log & Audit Trail
-    const clientIp = getClientIp(request);
-    await recordAuditLog({
-      actorEmail: session?.email || 'admin@pemira.local',
-      actorName: session?.name || 'Panitia KPR',
-      actorRole: session?.role || 'kpr_admin',
-      action: 'BROADCAST_EMAIL_SENT',
-      description: `Mengirim broadcast email "${subject}" ke target ${targetGroup} (Angkatan: ${generation}, sandi disertakan: ${isCredentialsMode}, ${sentCount} terkirim, ${failedCount} gagal).`,
-      ipAddress: clientIp,
-      details: {
-        targetGroup,
-        generation,
-        template,
-        isCredentialsMode,
-        totalTarget: recipients.length,
-        sentCount,
-        failedCount,
-        subject,
-      },
-    });
+    // Catat ke Audit Log & Audit Trail jika batch terakhir atau mode monolitik
+    const shouldRecordAudit = limit === 0 || isLastChunk || !hasMore;
+    if (shouldRecordAudit) {
+      const clientIp = getClientIp(request);
+      const totalSentFinal = (accumulatedStats?.sent ?? 0) + chunkSent;
+      const totalFailedFinal = (accumulatedStats?.failed ?? 0) + chunkFailed;
+
+      await recordAuditLog({
+        actorEmail: session?.email || 'admin@pemira.local',
+        actorName: session?.name || 'Panitia KPR',
+        actorRole: session?.role || 'kpr_admin',
+        action: 'BROADCAST_EMAIL_SENT',
+        description: `Mengirim broadcast email "${subject}" ke target ${targetGroup} (Angkatan: ${generation}, sandi disertakan: ${isCredentialsMode}, ${totalSentFinal} terkirim, ${totalFailedFinal} gagal).`,
+        ipAddress: clientIp,
+        details: {
+          targetGroup,
+          generation,
+          template,
+          isCredentialsMode,
+          totalTarget,
+          sentCount: totalSentFinal,
+          failedCount: totalFailedFinal,
+          subject,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Broadcast email selesai diproses. ${sentCount} berhasil, ${failedCount} gagal dari total ${recipients.length} target.`,
+      message: hasMore
+        ? `Batch ${offset + 1}–${nextOffset} selesai diproses.`
+        : `Broadcast email selesai diproses. ${chunkSent} berhasil pada batch ini dari total ${totalTarget} target.`,
       stats: {
-        totalTarget: recipients.length,
-        sentCount,
-        failedCount,
+        totalTarget,
+        offset,
+        limit,
+        processedCount: recipientsToProcess.length,
+        chunkSent,
+        chunkFailed,
+        hasMore,
+        nextOffset,
       },
     });
   } catch (error) {
