@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DummyAccount } from "@/lib/auth/dummy";
 import {
-  ShieldCheck,
   AlertTriangle,
   Loader2,
   ChevronDown,
@@ -17,7 +16,6 @@ import {
   EyeOff,
   CheckCircle2,
   RefreshCw,
-  HelpCircle,
 } from "lucide-react";
 
 function getAuthErrorDisplay(
@@ -352,11 +350,11 @@ export function LoginForm({
   return (
     <div className="w-full flex flex-col justify-between">
       {/* 1. Card Header: Logo, Identity, & Dynamic Headline */}
-      <div className="text-center flex flex-col items-center space-y-3 mb-6">
+      <div className="text-center flex flex-col items-center space-y-2 mb-4">
         <div
           onClick={handleLogoClick}
-          className="relative w-14 h-14 shrink-0 flex items-center justify-center select-none cursor-default"
-          title={isAdminMode ? "Mode Admin Aktif" : "Logo HMIF"}
+          className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center select-none cursor-default"
+          title={isAdminMode ? "Mode Admin Aktif" : "Logo HMIF (Klik 3x untuk Akses Admin)"}
         >
           <Image
             src="/assets/img/hmif-logo.png"
@@ -369,40 +367,40 @@ export function LoginForm({
         </div>
 
         <div>
-          <p className="text-sm font-bold tracking-wider uppercase text-on-surface">
+          <p className="text-xs sm:text-sm font-bold tracking-wider uppercase text-on-surface">
             PEMIRA HMIF 2026/2027
           </p>
-          <p className="text-xs font-medium text-on-surface-variant">
+          <p className="text-[11px] sm:text-xs font-medium text-on-surface-variant">
             Telkom University Purwokerto
           </p>
         </div>
 
-        <div className="pt-1">
+        <div className="pt-0.5">
           {isMaintenance && !isAdminMode ? (
             <>
-              <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface leading-none text-balance">
+              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface leading-none text-balance">
                 Sedang Ada Pemeriksaan Sistem
               </h1>
-              <p className="text-sm text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto text-pretty">
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mt-1 max-w-xs mx-auto text-pretty">
                 Sistem pemilihan sedang dalam penyesuaian berkala oleh Panitia
                 KPR. Pemungutan suara akan segera dibuka kembali.
               </p>
             </>
           ) : isAdminMode ? (
             <>
-              <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface leading-none">
+              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface leading-none">
                 Masuk Administrator
               </h1>
-              <p className="text-sm text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto">
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mt-1 max-w-xs mx-auto">
                 Masukkan NIM atau email panitia dan kata sandi akun untuk mengelola sistem.
               </p>
             </>
           ) : (
             <>
-              <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface leading-none">
+              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface leading-none">
                 Waktunya Memilih.
               </h1>
-              <p className="text-sm text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto text-pretty">
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mt-1 max-w-xs mx-auto text-pretty">
                 Masukkan NIM dan kata sandi pemilih yang telah dikirimkan ke email resmi kampus kamu.
               </p>
             </>
@@ -585,35 +583,36 @@ export function LoginForm({
             )}
           </motion.button>
 
-          {/* Petunjuk & Bantuan Kata Sandi */}
-          {!isAdminMode && (
-            <div className="space-y-2 pt-1 text-center">
-              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant justify-center font-medium">
-                <HelpCircle className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span>
-                  Kata sandi pemilih dikirimkan melalui email resmi kampus kamu.
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant/80 justify-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>
-                  Hanya untuk mahasiswa aktif Informatika terdaftar di DPT.
-                </span>
-              </div>
-            </div>
-          )}
+          {/* Toggle Akses Administrator / Bilik Suara Mahasiswa */}
+          <div className="pt-0.5 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdminMode((prev) => !prev);
+                setErrorMessage(null);
+                setSuccessNotice(null);
+                setRemainingAttempts(null);
+                setLockoutMinutes(null);
+              }}
+              className="text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors cursor-pointer py-1 px-2.5 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+            >
+              {isAdminMode
+                ? "← Kembali ke Bilik Suara Mahasiswa"
+                : "Masuk sebagai Administrator / Panitia KPR →"}
+            </button>
+          </div>
         </form>
       )}
 
       {/* 4. Card Footer: Panitia Support */}
-      <div className="pt-5 border-t border-outline-variant/20 text-center mt-6">
-        <p className="text-sm text-on-surface-variant font-medium">
-          Belum menerima kata sandi atau kendala DPT?{" "}
+      <div className="pt-3.5 border-t border-outline-variant/20 text-center mt-4">
+        <p className="text-xs text-on-surface-variant font-medium">
+          Kendala DPT atau kata sandi?{" "}
           <a
             href="https://wa.me/6281809300406"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-primary hover:underline inline-flex items-center gap-1 min-h-[44px] px-2 py-1 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+            className="font-semibold text-primary hover:underline inline-flex items-center min-h-[36px] px-1 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           >
             Hubungi Panitia KPR
           </a>

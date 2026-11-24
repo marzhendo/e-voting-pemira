@@ -42,7 +42,7 @@ export interface VoterLoginResult {
 }
 
 /**
- * Autentikasi Pemilih berbasis NIM dan Kata Sandi Pemilih Unik.
+ * Autentikasi Pemilih & Administrator berbasis NIM/Email dan Kata Sandi.
  * Mendukung basis data PostgreSQL Supabase dengan fallback dev-store lokal.
  */
 export async function authenticateWithPassword(
@@ -70,32 +70,101 @@ export async function authenticateWithPassword(
   if (isSupabaseConfigured()) {
     try {
       const adminSupabase = createAdminClient();
+      let voterRecord: {
+        id: string;
+        nim: string;
+        name: string;
+        email: string;
+        generation: number;
+        has_voted: boolean;
+        password_hash: string | null;
+        login_attempts: number;
+        locked_until: string | null;
+      } | null = null;
+      let isUsingLegacyOtpCols = false;
+
+      // Coba query dengan kolom password baru
       const { data: voter, error } = await adminSupabase
         .from('voters_whitelist')
         .select('id, nim, name, email, generation, has_voted, password_hash, login_attempts, locked_until')
         .or(`nim.ilike.${cleanId},email.ilike.${cleanId}`)
         .maybeSingle();
 
-      if (error) {
+      if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+        // Fallback jika migrasi 00013 belum dieksekusi di Supabase remote
+        isUsingLegacyOtpCols = true;
+        const { data: legacyVoter, error: legacyErr } = await adminSupabase
+          .from('voters_whitelist')
+          .select('id, nim, name, email, generation, has_voted, otp_hash, otp_attempts, otp_expires_at')
+          .or(`nim.ilike.${cleanId},email.ilike.${cleanId}`)
+          .maybeSingle();
+
+        if (legacyErr) {
+          console.error('[VoterAuth] Supabase legacy query error:', legacyErr);
+          return {
+            success: false,
+            code: 'SERVER_ERROR',
+            message: 'Terjadi kegagalan koneksi ke basis data pemilihan. Silakan coba kembali.',
+          };
+        }
+
+        if (legacyVoter) {
+          voterRecord = {
+            id: legacyVoter.id,
+            nim: legacyVoter.nim,
+            name: legacyVoter.name,
+            email: legacyVoter.email,
+            generation: legacyVoter.generation,
+            has_voted: legacyVoter.has_voted,
+            password_hash: legacyVoter.otp_hash,
+            login_attempts: legacyVoter.otp_attempts || 0,
+            locked_until: legacyVoter.otp_expires_at,
+          };
+        }
+      } else if (error) {
         console.error('[VoterAuth] Supabase query error:', error);
         return {
           success: false,
           code: 'SERVER_ERROR',
           message: 'Terjadi kegagalan koneksi ke basis data pemilihan. Silakan coba kembali.',
         };
+      } else if (voter) {
+        voterRecord = voter;
       }
 
-      if (!voter) {
-        return {
-          success: false,
-          code: 'NIM_NOT_IN_DPT',
-          message: 'NIM atau kredensial kamu tidak terdaftar dalam Daftar Pemilih Tetap (DPT) resmi.',
-        };
+      // Jika tidak ditemukan di voters_whitelist, periksa tabel admin_users
+      if (!voterRecord) {
+        const { data: adminUser } = await adminSupabase
+          .from('admin_users')
+          .select('id, email, role, is_active')
+          .eq('email', cleanId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (adminUser) {
+          voterRecord = {
+            id: adminUser.id,
+            nim: '999999999999',
+            name: 'Administrator KPR',
+            email: adminUser.email,
+            generation: 2024,
+            has_voted: false,
+            password_hash: null,
+            login_attempts: 0,
+            locked_until: null,
+          };
+        } else {
+          return {
+            success: false,
+            code: 'NIM_NOT_IN_DPT',
+            message: 'NIM atau kredensial kamu tidak terdaftar dalam Daftar Pemilih Tetap (DPT) resmi.',
+          };
+        }
       }
 
       // 3. Periksa Status Penguncian Akun (Lockout)
-      const currentAttempts = voter.login_attempts || 0;
-      const lockoutStatus = checkAccountLockout(currentAttempts, voter.locked_until);
+      const currentAttempts = voterRecord.login_attempts || 0;
+      const lockoutStatus = checkAccountLockout(currentAttempts, voterRecord.locked_until);
 
       if (lockoutStatus.isLocked) {
         return {
@@ -106,8 +175,31 @@ export async function authenticateWithPassword(
         };
       }
 
-      // 4. Periksa apakah kata sandi sudah digenerate
-      if (!voter.password_hash) {
+      // 4. Verifikasi Kata Sandi
+      const isSuperadminAccount = isRootSuperadminEmail(voterRecord.email) || isRootSuperadminEmail(cleanId);
+      const configuredAdminPassword = process.env.SUPER_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+
+      let isPasswordValid = false;
+
+      // Cek dengan hash tersimpan jika ada
+      if (voterRecord.password_hash) {
+        isPasswordValid = verifyVoterPassword(cleanPassword, voterRecord.password_hash);
+      }
+
+      // Khusus akun Superadmin utama, selalu izinkan sandi master terkonfigurasi atau default darurat
+      if (!isPasswordValid && isSuperadminAccount) {
+        if (configuredAdminPassword) {
+          isPasswordValid = cleanPassword === normalizePassword(configuredAdminPassword);
+        } else {
+          // Sandi default awal superadmin (dapat diubah di .env.local via SUPER_ADMIN_PASSWORD)
+          isPasswordValid =
+            cleanPassword === 'HMIF2026!' ||
+            cleanPassword === 'HMIF2026' ||
+            cleanPassword === 'SUPERADMIN2026';
+        }
+      }
+
+      if (!isPasswordValid && !voterRecord.password_hash && !isSuperadminAccount) {
         return {
           success: false,
           code: 'PASSWORD_NOT_SET',
@@ -115,21 +207,28 @@ export async function authenticateWithPassword(
         };
       }
 
-      // 5. Verifikasi Kata Sandi (Timing-Safe)
-      const isPasswordValid = verifyVoterPassword(cleanPassword, voter.password_hash);
-
       if (!isPasswordValid) {
         const nextAttempts = currentAttempts + 1;
         const isNowLocked = nextAttempts >= MAX_LOGIN_ATTEMPTS;
         const lockedUntil = isNowLocked ? new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString() : null;
 
-        await adminSupabase
-          .from('voters_whitelist')
-          .update({
-            login_attempts: nextAttempts,
-            locked_until: lockedUntil,
-          })
-          .eq('id', voter.id);
+        if (isUsingLegacyOtpCols) {
+          await adminSupabase
+            .from('voters_whitelist')
+            .update({
+              otp_attempts: nextAttempts,
+              otp_expires_at: lockedUntil,
+            })
+            .eq('id', voterRecord.id);
+        } else {
+          await adminSupabase
+            .from('voters_whitelist')
+            .update({
+              login_attempts: nextAttempts,
+              locked_until: lockedUntil,
+            })
+            .eq('id', voterRecord.id);
+        }
 
         if (isNowLocked) {
           return {
@@ -149,24 +248,34 @@ export async function authenticateWithPassword(
         };
       }
 
-      // 6. Sukses: Reset penghitung percobaan gagal ke 0
-      await adminSupabase
-        .from('voters_whitelist')
-        .update({
-          login_attempts: 0,
-          locked_until: null,
-        })
-        .eq('id', voter.id);
+      // 5. Sukses: Reset penghitung percobaan gagal ke 0
+      if (isUsingLegacyOtpCols) {
+        await adminSupabase
+          .from('voters_whitelist')
+          .update({
+            otp_attempts: 0,
+            otp_expires_at: null,
+          })
+          .eq('id', voterRecord.id);
+      } else {
+        await adminSupabase
+          .from('voters_whitelist')
+          .update({
+            login_attempts: 0,
+            locked_until: null,
+          })
+          .eq('id', voterRecord.id);
+      }
 
       // Tentukan role pengguna
       let effectiveRole: AdminRole | 'voter' = 'voter';
-      if (isRootSuperadminEmail(voter.email)) {
+      if (isRootSuperadminEmail(voterRecord.email) || isRootSuperadminEmail(cleanId)) {
         effectiveRole = 'super_admin';
       } else {
         const { data: adminUser } = await adminSupabase
           .from('admin_users')
           .select('role')
-          .eq('email', voter.email.toLowerCase())
+          .eq('email', voterRecord.email.toLowerCase())
           .eq('is_active', true)
           .maybeSingle();
 
@@ -175,19 +284,19 @@ export async function authenticateWithPassword(
         }
       }
 
-      const hasVoted = Boolean(voter.has_voted);
+      const hasVoted = Boolean(voterRecord.has_voted);
 
       const sessionUser: SessionUser = {
-        id: voter.id,
-        email: voter.email,
-        name: voter.name,
-        nim: voter.nim,
+        id: voterRecord.id,
+        email: voterRecord.email,
+        name: voterRecord.name,
+        nim: voterRecord.nim,
         role: effectiveRole,
         isDptVerified: true,
         hasVoted,
-        generation: voter.generation,
+        generation: voterRecord.generation,
         entraTenantId: 'voter-password-auth',
-        entraObjectId: `voter-${voter.nim}`,
+        entraObjectId: `voter-${voterRecord.nim}`,
       };
 
       const token = await createSessionToken(sessionUser);
@@ -203,7 +312,7 @@ export async function authenticateWithPassword(
       return {
         success: true,
         code: 'SUCCESS',
-        message: 'Autentikasi pemilih berhasil.',
+        message: 'Autentikasi berhasil.',
         user: sessionUser,
         redirectUrl,
         token,
@@ -248,11 +357,31 @@ export async function authenticateWithPassword(
     };
   }
 
-  // Di dev mode lokal, jika kata sandi belum disetel, izinkan default "HMIF2026" atau hash yang tersimpan
+  const isSuperadminDev = isRootSuperadminEmail(devVoter.email) || isRootSuperadminEmail(cleanId);
+  const configuredAdminPassword = process.env.SUPER_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+
+  // Di dev mode lokal, izinkan default "HMIF2026!" / "HMIF2026" atau hash yang tersimpan
   const hasCustomPassword = Boolean(devVoter.password_hash);
-  const isValidDev = hasCustomPassword
-    ? verifyVoterPassword(cleanPassword, devVoter.password_hash!)
-    : cleanPassword === 'HMIF2026' || cleanPassword === cleanId.toUpperCase();
+  let isValidDev = false;
+
+  if (hasCustomPassword) {
+    isValidDev = verifyVoterPassword(cleanPassword, devVoter.password_hash!);
+  }
+
+  if (!isValidDev) {
+    if (isSuperadminDev) {
+      if (configuredAdminPassword) {
+        isValidDev = cleanPassword === normalizePassword(configuredAdminPassword);
+      } else {
+        isValidDev =
+          cleanPassword === 'HMIF2026!' ||
+          cleanPassword === 'HMIF2026' ||
+          cleanPassword === 'SUPERADMIN2026';
+      }
+    } else if (!hasCustomPassword) {
+      isValidDev = cleanPassword === 'HMIF2026' || cleanPassword === cleanId.toUpperCase();
+    }
+  }
 
   if (!isValidDev) {
     const nextAttempts = currentAttempts + 1;
@@ -311,7 +440,7 @@ export async function authenticateWithPassword(
   return {
     success: true,
     code: 'SUCCESS',
-    message: 'Login pemilih berhasil (Mode Pengujian Lokal).',
+    message: 'Login berhasil (Mode Pengujian Lokal).',
     user: sessionUser,
     redirectUrl,
     token,
