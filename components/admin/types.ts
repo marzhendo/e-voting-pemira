@@ -31,6 +31,8 @@ export interface VoterRow {
   email: string;
   generation: number;
   has_voted: boolean;
+  has_password?: boolean;
+  password_created_at?: string | null;
   updated_at: string;
 }
 

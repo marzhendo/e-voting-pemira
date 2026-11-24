@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
       let query = adminSupabase
         .from('voters_whitelist')
-        .select('id, nim, name, email, generation, has_voted, created_at', { count: 'exact' });
+        .select('id, nim, name, email, generation, has_voted, password_created_at, password_hash, created_at', { count: 'exact' });
 
       const sanitizedSearch = search.trim().replace(/[^a-zA-Z0-9\s@._-]/g, '');
       if (sanitizedSearch) {
@@ -84,7 +84,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
           success: true,
           voters: voters.map((v) => ({
-            ...v,
+            id: v.id,
+            nim: v.nim,
+            name: v.name,
+            email: v.email,
+            generation: v.generation,
+            has_voted: v.has_voted,
+            has_password: Boolean(v.password_hash),
+            password_created_at: v.password_created_at || null,
             updated_at: v.created_at || new Date().toISOString(),
           })),
           total,
@@ -127,7 +134,17 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      voters: result.voters,
+      voters: result.voters.map((v) => ({
+        id: v.id,
+        nim: v.nim,
+        name: v.name,
+        email: v.email,
+        generation: v.generation,
+        has_voted: v.has_voted,
+        has_password: Boolean(v.password_hash),
+        password_created_at: v.password_created_at || null,
+        updated_at: v.updated_at || v.created_at || new Date().toISOString(),
+      })),
       total,
       limit,
       offset,

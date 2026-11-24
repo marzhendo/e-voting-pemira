@@ -27,6 +27,10 @@ export interface Database {
           otp_expires_at: string | null;
           otp_attempts: number;
           otp_last_sent_at: string | null;
+          password_hash: string | null;
+          password_created_at: string | null;
+          login_attempts: number;
+          locked_until: string | null;
           created_at: string;
         };
         Insert: {
@@ -44,6 +48,10 @@ export interface Database {
           otp_expires_at?: string | null;
           otp_attempts?: number;
           otp_last_sent_at?: string | null;
+          password_hash?: string | null;
+          password_created_at?: string | null;
+          login_attempts?: number;
+          locked_until?: string | null;
           created_at?: string;
         };
         Update: {
@@ -61,6 +69,10 @@ export interface Database {
           otp_expires_at?: string | null;
           otp_attempts?: number;
           otp_last_sent_at?: string | null;
+          password_hash?: string | null;
+          password_created_at?: string | null;
+          login_attempts?: number;
+          locked_until?: string | null;
           created_at?: string;
         };
         Relationships: [];

@@ -217,6 +217,8 @@ export default function AdminDashboardPage() {
   const [isResettingDpt, setIsResettingDpt] = useState(false);
   const [dptActionMessage, setDptActionMessage] = useState<string | null>(null);
   const [dptErrorMessage, setDptErrorMessage] = useState<string | null>(null);
+  const [isGeneratingPasswords, setIsGeneratingPasswords] = useState(false);
+  const [resendingPasswordNim, setResendingPasswordNim] = useState<string | null>(null);
 
   // State Reset Ballots Simulasi
   const [isResettingBallots, setIsResettingBallots] = useState(false);
@@ -1517,6 +1519,67 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleGenerateBatchPasswords = async (gen = selectedGeneration) => {
+    if (!confirm(`Apakah Anda yakin ingin menerbitkan kata sandi unik untuk pemilih (Angkatan: ${gen}) yang belum memiliki sandi?`)) {
+      return;
+    }
+    setIsGeneratingPasswords(true);
+    setDptActionMessage(null);
+    setDptErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt/passwords/generate-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generation: gen,
+          overwriteExisting: false,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDptErrorMessage(data.error || 'Gagal menerbitkan kata sandi pemilih.');
+      } else {
+        setDptActionMessage(`✓ ${data.message}`);
+        fetchVoters();
+      }
+    } catch {
+      setDptErrorMessage('Terjadi kesalahan jaringan saat menerbitkan kata sandi.');
+    } finally {
+      setIsGeneratingPasswords(false);
+    }
+  };
+
+  const handleResendVoterPassword = async (voter: VoterRow) => {
+    if (!confirm(`Reset dan kirim ulang kata sandi baru untuk ${voter.name} (${voter.nim}) ke email ${voter.email}?`)) {
+      return;
+    }
+    setResendingPasswordNim(voter.nim);
+    setDptActionMessage(null);
+    setDptErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt/passwords/resend-single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nim: voter.nim }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDptErrorMessage(data.error || 'Gagal mengirim ulang kata sandi pemilih.');
+      } else {
+        setDptActionMessage(`✓ ${data.message}`);
+        fetchVoters();
+      }
+    } catch {
+      setDptErrorMessage('Terjadi kesalahan jaringan saat mengirim ulang kata sandi.');
+    } finally {
+      setResendingPasswordNim(null);
+    }
+  };
+
   const handleResetDevBallots = async () => {
     if (!confirm('Apakah Anda yakin ingin mereset seluruh surat suara simulasi pengujian? Tindakan ini akan mengosongkan perolehan suara.')) {
       return;
@@ -1901,6 +1964,10 @@ export default function AdminDashboardPage() {
                   }}
                   onPrevPage={() => setDptPage((p) => Math.max(p - 1, 1))}
                   onNextPage={() => setDptPage((p) => Math.min(p + 1, dptTotalPages))}
+                  onGenerateBatchPasswords={handleGenerateBatchPasswords}
+                  isGeneratingPasswords={isGeneratingPasswords}
+                  onResendVoterPassword={handleResendVoterPassword}
+                  resendingPasswordNim={resendingPasswordNim}
                 />
               )}
 

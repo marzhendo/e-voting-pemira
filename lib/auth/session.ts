@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
-import type { AdminRole } from '@/lib/supabase/types';
-import { isProductionEnvironment } from '@/lib/security/env';
+import { cookies } from 'next/headers.js';
+import type { AdminRole } from '../supabase/types.ts';
+import { isProductionEnvironment } from '../security/env.ts';
 
 export const SESSION_COOKIE_NAME = 'hmif_voting_session';
 export const SESSION_MAX_AGE_SECONDS = 15 * 60; // 15 menit sesuai batas PRD bilik suara
@@ -90,16 +90,20 @@ export function isSecureCookieEnvironment(): boolean {
  * Enforces security standard: HTTPOnly, Secure (saat HTTPS), SameSite=Lax.
  */
 export function setSessionCookie(token: string) {
-  const cookieStore = cookies();
-  const isSecure = isSecureCookieEnvironment();
+  try {
+    const cookieStore = cookies();
+    const isSecure = isSecureCookieEnvironment();
 
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: 'lax',
-    maxAge: SESSION_MAX_AGE_SECONDS,
-    path: '/',
-  });
+    cookieStore.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+      path: '/',
+    });
+  } catch {
+    // Graceful fallback saat dipanggil di luar konteks Next.js Request (misal: Unit Test Runner)
+  }
 }
 
 /**

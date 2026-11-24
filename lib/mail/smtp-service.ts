@@ -1,11 +1,13 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import type { MailService, SendPinPayload, SendBroadcastPayload, MailDeliveryResult } from './types';
+import type { MailService, SendPinPayload, SendBroadcastPayload, SendVoterPasswordPayload, MailDeliveryResult } from './types';
 import {
   generatePinEmailHtml,
   generatePinEmailText,
   generateBroadcastEmailHtml,
   generateBroadcastEmailText,
+  generateVoterPasswordEmailHtml,
+  generateVoterPasswordEmailText,
 } from './template';
 
 export class SmtpMailService implements MailService {
@@ -146,6 +148,82 @@ export class SmtpMailService implements MailService {
           success: true,
           isDevFallback: true,
           messageId: `dev-failsafe-${Date.now()}`,
+        };
+      }
+
+      return {
+        success: false,
+        isDevFallback: false,
+        error: errorMsg,
+      };
+    }
+  }
+
+  async sendVoterPassword({
+    to,
+    voterName,
+    nim,
+    password,
+    loginUrl,
+  }: SendVoterPasswordPayload): Promise<MailDeliveryResult> {
+    const transporter = this.getTransporter();
+
+    // Fallback Dev / Offline mode jika SMTP tidak dikonfigurasi
+    if (!transporter) {
+      console.log(`\n======================================================`);
+      console.log(`📧 [DEV EMAIL FALLBACK] Kata Sandi Pemilih Dikirim`);
+      console.log(`Penerima  : ${to} (${voterName} - NIM: ${nim})`);
+      console.log(`SANDI     : [ ${password} ]`);
+      console.log(`Login URL : ${loginUrl || '/login'}`);
+      console.log(`Status    : SMTP tidak aktif / dev mode, kata sandi dicetak di console.`);
+      console.log(`======================================================\n`);
+
+      return {
+        success: true,
+        isDevFallback: true,
+        messageId: `dev-pwd-${Date.now()}-${nim}`,
+      };
+    }
+
+    const domain = process.env.SMTP_FROM_DOMAIN || 'pemirahmif.com';
+    const fromName = process.env.SMTP_FROM_NAME || 'Panitia Pemira HMIF';
+    const fromEmail = process.env.SMTP_FROM_EMAIL || `noreply@${domain}`;
+    const replyTo = process.env.SMTP_REPLY_TO || fromEmail;
+
+    const html = generateVoterPasswordEmailHtml({ voterName, nim, password, loginUrl });
+    const text = generateVoterPasswordEmailText({ voterName, nim, password, loginUrl });
+
+    try {
+      const info = await transporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to,
+        replyTo,
+        subject: `[PEMIRA HMIF] Kata Sandi Bilik Suara Pemilih: ${nim}`,
+        text,
+        html,
+        headers: {
+          'X-Entity-Ref-ID': `pemira-pwd-${nim}-${Date.now()}`,
+          'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        },
+      });
+
+      return {
+        success: true,
+        isDevFallback: false,
+        messageId: info.messageId,
+      };
+    } catch (err: unknown) {
+      const errorMsg = this.extractErrorMessage(err);
+      console.error('[SmtpMailService] Gagal kirim kata sandi pemilih via SMTP:', errorMsg);
+
+      const isDevEnv = process.env.NODE_ENV !== 'production' || process.env.APP_ENV === 'development';
+      if (isDevEnv) {
+        console.warn(`[DEV FAIL-SAFE] Kata sandi mail fallback untuk ${to} (NIM: ${nim}): ${errorMsg}`);
+        console.log(`📧 [DEV EMAIL FALLBACK] KATA SANDI PEMILIH: [ ${password} ]`);
+        return {
+          success: true,
+          isDevFallback: true,
+          messageId: `dev-pwd-failsafe-${Date.now()}-${nim}`,
         };
       }
 

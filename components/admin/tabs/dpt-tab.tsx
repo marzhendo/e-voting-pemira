@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  KeyRound,
   Loader2,
   Search,
   Trash2,
@@ -65,6 +66,10 @@ export interface DptTabProps {
   onPageSizeChange: (size: number) => void;
   onPrevPage: () => void;
   onNextPage: () => void;
+  onGenerateBatchPasswords?: (generation?: string) => void;
+  isGeneratingPasswords?: boolean;
+  onResendVoterPassword?: (voter: VoterRow) => void;
+  resendingPasswordNim?: string | null;
 }
 
 export function DptTab({
@@ -108,6 +113,10 @@ export function DptTab({
   onPageSizeChange,
   onPrevPage,
   onNextPage,
+  onGenerateBatchPasswords,
+  isGeneratingPasswords = false,
+  onResendVoterPassword,
+  resendingPasswordNim = null,
 }: DptTabProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -130,6 +139,21 @@ export function DptTab({
           >
             <UserPlus className="w-3.5 h-3.5 text-primary" />
             <span>+ Pemilih Uji Coba</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onGenerateBatchPasswords?.(selectedGeneration)}
+            disabled={isGeneratingPasswords || loadingVoters}
+            title="Terbitkan kata sandi unik untuk pemilih DPT yang belum memiliki sandi"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/30 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            {isGeneratingPasswords ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            ) : (
+              <KeyRound className="w-3.5 h-3.5 text-primary" />
+            )}
+            <span>{isGeneratingPasswords ? "Menerbitkan..." : "Terbitkan Sandi"}</span>
           </button>
 
           <button
@@ -395,17 +419,16 @@ export function DptTab({
                 <th className="py-3 px-5">Nama Mahasiswa</th>
                 <th className="py-3 px-5">Email SSO</th>
                 <th className="py-3 px-5">Angkatan</th>
-                <th className="py-3 px-5">Status</th>
-                {userRole === "super_admin" && (
-                  <th className="py-3 px-5 text-right w-20">Aksi</th>
-                )}
+                <th className="py-3 px-5">Hak Suara</th>
+                <th className="py-3 px-5">Sandi Pemilih</th>
+                <th className="py-3 px-5 text-right w-24">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
               {loadingVoters ? (
                 <tr>
                   <td
-                    colSpan={userRole === "super_admin" ? 7 : 5}
+                    colSpan={userRole === "super_admin" ? 8 : 7}
                     className="py-8 text-center text-on-surface-variant"
                   >
                     Memuat data pemilih...
@@ -414,7 +437,7 @@ export function DptTab({
               ) : voters.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={userRole === "super_admin" ? 7 : 5}
+                    colSpan={userRole === "super_admin" ? 8 : 7}
                     className="py-8 text-center text-on-surface-variant"
                   >
                     Tidak ada data yang cocok dengan pencarian.
@@ -463,28 +486,56 @@ export function DptTab({
                         </span>
                       )}
                     </td>
-                    {userRole === "super_admin" && (
-                      <td className="py-3 px-5 text-right">
-                        {v.email?.toLowerCase() ===
-                        "marzhendogalangs@gmail.com" ? (
-                          <span
-                            className="text-[10px] text-primary/70 font-mono italic"
-                            title="Akun Superadmin Utama (Dilindungi)"
-                          >
-                            Utama
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => onRequestDeleteVoter(v)}
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                            title={`Hapus ${v.name} (${v.nim}) dari DPT`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                    <td className="py-3 px-5">
+                      {v.has_password ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Telah Terbit
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[11px] font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                          Belum Terbit
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onResendVoterPassword?.(v)}
+                          disabled={resendingPasswordNim === v.nim}
+                          title={`Reset & Kirim Ulang Sandi ke ${v.email}`}
+                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {resendingPasswordNim === v.nim ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                          ) : (
+                            <KeyRound className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        {userRole === "super_admin" && (
+                          v.email?.toLowerCase() ===
+                          "marzhendogalangs@gmail.com" ? (
+                            <span
+                              className="text-[10px] text-primary/70 font-mono italic px-1"
+                              title="Akun Superadmin Utama (Dilindungi)"
+                            >
+                              Utama
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => onRequestDeleteVoter(v)}
+                              className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                              title={`Hapus ${v.name} (${v.nim}) dari DPT`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )
                         )}
-                      </td>
-                    )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

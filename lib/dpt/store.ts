@@ -13,6 +13,10 @@ export interface VoterRecord {
   role?: AdminRole | 'voter';
   receipt_hash?: string;
   voted_at?: string;
+  password_hash?: string | null;
+  password_created_at?: string | null;
+  login_attempts?: number;
+  locked_until?: string | null;
   updated_at?: string;
   created_at?: string;
 }
@@ -456,4 +460,71 @@ export function resetAllVoters(mode: 'reset_to_default' | 'clear_all' | 'reset_v
   }
 
   return { success: false, count: 0 };
+}
+
+/**
+ * Menyimpan hash kata sandi pemilih di dev store (in-memory & json file).
+ */
+export function setVoterPasswordHash(identifier: string, hash: string): boolean {
+  const current = getAllVoters();
+  const clean = identifier.trim().toLowerCase();
+  let found = false;
+
+  const updated = current.map((v) => {
+    if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean) {
+      found = true;
+      return {
+        ...v,
+        password_hash: hash,
+        password_created_at: new Date().toISOString(),
+        login_attempts: 0,
+        locked_until: null,
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return v;
+  });
+
+  if (found) {
+    saveVotersStore(updated);
+  }
+  return found;
+}
+
+/**
+ * Memperbarui jumlah percobaan login gagal dan waktu penguncian jika ada.
+ */
+export function updateVoterLoginAttempts(
+  identifier: string,
+  attempts: number,
+  lockedUntil?: string | null
+): boolean {
+  const current = getAllVoters();
+  const clean = identifier.trim().toLowerCase();
+  let found = false;
+
+  const updated = current.map((v) => {
+    if (v.nim.toLowerCase() === clean || v.email.toLowerCase() === clean || v.id === clean) {
+      found = true;
+      return {
+        ...v,
+        login_attempts: attempts,
+        locked_until: lockedUntil !== undefined ? lockedUntil : v.locked_until,
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return v;
+  });
+
+  if (found) {
+    saveVotersStore(updated);
+  }
+  return found;
+}
+
+/**
+ * Mereset status percobaan login pemilih ke 0 setelah login berhasil.
+ */
+export function resetVoterLoginAttempts(identifier: string): boolean {
+  return updateVoterLoginAttempts(identifier, 0, null);
 }

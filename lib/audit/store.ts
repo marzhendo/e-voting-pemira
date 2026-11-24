@@ -20,7 +20,9 @@ export type AuditActionType =
   | 'ADMIN_CREATE'
   | 'ADMIN_UPDATE_ROLE'
   | 'ADMIN_REVOKE'
-  | 'ADMIN_LOGIN';
+  | 'ADMIN_LOGIN'
+  | 'VOTER_PASSWORD_BATCH_GENERATION'
+  | 'VOTER_PASSWORD_RESET';
 
 export interface AuditLogEntry {
   id: string;

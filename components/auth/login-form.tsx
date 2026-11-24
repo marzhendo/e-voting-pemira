@@ -11,47 +11,40 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Mail,
+  User,
+  KeyRound,
+  Eye,
+  EyeOff,
   CheckCircle2,
   RefreshCw,
+  HelpCircle,
 } from "lucide-react";
 
 function getAuthErrorDisplay(
   urlError: string | null,
   urlMessage: string | null,
   errorMessage: string | null,
-  step?: "nim" | "pin",
 ): { title: string; message: string } | null {
-  // 1. Error dari aksi klien (input NIM / verifikasi PIN)
+  // 1. Error dari respons API login
   if (errorMessage) {
     const lower = errorMessage.toLowerCase();
 
-    // Jika sedang di tahap verifikasi PIN
-    if (step === "pin") {
-      if (lower.includes("kedaluwarsa") || lower.includes("expired")) {
-        return {
-          title: "Kode PIN Kedaluwarsa",
-          message: errorMessage,
-        };
-      }
-      if (
-        lower.includes("batas") ||
-        lower.includes("terkunci") ||
-        lower.includes("percobaan") ||
-        lower.includes("habis")
-      ) {
-        return {
-          title: "Percobaan Melebihi Batas",
-          message: errorMessage,
-        };
-      }
+    if (
+      lower.includes("terkunci") ||
+      lower.includes("lockout") ||
+      lower.includes("batas percobaan")
+    ) {
       return {
-        title: "Kode PIN Tidak Sesuai",
+        title: "Akun Sementara Terkunci",
         message: errorMessage,
       };
     }
-
-    // Jika sedang di tahap input NIM
+    if (lower.includes("sandi") || lower.includes("password")) {
+      return {
+        title: "Kata Sandi Tidak Sesuai",
+        message: errorMessage,
+      };
+    }
     if (lower.includes("pemeliharaan") || lower.includes("maintenance")) {
       return {
         title: "Bilik Suara Dalam Pemeliharaan",
@@ -70,36 +63,13 @@ function getAuthErrorDisplay(
         message: errorMessage,
       };
     }
-    if (
-      lower.includes("tunggu") ||
-      lower.includes("detik") ||
-      lower.includes("rate") ||
-      lower.includes("cooldown")
-    ) {
-      return {
-        title: "Batas Frekuensi Permintaan",
-        message: errorMessage,
-      };
-    }
-    if (
-      lower.includes("email") ||
-      lower.includes("kirim") ||
-      lower.includes("server") ||
-      lower.includes("smtp") ||
-      lower.includes("pin")
-    ) {
-      return {
-        title: "Gagal Mengirim Kode PIN",
-        message: errorMessage,
-      };
-    }
     return {
       title: "Gagal Masuk",
       message: errorMessage,
     };
   }
 
-  // 2. Pemetaan pengalihan URL (Middleware) ke bahasa yang manusiawi
+  // 2. Pemetaan error pengalihan middleware
   if (
     urlError === "ADMIN_AUTH_REQUIRED" ||
     (urlError === "AUTH_REQUIRED" && urlMessage?.includes("panitia"))
@@ -107,7 +77,7 @@ function getAuthErrorDisplay(
     return {
       title: "Perlu Akun Panitia",
       message:
-        "Halaman dashboard hanya dapat diakses oleh Panitia KPR. Jika kamu pemilih, silakan masuk ke bilik suara menggunakan NIM.",
+        "Halaman dashboard hanya dapat diakses oleh Panitia KPR. Jika kamu pemilih, silakan masuk ke bilik suara menggunakan NIM dan kata sandi pemilih.",
     };
   }
 
@@ -125,9 +95,9 @@ function getAuthErrorDisplay(
     urlError === "AUTH_REQUIRED"
   ) {
     return {
-      title: "Sesi Perlu Diperbarui",
+      title: "Sesi Berakhir",
       message:
-        "Waktu sesi bilik suaramu sudah berakhir. Silakan masukkan NIM untuk meminta kode PIN baru.",
+        "Waktu sesi pemilihan kamu telah selesai. Silakan masukkan kembali NIM dan kata sandi pemilih.",
     };
   }
 
@@ -163,13 +133,9 @@ export function LoginForm({
   const urlMessage = searchParams.get("message");
   const urlError = searchParams.get("error");
 
-  // Step 1: 'nim' | Step 2: 'pin'
-  const [step, setStep] = useState<"nim" | "pin">("nim");
   const [identifier, setIdentifier] = useState("");
-  const [pin, setPin] = useState("");
-  const [isPinFocused, setIsPinFocused] = useState(false);
-  const [maskedEmail, setMaskedEmail] = useState("");
-  const [cooldown, setCooldown] = useState(0);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -177,6 +143,7 @@ export function LoginForm({
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(
     null,
   );
+  const [lockoutMinutes, setLockoutMinutes] = useState<number | null>(null);
 
   // Status Pemeliharaan & Mode Admin Tersembunyi (Secret Trigger 3x Logo)
   const [isMaintenance, setIsMaintenance] = useState(initialMaintenance);
@@ -203,7 +170,6 @@ export function LoginForm({
   }, [initialMaintenance]);
 
   useEffect(() => {
-    // Parameter URL ?admin=1 atau ?admin=true langsung membuka form login admin
     const adminParam = searchParams.get("admin");
     if (adminParam === "1" || adminParam === "true") {
       setIsAdminMode(true);
@@ -229,15 +195,6 @@ export function LoginForm({
       .catch(() => {});
   }, [searchParams]);
 
-  // Cooldown countdown timer
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const timer = setInterval(() => {
-      setCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [cooldown]);
-
   // Secret Trigger: 3x klik logo HMIF dalam 1.5 detik memunculkan/menutup form admin
   const handleLogoClick = () => {
     const now = Date.now();
@@ -249,6 +206,8 @@ export function LoginForm({
       setLogoClicks([]);
       setErrorMessage(null);
       setSuccessNotice(null);
+      setRemainingAttempts(null);
+      setLockoutMinutes(null);
     }
   };
 
@@ -262,7 +221,7 @@ export function LoginForm({
         if (!data.electionStatus.maintenanceMode) {
           setIsMaintenance(false);
           setSuccessNotice(
-            "Pemeliharaan sistem telah selesai. Silakan masukkan NIM kamu.",
+            "Pemeliharaan sistem telah selesai. Silakan masukkan NIM dan kata sandi kamu.",
           );
         } else {
           const now = new Date();
@@ -280,12 +239,13 @@ export function LoginForm({
     }
   };
 
-  // Request OTP (Step 1)
-  async function handleRequestOtp(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const cleanId = identifier.trim();
+  // Submit Login dengan NIM dan Kata Sandi Pemilih
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanNim = identifier.trim();
+    const cleanPassword = password.trim();
 
-    if (!cleanId || cleanId.length < 4) {
+    if (!cleanNim || cleanNim.length < 4) {
       setErrorMessage(
         isAdminMode
           ? "Masukkan email atau NIM admin yang valid."
@@ -294,15 +254,25 @@ export function LoginForm({
       return;
     }
 
+    if (!cleanPassword || cleanPassword.length < 4) {
+      setErrorMessage("Masukkan kata sandi pemilih minimal 4 karakter.");
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessNotice(null);
+    setRemainingAttempts(null);
+    setLockoutMinutes(null);
 
     try {
-      const res = await fetch("/api/auth/otp/request", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: cleanId }),
+        body: JSON.stringify({
+          nim: cleanNim,
+          password: cleanPassword,
+        }),
       });
 
       const data = await res.json();
@@ -311,78 +281,33 @@ export function LoginForm({
         if (data?.code === "MAINTENANCE_MODE") {
           setIsMaintenance(true);
         }
-        setErrorMessage(data.error || "Gagal mengirim kode PIN verifikasi.");
-        if (data.cooldownSeconds) {
-          setCooldown(data.cooldownSeconds);
-        }
-        return;
-      }
-
-      setMaskedEmail(data.maskedEmail || "email SSO kampus");
-      setCooldown(data.cooldownSeconds || 60);
-      setSuccessNotice(
-        data.hasVoted
-          ? `Hak suara kamu sudah digunakan. Kode PIN verifikasi tanda terima dikirim ke ${data.maskedEmail || "email SSO kampus"}.`
-          : `Kode PIN 6-digit dikirim ke ${data.maskedEmail || "email SSO kampus"}.`,
-      );
-      setStep("pin");
-      setPin("");
-    } catch {
-      setErrorMessage("Terjadi gangguan jaringan saat meminta kode PIN.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // Verify OTP (Step 2)
-  async function handleVerifyOtp(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const cleanPin = pin.trim();
-
-    if (!/^\d{6}$/.test(cleanPin)) {
-      setErrorMessage("Kode PIN harus tepat 6 digit angka.");
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-    setSuccessNotice(null);
-
-    try {
-      const res = await fetch("/api/auth/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          identifier: identifier.trim(),
-          pin: cleanPin,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        setErrorMessage(data.error || "Kode PIN salah atau telah kedaluwarsa.");
-        if (typeof data.remainingAttempts === "number") {
+        if (typeof data?.remainingAttempts === "number") {
           setRemainingAttempts(data.remainingAttempts);
         }
+        if (typeof data?.lockoutMinutes === "number") {
+          setLockoutMinutes(data.lockoutMinutes);
+        }
+        setErrorMessage(data?.error || "Gagal masuk. Periksa kembali NIM dan kata sandi kamu.");
         return;
       }
 
       const isStaff = data.user?.role && data.user.role !== "voter";
       const hasVoted = Boolean(data.user?.hasVoted);
+
       setSuccessNotice(
         isStaff
-          ? "Terverifikasi sebagai Administrator. Membuka dashboard..."
+          ? "Terverifikasi sebagai administrator. Membuka dashboard..."
           : hasVoted
           ? "Terverifikasi. Membuka tanda terima pemilihan..."
           : "Terverifikasi. Membuka bilik suara...",
       );
+
       setTimeout(() => {
         window.location.href =
-          data.redirectTo || (isStaff ? "/admin/dashboard" : hasVoted ? "/receipt" : "/vote");
-      }, 600);
+          data.redirectUrl || (isStaff ? "/admin/dashboard" : hasVoted ? "/receipt" : "/vote");
+      }, 500);
     } catch {
-      setErrorMessage("Terjadi gangguan jaringan saat memverifikasi kode PIN.");
+      setErrorMessage("Terjadi gangguan jaringan saat memproses login.");
     } finally {
       setIsLoading(false);
     }
@@ -421,14 +346,8 @@ export function LoginForm({
     }
   }
 
-  const errorDisplay = getAuthErrorDisplay(
-    urlError,
-    urlMessage,
-    errorMessage,
-    step,
-  );
-  const hasPinError = Boolean(errorDisplay && step === "pin");
-  const hasNimError = Boolean(errorDisplay && step === "nim" && errorMessage);
+  const errorDisplay = getAuthErrorDisplay(urlError, urlMessage, errorMessage);
+  const isInputLocked = lockoutMinutes !== null && lockoutMinutes > 0;
 
   return (
     <div className="w-full flex flex-col justify-between">
@@ -437,6 +356,7 @@ export function LoginForm({
         <div
           onClick={handleLogoClick}
           className="relative w-14 h-14 shrink-0 flex items-center justify-center select-none cursor-default"
+          title={isAdminMode ? "Mode Admin Aktif" : "Logo HMIF"}
         >
           <Image
             src="/assets/img/hmif-logo.png"
@@ -474,7 +394,7 @@ export function LoginForm({
                 Masuk Administrator
               </h1>
               <p className="text-sm text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto">
-                Masukkan NIM akun panitia untuk mengelola sistem.
+                Masukkan NIM atau email panitia dan kata sandi akun untuk mengelola sistem.
               </p>
             </>
           ) : (
@@ -483,8 +403,7 @@ export function LoginForm({
                 Waktunya Memilih.
               </h1>
               <p className="text-sm text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto text-pretty">
-                Ketik NIM kamu untuk menerima kode PIN verifikasi di email SSO
-                kampus (@student.telkomuniversity.ac.id).
+                Masukkan NIM dan kata sandi pemilih yang telah dikirimkan ke email resmi kampus kamu.
               </p>
             </>
           )}
@@ -494,7 +413,7 @@ export function LoginForm({
       {/* 2. Interactive Feedback Banners (Error / Success) */}
       <div className="space-y-3 mb-4">
         <AnimatePresence>
-          {errorDisplay && !errorMessage && (
+          {errorDisplay && (
             <motion.div
               key="error-banner"
               initial={{ opacity: 0, y: -6 }}
@@ -509,36 +428,41 @@ export function LoginForm({
                 <div className="mt-0.5 text-on-surface-variant leading-relaxed">
                   {errorDisplay.message}
                 </div>
+                {remainingAttempts !== null && remainingAttempts > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-error">
+                    Sisa kesempatan login: {remainingAttempts} kali sebelum akun terkunci.
+                  </p>
+                )}
+                {lockoutMinutes !== null && lockoutMinutes > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-error">
+                    Akun terkunci selama {lockoutMinutes} menit demi keamanan.
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         <AnimatePresence>
-          {successNotice &&
-            (step !== "pin" ||
-              successNotice.includes("berhasil") ||
-              successNotice.includes("Terverifikasi") ||
-              successNotice.includes("selesai")) && (
-              <motion.div
-                key="success-banner"
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
-                className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-300 flex items-start gap-2.5"
-              >
-                <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" />
-                <span className="flex-1 leading-relaxed">{successNotice}</span>
-              </motion.div>
-            )}
+          {successNotice && (
+            <motion.div
+              key="success-banner"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
+              className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-300 flex items-start gap-2.5"
+            >
+              <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" />
+              <span className="flex-1 leading-relaxed">{successNotice}</span>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
-      {/* 3. Main Content: Maintenance State vs Interactive Form */}
+      {/* 3. Main Content: Maintenance State vs Single-Screen Login Form */}
       {isMaintenance && !isAdminMode ? (
         <div className="space-y-4 pt-1 flex flex-col justify-end">
-          {/* Slot status feedback dengan tinggi tetap (zero layout shift) */}
           <div className="min-h-[20px] flex items-center justify-center text-xs text-center text-on-surface-variant font-medium">
             {isCheckingStatus ? (
               <span className="text-on-surface-variant/80">
@@ -548,17 +472,16 @@ export function LoginForm({
               <span>{checkStatusNotice}</span>
             ) : (
               <span className="text-on-surface-variant/50">
-                Klik tombol untuk memverifikasi status
+                Klik tombol untuk memeriksa status bilik suara
               </span>
             )}
           </div>
 
-          {/* Action Button: Cek Status Sekarang */}
           <button
             type="button"
             onClick={handleCheckStatus}
             disabled={isCheckingStatus}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-transform duration-100 active:scale-[0.96] shadow-sm disabled:opacity-60 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none min-h-[44px]"
+            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-transform duration-100 active:scale-[0.98] shadow-sm disabled:opacity-60 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none min-h-[44px]"
           >
             <RefreshCw
               className={`w-4 h-4 ${isCheckingStatus ? "animate-spin" : ""}`}
@@ -569,256 +492,123 @@ export function LoginForm({
           </button>
         </div>
       ) : (
-        /* Regular Login Form (or Admin Login Form if isAdminMode is true) */
-        <div className="w-full space-y-4">
-          <AnimatePresence mode="wait">
-            {step === "nim" ? (
-              <motion.form
-                key="step-nim"
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
-                onSubmit={handleRequestOtp}
-                className="space-y-4"
+        <form onSubmit={handleLogin} className="space-y-4">
+          {/* Input NIM / Identitas */}
+          <div>
+            <label
+              htmlFor="identifier"
+              className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
+            >
+              {isAdminMode ? "NIM atau Email Panitia" : "NIM"}
+            </label>
+            <div className="relative">
+              <input
+                id="identifier"
+                type="text"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => {
+                  if (errorMessage) setErrorMessage(null);
+                  setIdentifier(e.target.value);
+                }}
+                placeholder={
+                  isAdminMode
+                    ? "Contoh: panitia@telkomuniversity.ac.id"
+                    : "Contoh: 103012300001"
+                }
+                disabled={isLoading || isInputLocked}
+                className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:ring-primary text-sm font-medium transition-all outline-none min-h-[44px] disabled:opacity-50"
+              />
+              <User className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Input Kata Sandi Pemilih */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor="password"
+                className="block text-xs font-bold uppercase tracking-wider text-on-surface"
               >
-                <div>
-                  <label
-                    htmlFor="identifier"
-                    className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
-                  >
-                    NIM
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="identifier"
-                      type="text"
-                      autoComplete="username"
-                      value={identifier}
-                      onChange={(e) => {
-                        if (errorMessage) setErrorMessage(null);
-                        setIdentifier(e.target.value);
-                      }}
-                      placeholder="Contoh: 103012300001"
-                      disabled={isLoading}
-                      className={`w-full h-12 pl-11 pr-4 rounded-xl border text-sm font-medium transition-all outline-none focus-visible:ring-2 ${
-                        hasNimError
-                          ? "border-2 border-error bg-error/10 text-error focus:border-error focus-visible:ring-error/20"
-                          : "border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:ring-primary"
-                      }`}
-                    />
-                    <Mail
-                      className={`w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none ${
-                        hasNimError ? "text-error" : "text-on-surface-variant"
-                      }`}
-                    />
-                  </div>
-                  {hasNimError && (
-                    <p className="mt-1.5 text-xs text-error font-medium flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        {errorDisplay?.message || "Masukkan data yang valid."}
-                      </span>
-                    </p>
-                  )}
-                </div>
-
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
-                  type="submit"
-                  disabled={isLoading || !identifier.trim()}
-                  className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
-                      <span>Mengirim Kode PIN...</span>
-                    </>
-                  ) : (
-                    <span>Kirim Kode PIN</span>
-                  )}
-                </motion.button>
-
-                {!isAdminMode && !hasNimError && (
-                  <div className="flex items-center gap-2 text-sm text-on-surface-variant justify-center text-center pt-1 font-medium">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>
-                      Hanya untuk mahasiswa aktif Informatika terdaftar di DPT.
-                    </span>
-                  </div>
+                {isAdminMode ? "Kata Sandi Akun" : "Kata Sandi Pemilih"}
+              </label>
+            </div>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                autoCapitalize="characters"
+                value={password}
+                onChange={(e) => {
+                  if (errorMessage) setErrorMessage(null);
+                  setPassword(e.target.value);
+                }}
+                placeholder={isAdminMode ? "Masukkan kata sandi" : "Contoh: 7K9P-2M4X"}
+                disabled={isLoading || isInputLocked}
+                className="w-full h-12 pl-11 pr-12 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:ring-primary text-sm font-mono tracking-wider transition-all outline-none min-h-[44px] disabled:opacity-50"
+              />
+              <KeyRound className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
+                aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
                 )}
-              </motion.form>
+              </button>
+            </div>
+          </div>
+
+          {/* Tombol Masuk */}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
+            type="submit"
+            disabled={isLoading || !identifier.trim() || !password.trim() || isInputLocked}
+            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-transform duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px] shadow-sm"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                <span>Memverifikasi...</span>
+              </>
             ) : (
-              <motion.form
-                key="step-pin"
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
-                onSubmit={handleVerifyOtp}
-                className="space-y-4"
-              >
-                <div>
-                  <label
-                    htmlFor="pin"
-                    className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
-                  >
-                    Kode PIN 6 Digit
-                  </label>
-
-                  <div className="relative">
-                    <input
-                      id="pin"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      autoFocus
-                      autoComplete="one-time-code"
-                      value={pin}
-                      onChange={(e) => {
-                        if (errorMessage) setErrorMessage(null);
-                        setPin(e.target.value.replace(/\D/g, "").slice(0, 6));
-                      }}
-                      onFocus={() => setIsPinFocused(true)}
-                      onBlur={() => setIsPinFocused(false)}
-                      disabled={isLoading}
-                      className="absolute inset-0 w-full h-full text-transparent bg-transparent border-0 outline-none focus:outline-none z-10 cursor-pointer caret-transparent"
-                      aria-label="Kode PIN 6 Digit"
-                    />
-
-                    {/* Tampilan Visual 6-Box Segmented OTP */}
-                    <div
-                      className={`grid grid-cols-6 gap-2 sm:gap-2.5 p-1 rounded-2xl transition-all ${
-                        hasPinError
-                          ? "ring-2 ring-error/30"
-                          : isPinFocused
-                            ? "ring-2 ring-primary/20"
-                            : ""
-                      }`}
-                    >
-                      {[0, 1, 2, 3, 4, 5].map((idx) => {
-                        const char = pin[idx];
-                        const isFilled = Boolean(char);
-                        const isCurrent = isPinFocused && pin.length === idx;
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`h-12 sm:h-14 rounded-xl flex items-center justify-center transition-all duration-150 ${
-                              hasPinError
-                                ? "border-2 border-error bg-error/10 text-error shadow-xs"
-                                : isCurrent
-                                  ? "border-2 border-primary bg-surface-container-highest shadow-xs"
-                                  : isFilled
-                                    ? "border border-primary/50 bg-surface-container-high"
-                                    : "border border-outline-variant/40 bg-surface-container"
-                            }`}
-                          >
-                            {isFilled ? (
-                              <span
-                                className={`font-mono text-2xl sm:text-3xl font-bold ${hasPinError ? "text-error" : "text-on-surface"}`}
-                              >
-                                {char}
-                              </span>
-                            ) : isCurrent ? (
-                              <motion.span
-                                animate={{ opacity: [1, 0, 1] }}
-                                transition={{
-                                  repeat: Infinity,
-                                  duration: 0.9,
-                                  ease: "linear",
-                                }}
-                                className={`w-0.5 h-6 rounded-full ${hasPinError ? "bg-error" : "bg-primary"}`}
-                              />
-                            ) : (
-                              <span className="w-2.5 h-2.5 rounded-full bg-outline/30" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Status Pengiriman & Error Inline */}
-                  <div className="mt-2.5 flex items-center justify-between text-xs px-1 min-h-[20px]">
-                    {hasPinError ? (
-                      <div className="flex items-center gap-1.5 min-w-0 text-error animate-pulse">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-error" />
-                        <span className="truncate font-semibold">
-                          Kode PIN tidak sesuai{" "}
-                          {remainingAttempts !== null
-                            ? `(Sisa ${remainingAttempts}x)`
-                            : ""}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 min-w-0 text-on-surface-variant">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="truncate">
-                          Terkirim ke{" "}
-                          <span className="font-mono text-on-surface font-semibold">
-                            {maskedEmail}
-                          </span>
-                        </span>
-                      </div>
-                    )}
-                    <span className="text-xs text-on-surface-variant shrink-0 font-medium pl-2">
-                      Berlaku 10 mnt
-                    </span>
-                  </div>
-                </div>
-
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
-                  type="submit"
-                  disabled={isLoading || pin.length !== 6}
-                  className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
-                      <span>Memverifikasi PIN...</span>
-                    </>
-                  ) : (
-                    <span>
-                      {isAdminMode
-                        ? "Masuk ke Dashboard"
-                        : "Masuk ke Bilik Suara"}
-                    </span>
-                  )}
-                </motion.button>
-
-                {/* Tombol Kirim Ulang Kode PIN */}
-                <div className="pt-0.5 text-center">
-                  <button
-                    type="button"
-                    disabled={cooldown > 0 || isLoading}
-                    onClick={() => handleRequestOtp()}
-                    className="min-h-[44px] px-3.5 py-1.5 rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-on-surface-variant hover:text-primary hover:bg-surface-container disabled:text-on-surface-variant/50 disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw
-                      className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
-                    />
-                    <span>
-                      {cooldown > 0
-                        ? `Kirim ulang PIN dalam ${cooldown} detik`
-                        : "Belum menerima email? Kirim ulang PIN"}
-                    </span>
-                  </button>
-                </div>
-              </motion.form>
+              <span>
+                {isAdminMode ? "Masuk ke Dashboard" : "Masuk ke Bilik Suara"}
+              </span>
             )}
-          </AnimatePresence>
-        </div>
+          </motion.button>
+
+          {/* Petunjuk & Bantuan Kata Sandi */}
+          {!isAdminMode && (
+            <div className="space-y-2 pt-1 text-center">
+              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant justify-center font-medium">
+                <HelpCircle className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>
+                  Kata sandi pemilih dikirimkan melalui email resmi kampus kamu.
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant/80 justify-center">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>
+                  Hanya untuk mahasiswa aktif Informatika terdaftar di DPT.
+                </span>
+              </div>
+            </div>
+          )}
+        </form>
       )}
 
-      {/* 4. Card Footer: Panitia Support (Satu-satunya tautan bantuan resmi, zero redundansi) */}
+      {/* 4. Card Footer: Panitia Support */}
       <div className="pt-5 border-t border-outline-variant/20 text-center mt-6">
         <p className="text-sm text-on-surface-variant font-medium">
-          Butuh bantuan atau informasi DPT?{" "}
+          Belum menerima kata sandi atau kendala DPT?{" "}
           <a
             href="https://wa.me/6281809300406"
             target="_blank"

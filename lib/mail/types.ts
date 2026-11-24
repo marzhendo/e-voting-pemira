@@ -5,6 +5,14 @@ export interface SendPinPayload {
   pin: string;
 }
 
+export interface SendVoterPasswordPayload {
+  to: string;
+  voterName: string;
+  nim: string;
+  password: string;
+  loginUrl?: string;
+}
+
 export interface SendBroadcastPayload {
   to: string;
   voterName: string;
@@ -25,5 +33,6 @@ export interface MailDeliveryResult {
 
 export interface MailService {
   sendLoginPin(payload: SendPinPayload): Promise<MailDeliveryResult>;
+  sendVoterPassword(payload: SendVoterPasswordPayload): Promise<MailDeliveryResult>;
   sendBroadcastEmail(payload: SendBroadcastPayload): Promise<MailDeliveryResult>;
 }
