@@ -583,29 +583,29 @@ export function LoginForm({
             )}
           </motion.button>
 
-          {/* Toggle Akses Administrator / Bilik Suara Mahasiswa */}
-          <div className="pt-0.5 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdminMode((prev) => !prev);
-                setErrorMessage(null);
-                setSuccessNotice(null);
-                setRemainingAttempts(null);
-                setLockoutMinutes(null);
-              }}
-              className="text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors cursor-pointer py-1 px-2.5 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-            >
-              {isAdminMode
-                ? "← Kembali ke Bilik Suara Mahasiswa"
-                : "Masuk sebagai Administrator / Panitia KPR →"}
-            </button>
-          </div>
+          {/* Opsi kembali ke bilik suara (hanya tampil saat mode admin aktif) */}
+          {isAdminMode && (
+            <div className="pt-0.5 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminMode(false);
+                  setErrorMessage(null);
+                  setSuccessNotice(null);
+                  setRemainingAttempts(null);
+                  setLockoutMinutes(null);
+                }}
+                className="text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors cursor-pointer py-1 px-2.5 rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              >
+                ← Kembali ke Bilik Suara Mahasiswa
+              </button>
+            </div>
+          )}
         </form>
       )}
 
       {/* 4. Card Footer: Panitia Support */}
-      <div className="pt-3.5 border-t border-outline-variant/20 text-center mt-4">
+      <div className="pt-3 border-t border-outline-variant/20 text-center mt-3.5">
         <p className="text-xs text-on-surface-variant font-medium">
           Kendala DPT atau kata sandi?{" "}
           <a
