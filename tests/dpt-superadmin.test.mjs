@@ -8,6 +8,7 @@ import {
   resetAllVoters,
   resetVotersStore,
   markVoterAsVoted,
+  recordEmailDelivery,
 } from '../lib/dpt/store.ts';
 import {
   getAllBallots,
@@ -190,5 +191,57 @@ test.describe('Superadmin DPT Management & Ballot Secrecy Invariants', () => {
     const ballotsAfter = getAllBallots();
     assert.strictEqual(ballotsAfter.length, 1, 'Anonymous ballot count must remain 1');
     assert.strictEqual(ballotsAfter[0].candidate_id, '11111111-1111-1111-1111-111111111111');
+  });
+
+  test('5. recordEmailDelivery records delivery outcome and preserves ballot secrecy', async () => {
+    const testNim1 = '103012999101';
+    const testNim2 = '103012999102';
+
+    addSingleVoter({
+      nim: testNim1,
+      name: 'Penerima Sukses',
+      email: 'sukses@student.telkomuniversity.ac.id',
+      generation: 2024,
+    });
+
+    addSingleVoter({
+      nim: testNim2,
+      name: 'Penerima Gagal',
+      email: 'gagal@student.telkomuniversity.ac.id',
+      generation: 2024,
+    });
+
+    // Initial state: not contacted
+    const votersInitial = getAllVoters();
+    const v1Init = votersInitial.find((v) => v.nim === testNim1);
+    assert.strictEqual(v1Init?.last_email_status, undefined);
+    assert.strictEqual(v1Init?.last_email_sent_at, undefined);
+
+    // Record success on voter 1
+    const res1 = await recordEmailDelivery(testNim1, { success: true });
+    assert.strictEqual(res1.success, true);
+
+    // Record failure on voter 2
+    const res2 = await recordEmailDelivery(testNim2, {
+      success: false,
+      error: '550 User mailbox quota exceeded',
+    });
+    assert.strictEqual(res2.success, true);
+
+    const votersAfter = getAllVoters();
+    const v1Updated = votersAfter.find((v) => v.nim === testNim1);
+    const v2Updated = votersAfter.find((v) => v.nim === testNim2);
+
+    assert.strictEqual(v1Updated?.last_email_status, 'sent');
+    assert.ok(v1Updated?.last_email_sent_at);
+    assert.strictEqual(v1Updated?.last_email_error, null);
+
+    assert.strictEqual(v2Updated?.last_email_status, 'failed');
+    assert.strictEqual(v2Updated?.last_email_sent_at, null);
+    assert.strictEqual(v2Updated?.last_email_error, '550 User mailbox quota exceeded');
+
+    // Invariant check: ballots table is completely empty and untouched
+    const ballots = getAllBallots();
+    assert.strictEqual(ballots.length, 0, 'Email delivery recording must never create or touch ballots');
   });
 });

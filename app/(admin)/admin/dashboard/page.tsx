@@ -136,7 +136,7 @@ export default function AdminDashboardPage() {
   const [toggleReason, setToggleReason] = useState<string>('');
 
   // Broadcast Email State
-  const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted'>('not_voted');
+  const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted' | 'failed_email' | 'uncontacted'>('not_voted');
   const [broadcastGeneration, setBroadcastGeneration] = useState('all');
   const [broadcastTemplate, setBroadcastTemplate] = useState<'credentials' | 'reminder' | 'invitation' | 'custom'>('credentials');
   const [broadcastSubject, setBroadcastSubject] = useState('[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi Pemilih');
@@ -1152,7 +1152,8 @@ export default function AdminDashboardPage() {
     }
   }, [activeTab, fetchBroadcastCount]);
 
-  const handleExecuteBroadcast = async () => {
+  const handleExecuteBroadcast = async (overrideTargetGroup?: 'not_voted' | 'all' | 'voted' | 'failed_email' | 'uncontacted') => {
+    const activeTarget = overrideTargetGroup || broadcastTargetGroup;
     setIsBroadcasting(true);
     setBroadcastError(null);
     setBroadcastResult(null);
@@ -1170,6 +1171,7 @@ export default function AdminDashboardPage() {
 
     const CHUNK_LIMIT = 20;
     let offset = 0;
+    let currentLastNim: string | undefined = undefined;
     let cumulativeSent = 0;
     let cumulativeFailed = 0;
     let hasMore = true;
@@ -1178,11 +1180,11 @@ export default function AdminDashboardPage() {
     try {
       while (hasMore) {
         const isLast = actualTotal > 0 && offset + CHUNK_LIMIT >= actualTotal;
-        const res = await fetch('/api/admin/broadcast-email', {
+        const res: Response = await fetch('/api/admin/broadcast-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            targetGroup: broadcastTargetGroup,
+            targetGroup: activeTarget,
             generation: broadcastGeneration,
             template: broadcastTemplate,
             includeCredentials: broadcastTemplate === 'credentials',
@@ -1193,6 +1195,7 @@ export default function AdminDashboardPage() {
             ctaUrl: broadcastCtaUrl || '/login',
             offset,
             limit: CHUNK_LIMIT,
+            lastNim: currentLastNim,
             isLastChunk: isLast,
             accumulatedStats: {
               sent: cumulativeSent,
@@ -1201,7 +1204,7 @@ export default function AdminDashboardPage() {
           }),
         });
 
-        const data = await res.json();
+        const data: any = await res.json();
         if (!res.ok) {
           throw new Error(data.error || 'Gagal memproses pengiriman batch email.');
         }
@@ -1214,6 +1217,7 @@ export default function AdminDashboardPage() {
 
         hasMore = data.stats.hasMore;
         offset = data.stats.nextOffset;
+        currentLastNim = data.stats.lastNim || undefined;
 
         setBroadcastProgress({
           current: currentProcessed,
@@ -2314,7 +2318,11 @@ export default function AdminDashboardPage() {
               setBroadcastProgress(null);
             }
           }}
-          onExecute={handleExecuteBroadcast}
+          onExecute={() => handleExecuteBroadcast()}
+          onRetryFailed={() => {
+            setBroadcastTargetGroup('failed_email');
+            handleExecuteBroadcast('failed_email');
+          }}
         />
 
         <QuickAddVoterModal

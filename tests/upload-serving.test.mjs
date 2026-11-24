@@ -83,4 +83,12 @@ test('Dynamic Upload File Serving Verification Suite', async (t) => {
       }
     }
   });
+
+  await t.test('5. Gracefully falls back to static candidate asset when uploaded file is missing', async () => {
+    const req = new Request('http://localhost:3000/uploads/candidates/1-1795509131373-ad1ca5a3.webp');
+    const res = await GET(req, { params: { path: ['candidates', '1-1795509131373-ad1ca5a3.webp'] } });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('content-type'), 'image/webp');
+  });
 });

@@ -289,13 +289,14 @@ export interface BroadcastConfirmModalProps {
   isBroadcasting: boolean;
   broadcastProgress?: BroadcastProgressState | null;
   broadcastTargetCount: number | null;
-  broadcastTargetGroup: "not_voted" | "all" | "voted";
+  broadcastTargetGroup: "not_voted" | "all" | "voted" | "failed_email" | "uncontacted";
   broadcastGeneration: string;
   availableGenerations: number[];
   broadcastSubject: string;
   broadcastTemplate?: "credentials" | "reminder" | "invitation" | "custom";
   onClose: () => void;
   onExecute: () => void;
+  onRetryFailed?: () => void;
 }
 
 export function BroadcastConfirmModal({
@@ -310,6 +311,7 @@ export function BroadcastConfirmModal({
   broadcastTemplate = "credentials",
   onClose,
   onExecute,
+  onRetryFailed,
 }: BroadcastConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -435,11 +437,25 @@ export function BroadcastConfirmModal({
                   </div>
                 )}
 
-                <div className="flex items-center justify-end pt-2 border-t border-outline-variant/20">
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-outline-variant/20">
+                  {failedCount > 0 && onRetryFailed && (
+                    <button
+                      type="button"
+                      onClick={onRetryFailed}
+                      className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>Kirim Ulang ({failedCount}) Email Gagal</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-full sm:w-auto h-11 px-6 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                    className={`w-full sm:w-auto h-11 px-6 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      failedCount > 0
+                        ? "bg-surface-container-highest text-on-surface hover:bg-surface-container-high border border-outline-variant/30"
+                        : "bg-primary text-on-primary hover:bg-secondary-fixed shadow-sm"
+                    }`}
                   >
                     <Check className="w-4 h-4" />
                     <span>Selesai &amp; Tutup</span>
@@ -555,7 +571,11 @@ export function BroadcastConfirmModal({
                         ? "Khusus yang Belum Memilih"
                         : broadcastTargetGroup === "all"
                           ? "Seluruh DPT"
-                          : "Khusus yang Sudah Memilih"}
+                          : broadcastTargetGroup === "voted"
+                            ? "Khusus yang Sudah Memilih"
+                            : broadcastTargetGroup === "failed_email"
+                              ? "Khusus yang Gagal Terkirim"
+                              : "Khusus Belum Pernah Terima Email"}
                     </span>
                   </div>
                   <div className="flex justify-between">

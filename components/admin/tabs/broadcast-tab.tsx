@@ -23,7 +23,7 @@ export interface BroadcastTabProps {
   broadcastResult: BroadcastResultSummary | null;
   broadcastError: string | null;
   broadcastTemplate: "credentials" | "reminder" | "invitation" | "custom";
-  broadcastTargetGroup: "not_voted" | "all" | "voted";
+  broadcastTargetGroup: "not_voted" | "all" | "voted" | "failed_email" | "uncontacted";
   broadcastGeneration: string;
   availableGenerations: number[];
   loadingBroadcastCount: boolean;
@@ -36,7 +36,7 @@ export interface BroadcastTabProps {
   isBroadcasting: boolean;
   onRefreshQuota: () => void;
   onSelectTemplate: (template: "credentials" | "reminder" | "invitation" | "custom") => void;
-  onTargetGroupChange: (group: "not_voted" | "all" | "voted") => void;
+  onTargetGroupChange: (group: "not_voted" | "all" | "voted" | "failed_email" | "uncontacted") => void;
   onGenerationChange: (generation: string) => void;
   onSubjectChange: (subject: string) => void;
   onHeadlineChange: (headline: string) => void;
@@ -282,7 +282,7 @@ export function BroadcastTab({
                   value={broadcastTargetGroup}
                   onChange={(e) =>
                     onTargetGroupChange(
-                      e.target.value as "not_voted" | "all" | "voted",
+                      e.target.value as "not_voted" | "all" | "voted" | "failed_email" | "uncontacted",
                     )
                   }
                   className="w-full bg-surface-container-lowest text-xs rounded-xl px-3.5 py-2.5 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
@@ -292,6 +292,8 @@ export function BroadcastTab({
                   </option>
                   <option value="all">Seluruh mahasiswa di DPT</option>
                   <option value="voted">Sudah memilih</option>
+                  <option value="failed_email">Gagal terkirim sebelumnya (Kirim Ulang)</option>
+                  <option value="uncontacted">Belum pernah menerima email</option>
                 </select>
               </div>
 

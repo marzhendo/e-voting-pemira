@@ -100,6 +100,19 @@ export async function POST(request: NextRequest) {
 
     await fs.writeFile(targetFilePath, buffer);
 
+    // If candidate photo, also persist to public/assets/candidates/ as permanent backup
+    if (subfolder === 'candidates' && safeCandidatePrefix) {
+      try {
+        const permanentAssetDir = path.join(process.cwd(), 'public', 'assets', 'candidates');
+        if (!existsSync(permanentAssetDir)) {
+          mkdirSync(permanentAssetDir, { recursive: true });
+        }
+        await fs.writeFile(path.join(permanentAssetDir, `paslon-${safeCandidatePrefix}.webp`), buffer);
+      } catch (err) {
+        console.warn('[AdminUploadRoute] Could not mirror to permanent assets:', err);
+      }
+    }
+
     const publicUrl = `/uploads/${subfolder}/${filename}`;
 
     return NextResponse.json({

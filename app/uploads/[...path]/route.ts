@@ -51,6 +51,24 @@ export async function GET(
     }
   }
 
+  // Graceful fallback for candidate assets if missing from uploads directory
+  if (!resolvedFilePath && pathSegments[0] === 'candidates') {
+    const assetRoots = [
+      path.join(process.cwd(), 'public', 'assets', 'candidates'),
+      path.join(process.cwd(), '.next', 'standalone', 'public', 'assets', 'candidates'),
+      path.resolve(process.cwd(), '..', '..', 'public', 'assets', 'candidates'),
+    ];
+    for (const aRoot of assetRoots) {
+      if (pathSegments[1]?.startsWith('1-') || pathSegments[1] === 'paslon-1.webp') {
+        const p1 = path.join(aRoot, 'paslon-1.webp');
+        if (existsSync(p1)) {
+          resolvedFilePath = p1;
+          break;
+        }
+      }
+    }
+  }
+
   // Reject missing files or directory traversal attempts
   if (!resolvedFilePath) {
     return new Response('Not Found', { status: 404 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portal } from "@/components/ui/portal";
@@ -37,6 +37,27 @@ export function CandidateDetailModal({
   onSelectCandidate,
 }: CandidateDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+
+  const [modalImgSrc, setModalImgSrc] = useState<string | null>(null);
+  const [modalImgFailed, setModalImgFailed] = useState(false);
+
+  useEffect(() => {
+    if (candidate) {
+      setModalImgSrc(sanitizeCandidateAssetUrl(candidate.photo_url));
+      setModalImgFailed(false);
+    }
+  }, [candidate]);
+
+  const handleModalImageError = () => {
+    if (candidate) {
+      const staticCandidateFallback = `/assets/candidates/paslon-${candidate.candidate_number}.webp`;
+      if (modalImgSrc && modalImgSrc !== staticCandidateFallback) {
+        setModalImgSrc(staticCandidateFallback);
+        return;
+      }
+    }
+    setModalImgFailed(true);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -137,12 +158,13 @@ export function CandidateDetailModal({
                   <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-surface-container-low p-6 rounded-2xl border border-outline-variant/20">
                     {/* Foto Paslon */}
                     <div className="relative w-40 h-48 sm:w-48 sm:h-56 shrink-0 rounded-2xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center shadow-md">
-                      {sanitizeCandidateAssetUrl(candidate.photo_url) ? (
+                      {!modalImgFailed && modalImgSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={sanitizeCandidateAssetUrl(candidate.photo_url)}
+                          src={modalImgSrc}
                           alt={`Paslon ${numberStr}`}
                           className="w-full h-full object-cover object-top"
+                          onError={handleModalImageError}
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-2 text-on-surface-variant p-4 text-center">

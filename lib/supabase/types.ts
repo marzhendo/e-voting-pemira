@@ -31,6 +31,9 @@ export interface Database {
           password_created_at: string | null;
           login_attempts: number;
           locked_until: string | null;
+          last_email_sent_at?: string | null;
+          last_email_status?: string | null;
+          last_email_error?: string | null;
           created_at: string;
         };
         Insert: {
@@ -52,6 +55,9 @@ export interface Database {
           password_created_at?: string | null;
           login_attempts?: number;
           locked_until?: string | null;
+          last_email_sent_at?: string | null;
+          last_email_status?: string | null;
+          last_email_error?: string | null;
           created_at?: string;
         };
         Update: {
@@ -73,6 +79,9 @@ export interface Database {
           password_created_at?: string | null;
           login_attempts?: number;
           locked_until?: string | null;
+          last_email_sent_at?: string | null;
+          last_email_status?: string | null;
+          last_email_error?: string | null;
           created_at?: string;
         };
         Relationships: [];

@@ -6,14 +6,14 @@ import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getClientIp } from '@/lib/auth/client-ip';
 import { recordAuditLog } from '@/lib/audit/store';
 import { smtpMailService } from '@/lib/mail/smtp-service';
-import { getAllVoters, setVoterPasswordHash } from '@/lib/dpt/store';
+import { getAllVoters, setVoterPasswordHash, recordEmailDelivery } from '@/lib/dpt/store';
 import { generateVoterPassword, hashVoterPassword } from '@/lib/auth/password-service';
 import { isDevFallbackAllowed } from '@/lib/security/env';
 
 export const dynamic = 'force-dynamic';
 
 const broadcastRequestSchema = z.object({
-  targetGroup: z.enum(['all', 'not_voted', 'voted']),
+  targetGroup: z.enum(['all', 'not_voted', 'voted', 'failed_email', 'uncontacted']),
   generation: z.string().default('all'),
   template: z.enum(['credentials', 'reminder', 'invitation', 'custom']).default('reminder'),
   includeCredentials: z.boolean().default(false),
@@ -24,6 +24,7 @@ const broadcastRequestSchema = z.object({
   ctaUrl: z.string().default('/login'),
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(0).default(0),
+  lastNim: z.string().optional(),
   isLastChunk: z.boolean().default(false),
   accumulatedStats: z
     .object({
@@ -55,6 +56,8 @@ export async function GET(request: NextRequest) {
 
       if (targetGroup === 'not_voted') query = query.eq('has_voted', false);
       if (targetGroup === 'voted') query = query.eq('has_voted', true);
+      if (targetGroup === 'failed_email') query = query.eq('last_email_status', 'failed');
+      if (targetGroup === 'uncontacted') query = query.is('last_email_sent_at', null);
       if (generation !== 'all') {
         const parsedGen = Number(generation);
         if (!Number.isInteger(parsedGen) || parsedGen < 2000 || parsedGen > 2100) {
@@ -98,6 +101,8 @@ export async function GET(request: NextRequest) {
   let filtered = getAllVoters();
   if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
   if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
+  if (targetGroup === 'failed_email') filtered = filtered.filter((v) => v.last_email_status === 'failed');
+  if (targetGroup === 'uncontacted') filtered = filtered.filter((v) => !v.last_email_sent_at);
   if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);
 
   return NextResponse.json({
@@ -155,6 +160,7 @@ export async function POST(request: NextRequest) {
       ctaUrl,
       offset,
       limit,
+      lastNim,
       isLastChunk,
       accumulatedStats,
     } = parsed.data;
@@ -170,12 +176,17 @@ export async function POST(request: NextRequest) {
 
       if (targetGroup === 'not_voted') query = query.eq('has_voted', false);
       if (targetGroup === 'voted') query = query.eq('has_voted', true);
+      if (targetGroup === 'failed_email') query = query.eq('last_email_status', 'failed');
+      if (targetGroup === 'uncontacted') query = query.is('last_email_sent_at', null);
       if (generation !== 'all') {
         const parsedGen = Number(generation);
         if (!Number.isInteger(parsedGen) || parsedGen < 2000 || parsedGen > 2100) {
           return NextResponse.json({ error: 'Parameter angkatan tidak valid.' }, { status: 400 });
         }
         query = query.eq('generation', parsedGen);
+      }
+      if (lastNim) {
+        query = query.gt('nim', lastNim);
       }
 
       query = query.order('nim', { ascending: true });
@@ -192,14 +203,17 @@ export async function POST(request: NextRequest) {
       let filtered = getAllVoters();
       if (targetGroup === 'not_voted') filtered = filtered.filter((v) => !v.has_voted);
       if (targetGroup === 'voted') filtered = filtered.filter((v) => v.has_voted);
+      if (targetGroup === 'failed_email') filtered = filtered.filter((v) => v.last_email_status === 'failed');
+      if (targetGroup === 'uncontacted') filtered = filtered.filter((v) => !v.last_email_sent_at);
       if (generation !== 'all') filtered = filtered.filter((v) => v.generation.toString() === generation);
+      if (lastNim) filtered = filtered.filter((v) => v.nim > lastNim);
       filtered.sort((a, b) => a.nim.localeCompare(b.nim));
       recipients = filtered;
     }
 
     const totalTarget = recipients.length;
 
-    if (totalTarget === 0) {
+    if (totalTarget === 0 && !lastNim) {
       return NextResponse.json(
         { error: 'Tidak ditemukan pemilih yang sesuai dengan kriteria filter yang dipilih.' },
         { status: 400 }
@@ -207,12 +221,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Tentukan penerima untuk batch / chunk saat ini
-    const recipientsToProcess = limit > 0
-      ? recipients.slice(offset, offset + limit)
-      : recipients;
+    const recipientsToProcess = lastNim
+      ? (limit > 0 ? recipients.slice(0, limit) : recipients)
+      : (limit > 0 ? recipients.slice(offset, offset + limit) : recipients);
 
-    const hasMore = limit > 0 ? (offset + recipientsToProcess.length) < totalTarget : false;
+    const hasMore = lastNim
+      ? (limit > 0 && recipients.length > limit)
+      : (limit > 0 ? (offset + recipientsToProcess.length) < totalTarget : false);
     const nextOffset = offset + recipientsToProcess.length;
+    const currentLastNim = recipientsToProcess.length > 0
+      ? recipientsToProcess[recipientsToProcess.length - 1].nim
+      : null;
 
     if (recipientsToProcess.length === 0) {
       return NextResponse.json({
@@ -225,8 +244,10 @@ export async function POST(request: NextRequest) {
           processedCount: 0,
           chunkSent: 0,
           chunkFailed: 0,
+          failedRecipients: [],
           hasMore: false,
           nextOffset: offset,
+          lastNim: currentLastNim,
         },
       });
     }
@@ -236,6 +257,7 @@ export async function POST(request: NextRequest) {
     const CHUNK_SIZE = 5;
     let chunkSent = 0;
     let chunkFailed = 0;
+    const failedRecipients: Array<{ nim: string; name: string; email: string; error?: string }> = [];
     let isUsingLegacyCols = false;
 
     for (let i = 0; i < recipientsToProcess.length; i += CHUNK_SIZE) {
@@ -285,20 +307,49 @@ export async function POST(request: NextRequest) {
               setVoterPasswordHash(voter.nim, passwordHash);
             }
 
-            return smtpMailService
-              .sendVoterPassword({
-                to: voter.email,
-                voterName: voter.name,
-                nim: voter.nim,
-                password: formattedPassword,
-                loginUrl: ctaUrl || '/login',
-                subject,
-                headline,
-                bodyText,
-              })
-              .catch(() => ({ success: false }));
+            let sendResult: { success: boolean; messageId?: string; error?: string } = { success: false };
+
+            if (isCredentialsMode) {
+              sendResult = await smtpMailService
+                .sendVoterPassword({
+                  to: voter.email,
+                  voterName: voter.name,
+                  nim: voter.nim,
+                  password: formattedPassword,
+                  loginUrl: ctaUrl || '/login',
+                  subject,
+                  headline,
+                  bodyText,
+                })
+                .catch((err) => ({ success: false, error: err?.message || 'SMTP exception' }));
+            } else {
+              sendResult = await smtpMailService
+                .sendBroadcastEmail({
+                  to: voter.email,
+                  voterName: voter.name,
+                  nim: voter.nim,
+                  subject,
+                  headline,
+                  bodyText,
+                  ctaText,
+                  ctaUrl,
+                })
+                .catch((err) => ({ success: false, error: err?.message || 'SMTP exception' }));
+            }
+
+            // Catat hasil pengiriman ke data pemilih (delivery tracking)
+            await recordEmailDelivery(voter.nim, {
+              success: Boolean(sendResult.success),
+              error: sendResult.error,
+            });
+
+            return {
+              success: Boolean(sendResult.success),
+              voter,
+              error: sendResult.error,
+            };
           } else {
-            return smtpMailService
+            const sendResult = await smtpMailService
               .sendBroadcastEmail({
                 to: voter.email,
                 voterName: voter.name,
@@ -309,7 +360,19 @@ export async function POST(request: NextRequest) {
                 ctaText,
                 ctaUrl,
               })
-              .catch(() => ({ success: false }));
+              .catch((err) => ({ success: false, error: err?.message || 'SMTP exception' }));
+
+            // Catat hasil pengiriman ke data pemilih (delivery tracking)
+            await recordEmailDelivery(voter.nim, {
+              success: Boolean(sendResult.success),
+              error: sendResult.error,
+            });
+
+            return {
+              success: Boolean(sendResult.success),
+              voter,
+              error: sendResult.error,
+            };
           }
         })
       );
@@ -319,6 +382,12 @@ export async function POST(request: NextRequest) {
           chunkSent++;
         } else {
           chunkFailed++;
+          failedRecipients.push({
+            nim: res.voter.nim,
+            name: res.voter.name,
+            email: res.voter.email,
+            error: res.error,
+          });
         }
       }
     }
@@ -362,8 +431,10 @@ export async function POST(request: NextRequest) {
         processedCount: recipientsToProcess.length,
         chunkSent,
         chunkFailed,
+        failedRecipients,
         hasMore,
         nextOffset,
+        lastNim: currentLastNim,
       },
     });
   } catch (error) {

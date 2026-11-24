@@ -17,6 +17,9 @@ export interface VoterRecord {
   password_created_at?: string | null;
   login_attempts?: number;
   locked_until?: string | null;
+  last_email_sent_at?: string | null;
+  last_email_status?: 'sent' | 'failed' | null;
+  last_email_error?: string | null;
   updated_at?: string;
   created_at?: string;
 }
@@ -527,4 +530,69 @@ export function updateVoterLoginAttempts(
  */
 export function resetVoterLoginAttempts(identifier: string): boolean {
   return updateVoterLoginAttempts(identifier, 0, null);
+}
+
+/**
+ * Mencatat hasil pengiriman email (sukses/gagal) pada record pemilih.
+ * Menangani Supabase dan fallback dev store secara fail-safe tanpa memutus loop pengiriman.
+ */
+export async function recordEmailDelivery(
+  nim: string,
+  result: { success: boolean; error?: string }
+): Promise<{ success: boolean; error?: string }> {
+  const nowIso = new Date().toISOString();
+  const status = result.success ? 'sent' : 'failed';
+  const sanitizedError = result.error ? result.error.slice(0, 255) : null;
+
+  // 1. Catat ke Supabase jika terkonfigurasi
+  try {
+    const { isSupabaseConfigured, createAdminClient } = await import('../supabase/admin.ts');
+    if (isSupabaseConfigured()) {
+      const adminSupabase = createAdminClient();
+      type VoterUpdate = import('../supabase/types').Database['public']['Tables']['voters_whitelist']['Update'];
+      const updatePayload: VoterUpdate = {
+        last_email_status: status,
+        last_email_error: sanitizedError,
+      };
+      if (result.success) {
+        updatePayload.last_email_sent_at = nowIso;
+      }
+
+      const { error: updateErr } = await adminSupabase
+        .from('voters_whitelist')
+        .update(updatePayload)
+        .eq('nim', nim);
+
+      if (updateErr) {
+        console.warn('[VoterStore] Supabase update delivery status warning:', updateErr.message);
+        return { success: false, error: updateErr.message };
+      }
+      return { success: true };
+    }
+  } catch {
+    // Lanjutkan ke dev store jika modul Supabase / environment tidak terkonfigurasi
+  }
+
+  // 2. Fallback update ke dev store lokal
+  try {
+    const current = getAllVoters();
+    const updated = current.map((v) => {
+      if (v.nim === nim) {
+        return {
+          ...v,
+          last_email_status: status as 'sent' | 'failed',
+          last_email_error: sanitizedError,
+          last_email_sent_at: result.success ? nowIso : (v.last_email_sent_at ?? null),
+          updated_at: nowIso,
+        };
+      }
+      return v;
+    });
+    saveVotersStore(updated);
+    return { success: true };
+  } catch (devErr) {
+    const errMsg = devErr instanceof Error ? devErr.message : 'Dev store error';
+    console.warn('[VoterStore] Dev store delivery update error:', devErr);
+    return { success: false, error: errMsg };
+  }
 }

@@ -70,7 +70,7 @@ test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
 
   await t.test('4. Chunked broadcast request schema validates offset, limit, and accumulated stats', () => {
     const broadcastRequestSchema = z.object({
-      targetGroup: z.enum(['all', 'not_voted', 'voted']),
+      targetGroup: z.enum(['all', 'not_voted', 'voted', 'failed_email', 'uncontacted']),
       generation: z.string().default('all'),
       template: z.enum(['credentials', 'reminder', 'invitation', 'custom']).default('reminder'),
       includeCredentials: z.boolean().default(false),
@@ -81,6 +81,7 @@ test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
       ctaUrl: z.string().default('/login'),
       offset: z.number().int().min(0).default(0),
       limit: z.number().int().min(0).default(0),
+      lastNim: z.string().optional(),
       isLastChunk: z.boolean().default(false),
       accumulatedStats: z
         .object({
@@ -91,24 +92,25 @@ test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
     });
 
     const parsedChunk = broadcastRequestSchema.safeParse({
-      targetGroup: 'not_voted',
+      targetGroup: 'failed_email',
       generation: '2024',
       template: 'credentials',
       includeCredentials: true,
       subject: '[Pemira HMIF] Pengingat Pemilihan Besok & Kata Sandi',
       headline: 'Waktunya Memilih Pemimpin HMIF',
       bodyText: 'Berikut merupakan kredensial bilik suara digital Anda.',
-      offset: 40,
+      offset: 0,
       limit: 20,
+      lastNim: '103112400010',
       isLastChunk: false,
-      accumulatedStats: { sent: 40, failed: 0 },
+      accumulatedStats: { sent: 40, failed: 2 },
     });
 
     assert.ok(parsedChunk.success);
-    assert.strictEqual(parsedChunk.data.offset, 40);
+    assert.strictEqual(parsedChunk.data.targetGroup, 'failed_email');
+    assert.strictEqual(parsedChunk.data.lastNim, '103112400010');
     assert.strictEqual(parsedChunk.data.limit, 20);
-    assert.strictEqual(parsedChunk.data.isLastChunk, false);
-    assert.strictEqual(parsedChunk.data.accumulatedStats?.sent, 40);
+    assert.strictEqual(parsedChunk.data.accumulatedStats?.failed, 2);
   });
 
   await t.test('5. Chunk slicing simulator correctly divides 269 recipients across batches without overlap', () => {
@@ -136,5 +138,45 @@ test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
 
     assert.strictEqual(iterations, 14); // 269 / 20 = 13 full chunks + 1 chunk of 9
     assert.strictEqual(processedNims.size, 269);
+  });
+
+  await t.test('6. Keyset pagination (lastNim) prevents drift when retrying failed emails that mutate status', () => {
+    // Simulate 35 failed emails being retried in chunks of 15
+    const failedVoters = Array.from({ length: 35 }, (_, i) => ({
+      nim: `103112400${String(i + 1).padStart(3, '0')}`,
+      last_email_status: 'failed',
+    }));
+
+    const CHUNK_SIZE = 15;
+    let currentLastNim = null;
+    let processedCount = 0;
+    const retryProcessedNims = [];
+
+    // Simulate loop
+    let hasMore = true;
+    while (hasMore) {
+      // Query filters: last_email_status == 'failed' AND nim > currentLastNim
+      const remainingCandidates = failedVoters.filter(
+        (v) => (currentLastNim ? v.nim > currentLastNim : true)
+      );
+      const chunk = remainingCandidates.slice(0, CHUNK_SIZE);
+      if (chunk.length === 0) break;
+
+      chunk.forEach((v) => {
+        retryProcessedNims.push(v.nim);
+        // Simulate in-place status update: 90% succeed, 10% fail again
+        v.last_email_status = 'sent';
+      });
+
+      processedCount += chunk.length;
+      currentLastNim = chunk[chunk.length - 1].nim;
+      hasMore = remainingCandidates.length > CHUNK_SIZE;
+    }
+
+    assert.strictEqual(processedCount, 35);
+    assert.strictEqual(retryProcessedNims.length, 35);
+    // Ensure every single NIM 1..35 was processed exactly once
+    const uniqueProcessed = new Set(retryProcessedNims);
+    assert.strictEqual(uniqueProcessed.size, 35);
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Users, Check, FileText, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -29,6 +30,23 @@ export function CandidateCard({
   onOpenDetail,
 }: CandidateCardProps) {
   const numberStr = candidate.candidate_number.toString().padStart(2, "0");
+
+  const [imgSrc, setImgSrc] = useState<string | null>(candidate.photo_url || null);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgSrc(candidate.photo_url || null);
+    setImgFailed(false);
+  }, [candidate.photo_url]);
+
+  const handleImageError = () => {
+    const staticCandidateFallback = `/assets/candidates/paslon-${candidate.candidate_number}.webp`;
+    if (imgSrc && imgSrc !== staticCandidateFallback) {
+      setImgSrc(staticCandidateFallback);
+    } else {
+      setImgFailed(true);
+    }
+  };
 
   return (
     <div
@@ -91,12 +109,13 @@ export function CandidateCard({
 
         {/* Foto Pasangan Calon (Rasio Konsisten 4:3, Tanpa Gepeng, Wajah Tidak Terpotong) */}
         <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center select-none">
-          {candidate.photo_url ? (
+          {!imgFailed && imgSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={candidate.photo_url}
+              src={imgSrc}
               alt={`Foto Pasangan Calon ${numberStr}`}
               className="w-full h-full object-cover object-top"
+              onError={handleImageError}
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-2.5 p-6 text-center">
