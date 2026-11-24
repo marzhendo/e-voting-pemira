@@ -67,6 +67,7 @@ export interface DptTabProps {
   onPrevPage: () => void;
   onNextPage: () => void;
   onGenerateBatchPasswords?: (generation?: string) => void;
+  onOpenGenerateBatchModal?: () => void;
   isGeneratingPasswords?: boolean;
   onResendVoterPassword?: (voter: VoterRow) => void;
   resendingPasswordNim?: string | null;
@@ -114,6 +115,7 @@ export function DptTab({
   onPrevPage,
   onNextPage,
   onGenerateBatchPasswords,
+  onOpenGenerateBatchModal,
   isGeneratingPasswords = false,
   onResendVoterPassword,
   resendingPasswordNim = null,
@@ -143,9 +145,15 @@ export function DptTab({
 
           <button
             type="button"
-            onClick={() => onGenerateBatchPasswords?.(selectedGeneration)}
+            onClick={() => {
+              if (onOpenGenerateBatchModal) {
+                onOpenGenerateBatchModal();
+              } else {
+                onGenerateBatchPasswords?.(selectedGeneration);
+              }
+            }}
             disabled={isGeneratingPasswords || loadingVoters}
-            title="Terbitkan kata sandi unik untuk pemilih DPT yang belum memiliki sandi"
+            title="Terbitkan kata sandi unik untuk pemilih DPT per angkatan atau semua"
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/30 transition-all shadow-sm cursor-pointer disabled:opacity-50"
           >
             {isGeneratingPasswords ? (

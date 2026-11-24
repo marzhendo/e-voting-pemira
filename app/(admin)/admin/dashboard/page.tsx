@@ -49,6 +49,7 @@ import {
 import {
   BatchDeleteVotersModal,
   DeleteVoterModal,
+  GenerateBatchPasswordsModal,
   QuickAddVoterModal,
   ResetDptModal,
   type ResetDptMode,
@@ -161,6 +162,14 @@ export default function AdminDashboardPage() {
   const [dptPage, setDptPage] = useState(1);
   const [dptPageSize, setDptPageSize] = useState(50);
   const [dptTotalPages, setDptTotalPages] = useState(1);
+  const [isGenerateBatchModalOpen, setIsGenerateBatchModalOpen] = useState(false);
+  const [passwordStats, setPasswordStats] = useState<{
+    total: number;
+    hasPassword: number;
+    pending: number;
+    byGeneration: Array<{ generation: number; total: number; hasPassword: number; pending: number }>;
+  } | null>(null);
+  const [loadingPasswordStats, setLoadingPasswordStats] = useState(false);
 
   // Daftar angkatan unik secara dinamis dari DPT aktif (dengan fallback 2019-2026 jika data belum dimuat)
   const availableGenerations = useMemo(() => {
@@ -1519,6 +1528,67 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleOpenGenerateBatchModal = async () => {
+    setIsGenerateBatchModalOpen(true);
+    setLoadingPasswordStats(true);
+    try {
+      const res = await fetch('/api/admin/dpt/passwords/generate-batch');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.summary) {
+          setPasswordStats({
+            total: data.summary.total,
+            hasPassword: data.summary.hasPassword,
+            pending: data.summary.pending,
+            byGeneration: data.byGeneration || [],
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load password statistics:', err);
+    } finally {
+      setLoadingPasswordStats(false);
+    }
+  };
+
+  const handleGenerateBatchSubmit = async ({
+    generation,
+    overwriteExisting,
+  }: {
+    generation: string;
+    overwriteExisting: boolean;
+  }) => {
+    setIsGeneratingPasswords(true);
+    setDptActionMessage(null);
+    setDptErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/dpt/passwords/generate-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generation,
+          overwriteExisting,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDptErrorMessage(data.error || 'Gagal menerbitkan kata sandi pemilih.');
+      } else {
+        setDptActionMessage(`✓ ${data.message}`);
+        setIsGenerateBatchModalOpen(false);
+        fetchVoters();
+        // Refresh statistik sandi jika modal dibuka lagi
+        handleOpenGenerateBatchModal();
+      }
+    } catch {
+      setDptErrorMessage('Terjadi kesalahan jaringan saat menerbitkan kata sandi.');
+    } finally {
+      setIsGeneratingPasswords(false);
+    }
+  };
+
   const handleGenerateBatchPasswords = async (gen = selectedGeneration) => {
     if (!confirm(`Apakah Anda yakin ingin menerbitkan kata sandi unik untuk pemilih (Angkatan: ${gen}) yang belum memiliki sandi?`)) {
       return;
@@ -1965,6 +2035,7 @@ export default function AdminDashboardPage() {
                   onPrevPage={() => setDptPage((p) => Math.max(p - 1, 1))}
                   onNextPage={() => setDptPage((p) => Math.min(p + 1, dptTotalPages))}
                   onGenerateBatchPasswords={handleGenerateBatchPasswords}
+                  onOpenGenerateBatchModal={handleOpenGenerateBatchModal}
                   isGeneratingPasswords={isGeneratingPasswords}
                   onResendVoterPassword={handleResendVoterPassword}
                   resendingPasswordNim={resendingPasswordNim}
@@ -2227,6 +2298,17 @@ export default function AdminDashboardPage() {
           onConfirmTextChange={setResetDptConfirmText}
           onClose={() => setIsResetDptModalOpen(false)}
           onConfirm={handleConfirmResetDpt}
+        />
+
+        <GenerateBatchPasswordsModal
+          isOpen={isGenerateBatchModalOpen}
+          isGenerating={isGeneratingPasswords}
+          availableGenerations={availableGenerations}
+          initialGeneration={selectedGeneration}
+          stats={passwordStats}
+          loadingStats={loadingPasswordStats}
+          onClose={() => setIsGenerateBatchModalOpen(false)}
+          onSubmit={handleGenerateBatchSubmit}
         />
       </div>
 

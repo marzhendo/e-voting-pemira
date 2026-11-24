@@ -1,7 +1,17 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { AlertTriangle, Loader2, Trash2, UserPlus, X } from "lucide-react";
+import { useState, useEffect, type FormEvent } from "react";
+import {
+  AlertTriangle,
+  KeyRound,
+  Loader2,
+  Trash2,
+  UserPlus,
+  X,
+  CheckCircle2,
+  Info,
+  Sparkles,
+} from "lucide-react";
 import { Portal } from "@/components/ui/portal";
 import type { VoterRow } from "../types";
 
@@ -646,6 +656,272 @@ export function ResetDptModal({
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+export interface GenerationPasswordStats {
+  generation: number;
+  total: number;
+  hasPassword: number;
+  pending: number;
+}
+
+export interface GenerateBatchPasswordsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  availableGenerations: number[];
+  onSubmit: (params: { generation: string; overwriteExisting: boolean }) => Promise<void>;
+  isGenerating: boolean;
+  initialGeneration?: string;
+  stats?: {
+    total: number;
+    hasPassword: number;
+    pending: number;
+    byGeneration: GenerationPasswordStats[];
+  } | null;
+  loadingStats?: boolean;
+}
+
+export function GenerateBatchPasswordsModal({
+  isOpen,
+  onClose,
+  availableGenerations,
+  onSubmit,
+  isGenerating,
+  initialGeneration = "all",
+  stats,
+  loadingStats = false,
+}: GenerateBatchPasswordsModalProps) {
+  const [selectedTargetGen, setSelectedTargetGen] = useState<string>(initialGeneration);
+  const [overwriteExisting, setOverwriteExisting] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedTargetGen(initialGeneration);
+      setOverwriteExisting(false);
+    }
+  }, [isOpen, initialGeneration]);
+
+  if (!isOpen) return null;
+
+  // Hitung ringkasan pemilih untuk angkatan yang dipilih
+  let targetTotal = 0;
+  let targetPending = 0;
+  let targetHasPassword = 0;
+
+  if (stats) {
+    if (selectedTargetGen === "all") {
+      targetTotal = stats.total;
+      targetPending = stats.pending;
+      targetHasPassword = stats.hasPassword;
+    } else {
+      const parsedGen = Number(selectedTargetGen);
+      const genStat = stats.byGeneration.find((g) => g.generation === parsedGen);
+      if (genStat) {
+        targetTotal = genStat.total;
+        targetPending = genStat.pending;
+        targetHasPassword = genStat.hasPassword;
+      }
+    }
+  }
+
+  const eligibleCount = overwriteExisting ? targetTotal : targetPending;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isGenerating) return;
+    onSubmit({
+      generation: selectedTargetGen,
+      overwriteExisting,
+    });
+  };
+
+  return (
+    <Portal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-password-modal-title"
+        className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isGenerating) {
+            onClose();
+          }
+        }}
+      >
+        <div className="flex min-h-full items-center justify-center p-4 text-left">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg rounded-2xl bg-surface-container p-6 flex flex-col gap-4 border border-outline-variant/30 my-auto animate-in zoom-in-95 duration-150 shadow-2xl"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-outline-variant/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-sm">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3
+                    id="batch-password-modal-title"
+                    className="text-base font-bold text-on-surface"
+                  >
+                    Terbitkan Kata Sandi Pemilih
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Buat kata sandi unik (CSPRNG) untuk pemilih DPT agar dapat masuk ke bilik suara.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isGenerating}
+                aria-label="Tutup modal"
+                className="w-8 h-8 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors disabled:opacity-40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              {/* Pilihan Angkatan */}
+              <div>
+                <label
+                  htmlFor="select-generation-target"
+                  className="block text-on-surface font-semibold mb-1.5"
+                >
+                  Pilih Angkatan Target <span className="text-primary">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    id="select-generation-target"
+                    value={selectedTargetGen}
+                    disabled={isGenerating}
+                    onChange={(e) => setSelectedTargetGen(e.target.value)}
+                    className="w-full px-3.5 py-2.5 min-h-[44px] rounded-xl bg-surface-container-lowest border border-outline-variant/40 text-on-surface text-xs focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary transition-all cursor-pointer font-medium"
+                  >
+                    <option value="all">
+                      Semua Angkatan {stats ? `(${stats.total} Mahasiswa)` : ""}
+                    </option>
+                    {availableGenerations.map((gen) => {
+                      const genStat = stats?.byGeneration.find((g) => g.generation === gen);
+                      const pendingLabel = genStat ? ` - ${genStat.pending} belum terbit` : "";
+                      return (
+                        <option key={gen} value={String(gen)}>
+                          Angkatan {gen} {genStat ? `(${genStat.total} Mahasiswa${pendingLabel})` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <p className="text-[11px] text-on-surface-variant/80 mt-1.5">
+                  Dianjurkan menerbitkan per angkatan (100–260 mahasiswa per proses) agar proses lebih cepat dan mudah dipantau.
+                </p>
+              </div>
+
+              {/* Panel Status / Ringkasan Pemilih */}
+              <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-on-surface">
+                    Target:{" "}
+                    {selectedTargetGen === "all"
+                      ? "Semua Angkatan"
+                      : `Angkatan ${selectedTargetGen}`}
+                  </span>
+                  {loadingStats && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-primary">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Memuat data...
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                  <div className="p-2.5 rounded-lg bg-surface-container/60 border border-outline-variant/20">
+                    <p className="text-[10px] text-on-surface-variant font-medium">Total Pemilih</p>
+                    <p className="text-sm font-bold text-on-surface mt-0.5">
+                      {loadingStats ? "..." : targetTotal}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20">
+                    <p className="text-[10px] text-primary font-medium">Belum Terbit</p>
+                    <p className="text-sm font-bold text-primary mt-0.5">
+                      {loadingStats ? "..." : targetPending}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-surface-container/60 border border-outline-variant/20">
+                    <p className="text-[10px] text-on-surface-variant font-medium">Sudah Terbit</p>
+                    <p className="text-sm font-bold text-on-surface mt-0.5">
+                      {loadingStats ? "..." : targetHasPassword}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Opsi Timpa Sandi */}
+              <div className="pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={overwriteExisting}
+                    disabled={isGenerating}
+                    onChange={(e) => setOverwriteExisting(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-surface-container-lowest border-outline-variant/40"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-semibold text-on-surface">
+                      Timpa kata sandi yang sudah ada
+                    </span>
+                    <p className="text-on-surface-variant text-[11px] mt-0.5">
+                      Secara bawaan tidak dicentang. Sandi pemilih yang sudah memiliki sandi tidak akan diubah kecuali opsi ini diaktifkan.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Informasi Efisiensi & Kecepatan */}
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/20 text-on-surface-variant text-[11px] leading-relaxed">
+                <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-primary">Proses Cepat &amp; Aman:</span> Pembuatan kata sandi menggunakan CSPRNG dan disimpan dalam format kriptografis SHA-256 ber-salt. Eksekusi berjalan secara batch paralel sehingga selesai dalam 1–3 detik.
+                </div>
+              </div>
+
+              {/* Tombol Aksi */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-outline-variant/20">
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={onClose}
+                  className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isGenerating || (eligibleCount === 0 && !loadingStats)}
+                  className="px-5 py-2 min-h-[44px] rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Menerbitkan Sandi...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-4 h-4" />
+                      <span>
+                        Terbitkan Sandi ({loadingStats ? "..." : `${eligibleCount} Mahasiswa`})
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>

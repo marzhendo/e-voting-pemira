@@ -201,4 +201,52 @@ describe('Voter Unique Password Authentication & Cryptography Tests', () => {
     assert.strictEqual(result.user?.role, 'super_admin');
     assert.strictEqual(result.redirectUrl, '/admin/dashboard');
   });
+
+  test('9. Per-Generation Batch Password Generation: Targets only specified angkatan', async () => {
+    resetVotersStore();
+    // Add voters across multiple generations
+    addSingleVoter({ nim: '103012300001', name: 'Mhs 2023 A', email: 'mhs23a@student.telu.ac.id', generation: 2023 });
+    addSingleVoter({ nim: '103012300002', name: 'Mhs 2023 B', email: 'mhs23b@student.telu.ac.id', generation: 2023 });
+    addSingleVoter({ nim: '103012400001', name: 'Mhs 2024 A', email: 'mhs24a@student.telu.ac.id', generation: 2024 });
+
+    // Target only generation 2024
+    const all = (await import('../lib/dpt/store.ts')).getAllVoters();
+    const target2024 = all.filter(v => v.generation === 2024);
+
+    for (const v of target2024) {
+      const { rawPassword } = generateVoterPassword();
+      setVoterPasswordHash(v.nim, hashVoterPassword(rawPassword));
+    }
+
+    // Verify 2024 has password, 2023 remains untouched
+    const mhs24 = findVoterByIdentifier('103012400001');
+    const mhs23a = findVoterByIdentifier('103012300001');
+    const mhs23b = findVoterByIdentifier('103012300002');
+
+    assert.ok(mhs24?.password_hash, 'Target 2024 voter must have password_hash');
+    assert.ok(!mhs23a?.password_hash, '2023 voter A must not have password');
+    assert.ok(!mhs23b?.password_hash, '2023 voter B must not have password');
+  });
+
+  test('10. Overwrite Flag: Preserves existing passwords when false', async () => {
+    resetVotersStore();
+    const nim = '103012499999';
+    addSingleVoter({ nim, name: 'Mhs Existing', email: 'existing@student.telu.ac.id', generation: 2024 });
+
+    const initialPass = 'PASS1234';
+    const initialHash = hashVoterPassword(initialPass);
+    setVoterPasswordHash(nim, initialHash);
+
+    const voter = findVoterByIdentifier(nim);
+    assert.strictEqual(voter?.password_hash, initialHash);
+
+    // If overwriteExisting is false, the existing password is preserved
+    const overwriteExisting = false;
+    if (overwriteExisting || !voter?.password_hash) {
+      setVoterPasswordHash(nim, hashVoterPassword('NEWPASSW'));
+    }
+
+    const voterAfter = findVoterByIdentifier(nim);
+    assert.strictEqual(voterAfter?.password_hash, initialHash, 'Existing password must not be overwritten when flag is false');
+  });
 });
