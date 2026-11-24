@@ -10,6 +10,7 @@ import {
   LogOut,
   Printer,
   BarChart2,
+  HelpCircle,
 } from 'lucide-react';
 
 interface TallyResultItem {
@@ -134,10 +135,16 @@ export default function ReceiptPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-outline-variant/30 text-xs text-primary font-semibold">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            <span>Sudah Memilih</span>
-          </div>
+          <a
+            href="https://wa.me/6281809300406?text=Halo%20Panitia%20KPR%20Pemira%20HMIF%2C%20saya%20sudang%20menyelesaikan%20pemilihan%20dan%20ingin%20menanyakan%20informasi%20terkait%20bukti%20suara."
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Bantuan Panitia KPR via WhatsApp"
+            className="text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          >
+            <HelpCircle className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+            <span className="hidden sm:inline">Bantuan KPR</span>
+          </a>
         </div>
       </header>
 

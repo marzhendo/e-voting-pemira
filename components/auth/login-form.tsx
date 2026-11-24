@@ -461,7 +461,7 @@ export function LoginForm({
           {isMaintenance && !isAdminMode ? (
             <>
               <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface leading-none text-balance">
-                Bilik Suara Ditutup Sementara
+                Sedang Ada Pemeriksaan Sistem
               </h1>
               <p className="text-sm text-on-surface-variant leading-relaxed mt-1.5 max-w-xs mx-auto text-pretty">
                 Sistem pemilihan sedang dalam penyesuaian berkala oleh Panitia
