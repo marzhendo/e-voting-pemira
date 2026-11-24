@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       const { rawPassword, formattedPassword } = generateVoterPassword();
       const passwordHash = hashVoterPassword(rawPassword);
 
-      const { error: updateError } = await adminSupabase
+      let { error: updateError } = await adminSupabase
         .from('voters_whitelist')
         .update({
           password_hash: passwordHash,
@@ -80,6 +80,18 @@ export async function POST(request: NextRequest) {
           locked_until: null,
         })
         .eq('id', voter.id);
+
+      if (updateError && (updateError.code === '42703' || updateError.message?.includes('does not exist'))) {
+        const legacyUpdate = await adminSupabase
+          .from('voters_whitelist')
+          .update({
+            otp_hash: passwordHash,
+            otp_last_sent_at: nowIso,
+            otp_attempts: 0,
+          })
+          .eq('id', voter.id);
+        updateError = legacyUpdate.error;
+      }
 
       if (updateError) {
         console.error('[ResendPassword] Supabase update error:', updateError);

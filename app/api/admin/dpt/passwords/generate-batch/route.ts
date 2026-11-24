@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
 
     if (isSupabaseConfigured()) {
       const adminSupabase = createAdminClient();
+      let isUsingLegacyCols = false;
       let query = adminSupabase
         .from('voters_whitelist')
         .select('id, nim, name, email, generation, password_hash');
@@ -62,7 +63,25 @@ export async function POST(request: NextRequest) {
         query = query.eq('generation', parsedGen);
       }
 
-      const { data: voters, error: queryError } = await query;
+      let { data: voters, error: queryError } = await query;
+
+      if (queryError && (queryError.code === '42703' || queryError.message?.includes('does not exist'))) {
+        isUsingLegacyCols = true;
+        let legacyQuery = adminSupabase
+          .from('voters_whitelist')
+          .select('id, nim, name, email, generation, otp_hash');
+
+        if (generation !== 'all') {
+          legacyQuery = legacyQuery.eq('generation', Number(generation));
+        }
+
+        const legacyResult = await legacyQuery;
+        voters = (legacyResult.data || []).map((v: Record<string, any>) => ({
+          ...v,
+          password_hash: v.otp_hash,
+        })) as typeof voters;
+        queryError = legacyResult.error;
+      }
 
       if (queryError || !voters) {
         console.error('[BatchPassword] Supabase query error:', queryError);
@@ -75,7 +94,7 @@ export async function POST(request: NextRequest) {
       totalEligible = voters.length;
 
       // Filter yang perlu digenerate
-      const targets = voters.filter((v) => overwriteExisting || !v.password_hash);
+      const targets = voters.filter((v: Record<string, any>) => overwriteExisting || !v.password_hash);
       skippedCount = totalEligible - targets.length;
 
       // Generate & update secara batch
@@ -83,20 +102,37 @@ export async function POST(request: NextRequest) {
         const { rawPassword } = generateVoterPassword();
         const passwordHash = hashVoterPassword(rawPassword);
 
-        const { error: updateError } = await adminSupabase
-          .from('voters_whitelist')
-          .update({
-            password_hash: passwordHash,
-            password_created_at: nowIso,
-            login_attempts: 0,
-            locked_until: null,
-          })
-          .eq('id', voter.id);
+        if (isUsingLegacyCols) {
+          const { error: updateError } = await adminSupabase
+            .from('voters_whitelist')
+            .update({
+              otp_hash: passwordHash,
+              otp_last_sent_at: nowIso,
+              otp_attempts: 0,
+            })
+            .eq('id', voter.id);
 
-        if (!updateError) {
-          generatedCount++;
+          if (!updateError) {
+            generatedCount++;
+          } else {
+            console.error(`[BatchPassword] Error updating voter ${voter.nim}:`, updateError);
+          }
         } else {
-          console.error(`[BatchPassword] Error updating voter ${voter.nim}:`, updateError);
+          const { error: updateError } = await adminSupabase
+            .from('voters_whitelist')
+            .update({
+              password_hash: passwordHash,
+              password_created_at: nowIso,
+              login_attempts: 0,
+              locked_until: null,
+            })
+            .eq('id', voter.id);
+
+          if (!updateError) {
+            generatedCount++;
+          } else {
+            console.error(`[BatchPassword] Error updating voter ${voter.nim}:`, updateError);
+          }
         }
       }
     } else {

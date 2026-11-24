@@ -70,7 +70,35 @@ export async function GET(req: NextRequest) {
 
       query = query.order('nim', { ascending: true }).range(offset, offset + limit - 1);
 
-      const { data: voters, error, count } = await query;
+      let { data: voters, error, count } = await query;
+
+      // Fallback cerdas jika migrasi 00013 belum dieksekusi di Supabase remote
+      if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+        let legacyQuery = adminSupabase
+          .from('voters_whitelist')
+          .select('id, nim, name, email, generation, has_voted, otp_hash, otp_last_sent_at, created_at', { count: 'exact' });
+
+        if (sanitizedSearch) {
+          legacyQuery = legacyQuery.or(`nim.ilike.%${sanitizedSearch}%,name.ilike.%${sanitizedSearch}%,email.ilike.%${sanitizedSearch}%`);
+        }
+        if (generation && generation !== 'all') {
+          const parsedGen = Number(generation);
+          if (Number.isInteger(parsedGen)) {
+            legacyQuery = legacyQuery.eq('generation', parsedGen);
+          }
+        }
+        if (status === 'voted') {
+          legacyQuery = legacyQuery.eq('has_voted', true);
+        } else if (status === 'not_voted') {
+          legacyQuery = legacyQuery.eq('has_voted', false);
+        }
+        legacyQuery = legacyQuery.order('nim', { ascending: true }).range(offset, offset + limit - 1);
+
+        const legacyResult = await legacyQuery;
+        voters = legacyResult.data as typeof voters;
+        error = legacyResult.error;
+        count = legacyResult.count;
+      }
 
       if (error) {
         console.error('[AdminDptRoute] Supabase query error:', error);
@@ -83,15 +111,15 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          voters: voters.map((v) => ({
+          voters: voters.map((v: Record<string, any>) => ({
             id: v.id,
             nim: v.nim,
             name: v.name,
             email: v.email,
             generation: v.generation,
             has_voted: v.has_voted,
-            has_password: Boolean(v.password_hash),
-            password_created_at: v.password_created_at || null,
+            has_password: Boolean(v.password_hash || v.otp_hash),
+            password_created_at: v.password_created_at || v.otp_last_sent_at || null,
             updated_at: v.created_at || new Date().toISOString(),
           })),
           total,
