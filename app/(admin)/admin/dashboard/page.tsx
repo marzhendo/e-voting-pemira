@@ -1158,7 +1158,10 @@ export default function AdminDashboardPage() {
     setBroadcastError(null);
     setBroadcastResult(null);
 
-    const targetTotal = broadcastTargetCount || 0;
+    const targetTotal =
+      overrideTargetGroup === 'failed_email' && broadcastProgress?.failed
+        ? broadcastProgress.failed
+        : (broadcastTargetCount || 0);
     setBroadcastProgress({
       current: 0,
       total: targetTotal,
@@ -1209,7 +1212,9 @@ export default function AdminDashboardPage() {
           throw new Error(data.error || 'Gagal memproses pengiriman batch email.');
         }
 
-        actualTotal = data.stats.totalTarget;
+        if (!currentLastNim && data.stats.totalTarget > 0) {
+          actualTotal = data.stats.totalTarget;
+        }
         cumulativeSent += data.stats.chunkSent;
         cumulativeFailed += data.stats.chunkFailed;
         const currentProcessed = Math.min(offset + data.stats.processedCount, actualTotal);

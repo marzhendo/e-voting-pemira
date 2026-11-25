@@ -411,7 +411,7 @@ export async function POST(request: NextRequest) {
           generation,
           template,
           isCredentialsMode,
-          totalTarget,
+          totalTarget: Math.max(totalTarget, totalSentFinal + totalFailedFinal),
           sentCount: totalSentFinal,
           failedCount: totalFailedFinal,
           subject,
