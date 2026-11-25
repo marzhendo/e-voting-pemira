@@ -11,6 +11,7 @@ import {
   Printer,
   BarChart2,
   HelpCircle,
+  ArrowRight,
 } from 'lucide-react';
 
 interface TallyResultItem {
@@ -232,7 +233,7 @@ export default function ReceiptPage() {
                     />
                   </div>
                   <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                    Perolehan suara tiap calon akan tampil di sini setelah waktu pemilihan selesai.
+                    Perolehan tiap pasangan calon dibuka setelah pemilihan ditutup.
                   </p>
                 </div>
               )}
@@ -267,6 +268,24 @@ export default function ReceiptPage() {
                     );
                   })}
                 </div>
+              )}
+
+              {/* Tautan Ringkas ke Halaman Rekapitulasi Lengkap */}
+              {!loadingTally && (
+                <Link
+                  href="/rekapitulasi"
+                  className="print:hidden min-h-[44px] px-3.5 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/25 flex items-center justify-between text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none group"
+                >
+                  <span>
+                    {tallyData?.isClosed
+                      ? 'Lihat rekapitulasi lengkap'
+                      : 'Lihat partisipasi per angkatan'}
+                  </span>
+                  <ArrowRight
+                    className="w-3.5 h-3.5 text-primary transition-transform group-hover:translate-x-0.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                </Link>
               )}
             </div>
 
