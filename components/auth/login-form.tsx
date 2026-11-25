@@ -87,6 +87,14 @@ function getAuthErrorDisplay(
     };
   }
 
+  if (urlError === "REKAP_AUTH_REQUIRED") {
+    return {
+      title: "Masuk untuk Melihat Rekapitulasi",
+      message:
+        "Masukkan NIM dan Kata Sandi Pemilih kamu untuk membuka halaman Partisipasi Pemilih dan Rekapitulasi Suara.",
+    };
+  }
+
   if (
     urlError === "VOTE_SESSION_REQUIRED" ||
     urlError === "SESSION_REQUIRED" ||
@@ -130,6 +138,7 @@ export function LoginForm({
 
   const urlMessage = searchParams.get("message");
   const urlError = searchParams.get("error");
+  const urlRedirect = searchParams.get("redirect");
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -270,6 +279,7 @@ export function LoginForm({
         body: JSON.stringify({
           nim: cleanNim,
           password: cleanPassword,
+          redirect: urlRedirect || undefined,
         }),
       });
 
@@ -292,8 +302,12 @@ export function LoginForm({
       const isStaff = data.user?.role && data.user.role !== "voter";
       const hasVoted = Boolean(data.user?.hasVoted);
 
+      const isRecapDest = data.redirectUrl === "/rekapitulasi";
+
       setSuccessNotice(
-        isStaff
+        isRecapDest
+          ? "Terverifikasi. Membuka halaman Rekapitulasi Suara..."
+          : isStaff
           ? "Terverifikasi sebagai administrator. Membuka dashboard..."
           : hasVoted
           ? "Terverifikasi. Membuka tanda terima pemilihan..."

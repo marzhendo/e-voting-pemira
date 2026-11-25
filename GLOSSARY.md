@@ -27,3 +27,7 @@ _Avoid_: Ballot record, suara pemilih, user ballot
 **Rekapitulasi Suara**:
 Hasil agregasi penghitungan perolehan suara sah seluruh pasangan calon dan kotak kosong yang dipublikasikan setelah masa pemilihan resmi ditutup oleh panitia.
 _Avoid_: Live tally, quick count, hasil suara sementara, perolehan real-time
+
+**Partisipasi Pemilih**:
+Rasio jumlah pemilih dalam Daftar Pemilih Tetap (DPT) yang telah menyalurkan hak suaranya dibandingkan total pemilih terdaftar secara keseluruhan maupun per angkatan; dapat dipantau saat Bilik Suara Digital masih aktif tanpa mengungkapkan perolehan suara pasangan calon.
+_Avoid_: Voter turnout, persentase suara paslon, hasil sementara

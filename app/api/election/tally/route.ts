@@ -1,70 +1,48 @@
 import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth/session';
 import { getElectionTallySnapshot } from '@/lib/ballots/tally-service';
+import { authorizeRecapAccess, formatRecapPayload } from '@/lib/ballots/recap-contract';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
 /**
- * Public Endpoint Rekapitulasi Suara & Partisipasi Pemilihan.
+ * Authenticated Endpoint for Partisipasi Pemilih & Rekapitulasi Suara.
  *
- * RESTRICTED VISIBILITY INVARIANT:
- * - Saat bilik suara AKTIF (isClosed === false): Mengembalikan metrik partisipasi DPT saja.
- *   Rincian suara per calon TIDAK PERNAH disertakan untuk mencegah efek bandwagon.
- * - Saat bilik suara DITUTUP RESMI (isClosed === true): Mengembalikan rekapitulasi suara
- *   lengkap antar paslon dan kotak kosong untuk transparansi hasil pemilu.
+ * Requires a valid session cookie and omits candidate vote breakdowns
+ * whenever the election has not been officially closed.
  */
 export async function GET() {
-  try {
-    const snapshot = await getElectionTallySnapshot();
-    const isClosed = Boolean(snapshot.electionSettings.isClosed);
+  const session = await getSession();
+  const authDecision = authorizeRecapAccess(session);
 
-    const baseTurnout = {
-      totalDpt: snapshot.turnout.totalDpt,
-      totalVotes: snapshot.turnout.totalVotesRecorded,
-      turnoutPercentage: snapshot.turnout.turnoutPercentage,
-    };
-
-    if (!isClosed) {
-      return NextResponse.json(
-        {
-          success: true,
-          isClosed: false,
-          turnout: baseTurnout,
-          message:
-            'Pemungutan suara sedang berlangsung. Rekapitulasi perolehan suara akan dipublikasikan secara otomatis setelah bilik suara resmi ditutup oleh Panitia KPR.',
-        },
-        {
-          headers: {
-            'Cache-Control': 'no-store, max-age=0',
-          },
-        }
-      );
-    }
-
+  if (!authDecision.authorized) {
     return NextResponse.json(
       {
-        success: true,
-        isClosed: true,
-        timestamp: snapshot.timestamp,
-        turnout: baseTurnout,
-        results: snapshot.tally.map((item) => ({
-          candidateId: item.candidateId,
-          candidateNumber: item.candidateNumber,
-          leaderName: item.leaderName,
-          viceLeaderName: item.viceLeaderName,
-          voteCount: item.voteCount,
-          percentage: item.percentage,
-        })),
+        success: false,
+        error: authDecision.error,
       },
       {
+        status: authDecision.status,
         headers: {
           'Cache-Control': 'no-store, max-age=0',
         },
       }
     );
+  }
+
+  try {
+    const snapshot = await getElectionTallySnapshot();
+    const payload = formatRecapPayload(snapshot);
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (error) {
-    console.error('[PublicElectionTally] Error retrieving public tally:', error);
+    console.error('[PublicElectionTally] Error retrieving recap tally:', error);
     return NextResponse.json(
       {
         success: false,

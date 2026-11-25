@@ -81,3 +81,28 @@ export async function isDesignatedAdminIdentifier(identifier: string): Promise<b
   const localAdmin = findAdminByIdentifier(cleanId);
   return Boolean(localAdmin && localAdmin.is_active);
 }
+
+/**
+ * Checks whether the voting period is officially closed (closed by KPR or past end_time).
+ */
+export async function getElectionClosedStatus(): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    try {
+      const adminClient = createAdminClient();
+      const { data, error } = await adminClient
+        .from('election_settings')
+        .select('is_voting_open, end_time')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (!error && data) {
+        return !data.is_voting_open || new Date() > new Date(data.end_time);
+      }
+    } catch (err) {
+      console.warn('[ElectionStatus] Gagal memeriksa status penutupan dari Supabase:', err);
+    }
+  }
+
+  const devSettings = getDevElectionSettings();
+  return !devSettings.is_voting_open || new Date() > new Date(devSettings.end_time);
+}

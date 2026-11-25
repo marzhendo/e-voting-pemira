@@ -128,6 +128,7 @@ export interface CandidateTallyItem {
   candidateNumber: number;
   leaderName: string;
   viceLeaderName: string;
+  photoUrl?: string | null;
   voteCount: number;
   percentage: number;
 }
@@ -179,6 +180,7 @@ export function calculateLiveTally(): TallyAggregationResult {
         candidateNumber: cand.candidate_number,
         leaderName: cand.leader_name,
         viceLeaderName: cand.vice_leader_name,
+        photoUrl: cand.photo_url || null,
         voteCount: count,
         percentage,
       };

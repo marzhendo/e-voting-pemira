@@ -8,6 +8,7 @@ export interface TallyCandidateSummary {
   candidateNumber: number;
   leaderName: string;
   viceLeaderName: string;
+  photoUrl?: string | null;
   voteCount: number;
   percentage: number;
 }
@@ -50,17 +51,34 @@ export async function getElectionTallySnapshot(): Promise<ElectionTallySnapshot>
   if (isSupabaseConfigured()) {
     const adminSupabase = createAdminClient();
 
-    // 1. Primary path: high-performance SQL stored procedure
-    const { data: rpcSummary, error: rpcError } = await adminSupabase.rpc(
-      'get_election_tally_summary'
-    );
+    // 1. Primary path: high-performance SQL stored procedure + candidate portrait lookup (read-only)
+    const [{ data: rpcSummary, error: rpcError }, { data: candidatePhotos }] = await Promise.all([
+      adminSupabase.rpc('get_election_tally_summary'),
+      adminSupabase
+        .from('candidates')
+        .select('id, photo_url')
+        .eq('is_active', true),
+    ]);
 
     if (!rpcError && rpcSummary && rpcSummary.success) {
+      const photoById = new Map<string, string | null>();
+      for (const cand of candidatePhotos || []) {
+        photoById.set(cand.id, cand.photo_url || null);
+      }
+
+      const enrichedTally: TallyCandidateSummary[] = (rpcSummary.tally || []).map((item) => ({
+        ...item,
+        photoUrl:
+          item.candidateNumber === 0
+            ? null
+            : photoById.get(item.candidateId) ?? null,
+      }));
+
       return {
         timestamp: rpcSummary.timestamp || new Date().toISOString(),
         electionSettings: rpcSummary.electionSettings,
         turnout: rpcSummary.turnout,
-        tally: rpcSummary.tally || [],
+        tally: enrichedTally,
       };
     }
 
@@ -85,7 +103,7 @@ export async function getElectionTallySnapshot(): Promise<ElectionTallySnapshot>
       await Promise.all([
         adminSupabase
           .from('candidates')
-          .select('id, candidate_number, leader_name, vice_leader_name, is_active')
+          .select('id, candidate_number, leader_name, vice_leader_name, photo_url, is_active')
           .eq('is_active', true)
           .order('candidate_number', { ascending: true }),
         adminSupabase.from('ballots').select('candidate_id'),
@@ -110,6 +128,7 @@ export async function getElectionTallySnapshot(): Promise<ElectionTallySnapshot>
         candidateNumber: cand.candidate_number,
         leaderName: cand.leader_name,
         viceLeaderName: cand.vice_leader_name,
+        photoUrl: cand.candidate_number === 0 ? null : cand.photo_url || null,
         voteCount: count,
         percentage,
       };

@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { nim, password } = parsed.data;
-    const result = await authenticateWithPassword(nim, password);
+    const { nim, password, redirect } = parsed.data;
+    const result = await authenticateWithPassword(nim, password, redirect);
 
     if (!result.success || !result.token) {
       const statusMap: Record<string, number> = {

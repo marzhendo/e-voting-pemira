@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { createAdminClient, isSupabaseConfigured } from '../supabase/admin.ts';
 import { isProductionEnvironment, isDevFallbackAllowed } from '../security/env.ts';
 import { isRootSuperadminEmail } from './constants.ts';
-import { getMaintenanceStatus, isDesignatedAdminIdentifier } from '../election/maintenance-status.ts';
+import {
+  getMaintenanceStatus,
+  getElectionClosedStatus,
+  isDesignatedAdminIdentifier,
+} from '../election/maintenance-status.ts';
+import { resolvePostLoginDestination } from './redirect.ts';
 import type { AdminRole } from '../supabase/types.ts';
 import {
   verifyVoterPassword,
@@ -21,6 +26,7 @@ import { createSessionToken, setSessionCookie, type SessionUser } from './sessio
 export const loginCredentialsSchema = z.object({
   nim: z.string().min(4, 'NIM atau nomor identitas wajib diisi.').max(50),
   password: z.string().min(4, 'Kata sandi minimal 4 karakter.'),
+  redirect: z.string().max(200).optional(),
 });
 
 export interface VoterLoginResult {
@@ -47,7 +53,8 @@ export interface VoterLoginResult {
  */
 export async function authenticateWithPassword(
   rawNim: string,
-  rawPassword: string
+  rawPassword: string,
+  requestedRedirect?: string | null
 ): Promise<VoterLoginResult> {
   const cleanId = rawNim.trim().toLowerCase();
   const cleanPassword = normalizePassword(rawPassword);
@@ -302,12 +309,13 @@ export async function authenticateWithPassword(
       const token = await createSessionToken(sessionUser);
       setSessionCookie(token);
 
-      const redirectUrl =
-        effectiveRole !== 'voter'
-          ? '/admin/dashboard'
-          : hasVoted
-          ? '/receipt'
-          : '/vote';
+      const isElectionClosed = await getElectionClosedStatus();
+      const redirectUrl = resolvePostLoginDestination({
+        role: effectiveRole,
+        hasVoted,
+        isElectionClosed,
+        requestedRedirect,
+      });
 
       return {
         success: true,
@@ -430,12 +438,13 @@ export async function authenticateWithPassword(
   const token = await createSessionToken(sessionUser);
   setSessionCookie(token);
 
-  const redirectUrl =
-    effectiveRole !== 'voter'
-      ? '/admin/dashboard'
-      : hasVoted
-      ? '/receipt'
-      : '/vote';
+  const isElectionClosed = await getElectionClosedStatus();
+  const redirectUrl = resolvePostLoginDestination({
+    role: effectiveRole,
+    hasVoted,
+    isElectionClosed,
+    requestedRedirect,
+  });
 
   return {
     success: true,

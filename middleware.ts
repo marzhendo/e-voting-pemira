@@ -88,6 +88,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 5. PROTEKSI HALAMAN REKAPITULASI SUARA (/rekapitulasi)
+  if (pathname === '/rekapitulasi' || pathname.startsWith('/rekapitulasi/')) {
+    if (!session) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', '/rekapitulasi');
+      loginUrl.searchParams.set('error', 'REKAP_AUTH_REQUIRED');
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   return NextResponse.next({
     request: {
       headers: requestHeaders,
@@ -101,5 +111,7 @@ export const config = {
     '/api/admin/:path*',
     '/vote',
     '/receipt',
+    '/rekapitulasi',
+    '/rekapitulasi/:path*',
   ],
 };

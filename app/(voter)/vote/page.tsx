@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -379,6 +380,15 @@ export default function VotePage() {
                       )} WIB.`
                     : "Waktu pemungutan suara telah berakhir atau belum dimulai sesuai ketetapan panitia."}
                 </p>
+                <div className="mt-3">
+                  <Link
+                    href="/rekapitulasi"
+                    className="min-h-[44px] px-4 py-2 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  >
+                    <span>Lihat Rekapitulasi Suara</span>
+                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                  </Link>
+                </div>
               </div>
             </div>
           )}
