@@ -33,6 +33,9 @@ export interface VoterRow {
   has_voted: boolean;
   has_password?: boolean;
   password_created_at?: string | null;
+  last_email_status?: "sent" | "failed" | null;
+  last_email_sent_at?: string | null;
+  last_email_error?: string | null;
   updated_at: string;
 }
 

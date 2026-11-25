@@ -1,6 +1,7 @@
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin';
 import { getDevElectionSettings } from '@/lib/election/dev-settings-store';
 import { isDevFallbackAllowed } from '@/lib/security/env';
+import { fetchAllPaginatedRows } from '@/lib/dpt/supabase-reader';
 import { calculateLiveTally } from './store';
 
 export interface TallyCandidateSummary {
@@ -99,18 +100,22 @@ export async function getElectionTallySnapshot(): Promise<ElectionTallySnapshot>
 
     const isClosed = !settings.is_voting_open || new Date() > new Date(settings.end_time);
 
-    const [{ data: candidates, error: candError }, { data: ballots, error: ballotError }, { data: voters, error: voterError }] =
+    const [{ data: candidates, error: candError }, ballots, voters] =
       await Promise.all([
         adminSupabase
           .from('candidates')
           .select('id, candidate_number, leader_name, vice_leader_name, photo_url, is_active')
           .eq('is_active', true)
           .order('candidate_number', { ascending: true }),
-        adminSupabase.from('ballots').select('candidate_id'),
-        adminSupabase.from('voters_whitelist').select('generation, has_voted'),
+        fetchAllPaginatedRows<{ candidate_id: string }>((from, to) =>
+          adminSupabase.from('ballots').select('candidate_id').range(from, to)
+        ),
+        fetchAllPaginatedRows<{ generation: number; has_voted: boolean }>((from, to) =>
+          adminSupabase.from('voters_whitelist').select('generation, has_voted').range(from, to)
+        ),
       ]);
 
-    if (candError || !candidates || ballotError || !ballots || voterError || !voters) {
+    if (candError || !candidates) {
       throw new Error('Gagal mengambil data kandidat, surat suara, atau partisipasi DPT.');
     }
 

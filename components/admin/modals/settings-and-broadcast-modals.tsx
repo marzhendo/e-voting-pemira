@@ -5,15 +5,18 @@ import {
   AlertCircle,
   Check,
   CheckCircle2,
+  Clock,
   Loader2,
   Lock,
   Mail,
+  Play,
   Send,
   Sparkles,
   X,
 } from "lucide-react";
 import { Portal } from "@/components/ui/portal";
 import type { ToggleModalConfig } from "../types";
+import type { BroadcastTargetGroup } from "@/lib/dpt/broadcast-targeting";
 
 export interface EmergencyLockModalProps {
   isOpen: boolean;
@@ -282,6 +285,10 @@ export interface BroadcastProgressState {
   percentage: number;
   statusText?: string;
   isComplete: boolean;
+  isPausedBatch?: boolean;
+  hasMore?: boolean;
+  lastBatchSent?: number;
+  lastBatchFailed?: number;
   lastError?: string;
 }
 
@@ -290,11 +297,14 @@ export interface BroadcastConfirmModalProps {
   isBroadcasting: boolean;
   broadcastProgress?: BroadcastProgressState | null;
   broadcastTargetCount: number | null;
-  broadcastTargetGroup: "not_voted" | "all" | "voted" | "failed_email" | "uncontacted";
+  broadcastTargetGroup: BroadcastTargetGroup;
   broadcastGeneration: string;
   availableGenerations: number[];
   broadcastSubject: string;
   broadcastTemplate?: "credentials" | "reminder" | "invitation" | "custom";
+  autoContinue?: boolean;
+  onToggleAutoContinue?: (value: boolean) => void;
+  onContinueNextBatch?: () => void;
   onClose: () => void;
   onExecute: () => void;
   onRetryFailed?: () => void;
@@ -310,6 +320,9 @@ export function BroadcastConfirmModal({
   availableGenerations,
   broadcastSubject,
   broadcastTemplate = "credentials",
+  autoContinue = false,
+  onToggleAutoContinue,
+  onContinueNextBatch,
   onClose,
   onExecute,
   onRetryFailed,
@@ -318,10 +331,13 @@ export function BroadcastConfirmModal({
 
   const isCredentials = broadcastTemplate === "credentials";
   const isComplete = Boolean(broadcastProgress?.isComplete);
+  const isPausedBatch = Boolean(!isBroadcasting && !isComplete && broadcastProgress?.isPausedBatch && broadcastProgress?.hasMore);
   const totalCount = broadcastProgress?.total ?? broadcastTargetCount ?? 0;
   const currentCount = broadcastProgress?.current ?? 0;
   const sentCount = broadcastProgress?.sent ?? 0;
   const failedCount = broadcastProgress?.failed ?? 0;
+  const remainingCount = Math.max(0, totalCount - currentCount);
+  const nextBatchSize = Math.min(20, remainingCount);
   const percentage = broadcastProgress?.percentage ?? (totalCount > 0 ? Math.round((currentCount / totalCount) * 100) : 0);
 
   return (
@@ -371,6 +387,20 @@ export function BroadcastConfirmModal({
                   </h3>
                   <p className="text-xs text-on-surface-variant mt-0.5">
                     Sedang mentransmisikan email secara bertahap via SMTP kampus.
+                  </p>
+                </div>
+              </div>
+              ) : isPausedBatch ? (
+              <div className="flex items-start gap-3.5 pb-2 border-b border-outline-variant/20">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-sm">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Batch 20 Email Selesai
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Jeda otomatis aktif setelah 20 penerima agar server email tetap stabil.
                   </p>
                 </div>
               </div>
@@ -570,6 +600,96 @@ export function BroadcastConfirmModal({
                   </button>
                 </div>
               </div>
+            ) : isPausedBatch ? (
+              /* Body: Controlled Batch Pause State */
+              <div className="space-y-4 py-1">
+                <div className="p-4 rounded-xl bg-surface-container-high border border-outline-variant/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
+                      Progres Antrean
+                    </span>
+                    <span className="text-xl font-bold font-mono tabular-nums text-primary">
+                      {percentage}%
+                    </span>
+                  </div>
+
+                  <div className="w-full h-3 bg-surface-container-lowest rounded-full overflow-hidden p-0.5 border border-outline-variant/30">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary via-primary to-secondary-fixed rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${Math.max(3, percentage)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                    <div className="text-on-surface-variant">
+                      <span className="font-bold text-on-surface font-mono tabular-nums">
+                        {currentCount}
+                      </span>{" "}
+                      dari{" "}
+                      <span className="font-bold text-on-surface font-mono tabular-nums">
+                        {totalCount}
+                      </span>{" "}
+                      Mahasiswa diproses
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono text-[11px]">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold tabular-nums">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {sentCount} Terkirim
+                      </span>
+                      {failedCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-error/10 border border-error/20 text-error font-semibold tabular-nums">
+                          <AlertTriangle className="w-3 h-3" />
+                          {failedCount} Gagal
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/20 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-on-surface-variant">Hasil batch terakhir:</span>
+                    <span className="font-semibold text-on-surface tabular-nums">
+                      {broadcastProgress?.lastBatchSent ?? 0} terkirim
+                      {(broadcastProgress?.lastBatchFailed ?? 0) > 0
+                        ? `, ${broadcastProgress?.lastBatchFailed} gagal`
+                        : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-on-surface-variant">Sisa antrean:</span>
+                    <span className="font-bold text-primary tabular-nums">
+                      {remainingCount.toLocaleString("id-ID")} Mahasiswa
+                    </span>
+                  </div>
+                  {broadcastProgress?.lastError && (
+                    <p className="text-[11px] text-error pt-1 border-t border-outline-variant/20">
+                      Catatan kendala terakhir: {broadcastProgress.lastError.slice(0, 120)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-outline-variant/20">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-semibold text-on-surface bg-surface-container-highest hover:bg-surface-container-high border border-outline-variant/30 transition-colors cursor-pointer flex items-center justify-center"
+                  >
+                    Tutup &amp; Jeda
+                  </button>
+                  {onContinueNextBatch && (
+                    <button
+                      type="button"
+                      onClick={onContinueNextBatch}
+                      className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Kirim {nextBatchSize} Berikutnya</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             ) : (
               /* Body: Confirmation / Review State */
               <>
@@ -595,15 +715,17 @@ export function BroadcastConfirmModal({
                       Kelompok Sasaran:
                     </span>
                     <span className="font-semibold text-on-surface">
-                      {broadcastTargetGroup === "not_voted"
-                        ? "Khusus yang Belum Memilih"
-                        : broadcastTargetGroup === "all"
-                          ? "Seluruh DPT"
-                          : broadcastTargetGroup === "voted"
-                            ? "Khusus yang Sudah Memilih"
-                            : broadcastTargetGroup === "failed_email"
-                              ? "Khusus yang Gagal Terkirim"
-                              : "Khusus Belum Pernah Terima Email"}
+                      {broadcastTargetGroup === "pending_unvoted"
+                        ? "Belum Terkirim & Belum Memilih"
+                        : broadcastTargetGroup === "not_voted"
+                          ? "Semua yang Belum Memilih"
+                          : broadcastTargetGroup === "all"
+                            ? "Seluruh DPT"
+                            : broadcastTargetGroup === "voted"
+                              ? "Khusus yang Sudah Memilih"
+                              : broadcastTargetGroup === "failed_email"
+                                ? "Khusus yang Gagal Terkirim"
+                                : "Khusus Belum Pernah Terima Email"}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -635,9 +757,27 @@ export function BroadcastConfirmModal({
                   </div>
                 )}
 
+                {onToggleAutoContinue && (
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/25 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoContinue}
+                      onChange={(e) => onToggleAutoContinue(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <span className="text-[11px] text-on-surface leading-relaxed">
+                      <strong className="block text-on-surface font-semibold">
+                        Auto-lanjut setiap 20 email (jeda 5 detik)
+                      </strong>
+                      <span className="text-on-surface-variant">
+                        Jika tidak dicentang, pengiriman berhenti otomatis tiap 20 penerima agar panitia bisa memantau hasil sebelum lanjut.
+                      </span>
+                    </span>
+                  </label>
+                )}
+
                 <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                  ⚠️ Sistem menggunakan transmisi batching paralel berprogres untuk menjaga
-                  deliverability SMTP dan mencegah batas waktu serverless (timeout).
+                  Pengiriman dibagi per 20 mahasiswa agar server Gmail tidak membatasi koneksi dan status tiap email langsung tercatat.
                 </p>
 
                 <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3 pt-2">
@@ -655,7 +795,11 @@ export function BroadcastConfirmModal({
                     onClick={onExecute}
                     className="w-full sm:w-auto h-11 px-5 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-secondary-fixed transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
                   >
-                    <span>Ya, Kirim Sekarang</span>
+                    <span>
+                      {!autoContinue && totalCount > 20
+                        ? "Kirim 20 Email Pertama"
+                        : "Ya, Kirim Sekarang"}
+                    </span>
                   </button>
                 </div>
               </>

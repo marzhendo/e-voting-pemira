@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
       const search = searchParams.get('q') || '';
       const generation = searchParams.get('generation');
       const status = searchParams.get('status'); // 'voted' | 'not_voted' | null
+      const emailStatus = searchParams.get('emailStatus'); // 'sent' | 'failed' | 'uncontacted' | 'all' | null
       const requestedLimit = Number(searchParams.get('limit') || '50');
       const limit = Math.min(Math.max(requestedLimit, 10), 100);
       const requestedPage = Number(searchParams.get('page') || '0');
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 
       let query = adminSupabase
         .from('voters_whitelist')
-        .select('id, nim, name, email, generation, has_voted, password_created_at, password_hash, created_at', { count: 'exact' });
+        .select('id, nim, name, email, generation, has_voted, password_created_at, password_hash, last_email_status, last_email_sent_at, last_email_error, created_at', { count: 'exact' });
 
       const sanitizedSearch = search.trim().replace(/[^a-zA-Z0-9\s@._-]/g, '');
       if (sanitizedSearch) {
@@ -66,6 +67,14 @@ export async function GET(req: NextRequest) {
         query = query.eq('has_voted', true);
       } else if (status === 'not_voted') {
         query = query.eq('has_voted', false);
+      }
+
+      if (emailStatus === 'sent') {
+        query = query.eq('last_email_status', 'sent');
+      } else if (emailStatus === 'failed') {
+        query = query.eq('last_email_status', 'failed');
+      } else if (emailStatus === 'uncontacted') {
+        query = query.is('last_email_status', null);
       }
 
       query = query.order('nim', { ascending: true }).range(offset, offset + limit - 1);
@@ -120,6 +129,9 @@ export async function GET(req: NextRequest) {
             has_voted: v.has_voted,
             has_password: Boolean(v.password_hash || v.otp_hash),
             password_created_at: v.password_created_at || v.otp_last_sent_at || null,
+            last_email_status: v.last_email_status || null,
+            last_email_sent_at: v.last_email_sent_at || null,
+            last_email_error: v.last_email_error || null,
             updated_at: v.created_at || new Date().toISOString(),
           })),
           total,
@@ -141,6 +153,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('q') || '';
     const generation = searchParams.get('generation');
     const status = searchParams.get('status') as 'voted' | 'not_voted' | 'all' | null;
+    const emailStatus = searchParams.get('emailStatus') as 'all' | 'sent' | 'failed' | 'uncontacted' | null;
     const requestedLimit = Number(searchParams.get('limit') || '50');
     const limit = Math.min(Math.max(requestedLimit, 10), 100);
     const requestedPage = Number(searchParams.get('page') || '0');
@@ -152,6 +165,7 @@ export async function GET(req: NextRequest) {
       search,
       generation: generation || undefined,
       status: status || undefined,
+      emailStatus: emailStatus || undefined,
       limit,
       offset,
     });
@@ -171,6 +185,9 @@ export async function GET(req: NextRequest) {
         has_voted: v.has_voted,
         has_password: Boolean(v.password_hash),
         password_created_at: v.password_created_at || null,
+        last_email_status: v.last_email_status || null,
+        last_email_sent_at: v.last_email_sent_at || null,
+        last_email_error: v.last_email_error || null,
         updated_at: v.updated_at || v.created_at || new Date().toISOString(),
       })),
       total,

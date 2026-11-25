@@ -27,6 +27,10 @@ import type {
   ToggleModalConfig,
   VoterRow,
 } from '@/components/admin/types';
+import type {
+  BroadcastTargetGroup,
+  DeliveryStatsSummary,
+} from '@/lib/dpt/broadcast-targeting';
 import {
   formatDateTimeLocal,
   getElectionSystemStatus,
@@ -136,7 +140,7 @@ export default function AdminDashboardPage() {
   const [toggleReason, setToggleReason] = useState<string>('');
 
   // Broadcast Email State
-  const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<'not_voted' | 'all' | 'voted' | 'failed_email' | 'uncontacted'>('not_voted');
+  const [broadcastTargetGroup, setBroadcastTargetGroup] = useState<BroadcastTargetGroup>('pending_unvoted');
   const [broadcastGeneration, setBroadcastGeneration] = useState('all');
   const [broadcastTemplate, setBroadcastTemplate] = useState<'credentials' | 'reminder' | 'invitation' | 'custom'>('credentials');
   const [broadcastSubject, setBroadcastSubject] = useState('[Pemira HMIF] Hari Pemilihan: Kata Sandi & Akses Bilik Suara');
@@ -147,8 +151,18 @@ export default function AdminDashboardPage() {
   const [broadcastCtaText, setBroadcastCtaText] = useState('Buka Bilik Suara');
   const [broadcastCtaUrl, setBroadcastCtaUrl] = useState('/login');
   const [broadcastTargetCount, setBroadcastTargetCount] = useState<number | null>(null);
+  const [broadcastDeliveryStats, setBroadcastDeliveryStats] = useState<DeliveryStatsSummary | null>(null);
   const [loadingBroadcastCount, setLoadingBroadcastCount] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastAutoContinue, setBroadcastAutoContinue] = useState(false);
+  const [broadcastCursor, setBroadcastCursor] = useState<{
+    targetGroup: BroadcastTargetGroup;
+    offset: number;
+    lastNim?: string;
+    cumulativeSent: number;
+    cumulativeFailed: number;
+    actualTotal: number;
+  } | null>(null);
   const [broadcastResult, setBroadcastResult] = useState<{ totalTarget: number; sentCount: number; failedCount: number } | null>(null);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
   const [isConfirmBroadcastOpen, setIsConfirmBroadcastOpen] = useState(false);
@@ -160,6 +174,7 @@ export default function AdminDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGeneration, setSelectedGeneration] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedEmailStatus, setSelectedEmailStatus] = useState('all');
   const [voterTotalCount, setVoterTotalCount] = useState(0);
   const [dptPage, setDptPage] = useState(1);
   const [dptPageSize, setDptPageSize] = useState(50);
@@ -483,6 +498,7 @@ export default function AdminDashboardPage() {
     if (searchQuery) params.set('q', searchQuery);
     if (selectedGeneration !== 'all') params.set('generation', selectedGeneration);
     if (selectedStatus !== 'all') params.set('status', selectedStatus);
+    if (selectedEmailStatus !== 'all') params.set('emailStatus', selectedEmailStatus);
     params.set('page', String(page));
     params.set('limit', String(limit));
 
@@ -497,7 +513,7 @@ export default function AdminDashboardPage() {
       })
       .catch(() => {})
       .finally(() => setLoadingVoters(false));
-  }, [searchQuery, selectedGeneration, selectedStatus, dptPage, dptPageSize]);
+  }, [searchQuery, selectedGeneration, selectedStatus, selectedEmailStatus, dptPage, dptPageSize]);
 
   useEffect(() => {
     if (activeTab === 'dpt') {
@@ -1140,6 +1156,9 @@ export default function AdminDashboardPage() {
       .then((data) => {
         if (data?.success) {
           setBroadcastTargetCount(data.count);
+          if (data.deliveryStats) {
+            setBroadcastDeliveryStats(data.deliveryStats);
+          }
         }
       })
       .catch(() => {})
@@ -1152,33 +1171,27 @@ export default function AdminDashboardPage() {
     }
   }, [activeTab, fetchBroadcastCount]);
 
-  const handleExecuteBroadcast = async (overrideTargetGroup?: 'not_voted' | 'all' | 'voted' | 'failed_email' | 'uncontacted') => {
-    const activeTarget = overrideTargetGroup || broadcastTargetGroup;
+  const runBroadcastBatches = async (params: {
+    activeTarget: BroadcastTargetGroup;
+    offset: number;
+    lastNim?: string;
+    cumulativeSent: number;
+    cumulativeFailed: number;
+    actualTotal: number;
+  }) => {
     setIsBroadcasting(true);
     setBroadcastError(null);
-    setBroadcastResult(null);
-
-    const targetTotal =
-      overrideTargetGroup === 'failed_email' && broadcastProgress?.failed
-        ? broadcastProgress.failed
-        : (broadcastTargetCount || 0);
-    setBroadcastProgress({
-      current: 0,
-      total: targetTotal,
-      sent: 0,
-      failed: 0,
-      percentage: 0,
-      statusText: 'Mempersiapkan antrean pengiriman email...',
-      isComplete: false,
-    });
+    if (params.offset === 0) {
+      setBroadcastResult(null);
+    }
 
     const CHUNK_LIMIT = 20;
-    let offset = 0;
-    let currentLastNim: string | undefined = undefined;
-    let cumulativeSent = 0;
-    let cumulativeFailed = 0;
+    let offset = params.offset;
+    let currentLastNim: string | undefined = params.lastNim;
+    let cumulativeSent = params.cumulativeSent;
+    let cumulativeFailed = params.cumulativeFailed;
     let hasMore = true;
-    let actualTotal = targetTotal;
+    let actualTotal = params.actualTotal;
 
     try {
       while (hasMore) {
@@ -1187,7 +1200,7 @@ export default function AdminDashboardPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            targetGroup: activeTarget,
+            targetGroup: params.activeTarget,
             generation: broadcastGeneration,
             template: broadcastTemplate,
             includeCredentials: broadcastTemplate === 'credentials',
@@ -1217,18 +1230,23 @@ export default function AdminDashboardPage() {
         }
         cumulativeSent += data.stats.chunkSent;
         cumulativeFailed += data.stats.chunkFailed;
-        const currentProcessed = Math.min(offset + data.stats.processedCount, actualTotal);
+        const currentProcessed = Math.min(offset + data.stats.processedCount, Math.max(actualTotal, offset + data.stats.processedCount));
+        if (!data.stats.hasMore && currentProcessed > actualTotal) {
+          actualTotal = currentProcessed;
+        }
         const percent = actualTotal > 0 ? Math.min(100, Math.round((currentProcessed / actualTotal) * 100)) : 100;
 
-        hasMore = data.stats.hasMore;
+        hasMore = Boolean(data.stats.hasMore);
         offset = data.stats.nextOffset;
         currentLastNim = data.stats.lastNim || undefined;
 
-        const nextBatchStart = Math.min(offset + 1, actualTotal);
-        const nextBatchEnd = Math.min(offset + CHUNK_LIMIT, actualTotal);
+        const nextBatchStart = Math.min(offset + 1, Math.max(actualTotal, offset + 1));
+        const nextBatchEnd = Math.min(offset + CHUNK_LIMIT, Math.max(actualTotal, offset + CHUNK_LIMIT));
         const chunkLastError = data.stats.failedRecipients?.length > 0
           ? data.stats.failedRecipients[0].error
           : undefined;
+
+        const shouldPauseAfterBatch = hasMore && !broadcastAutoContinue;
 
         setBroadcastProgress((prev) => ({
           current: currentProcessed,
@@ -1236,16 +1254,37 @@ export default function AdminDashboardPage() {
           sent: cumulativeSent,
           failed: cumulativeFailed,
           percentage: percent,
-          statusText: hasMore
-            ? `Memproses batch penerima ${nextBatchStart}–${nextBatchEnd} dari ${actualTotal}...`
-            : 'Seluruh batch pengiriman selesai diproses.',
+          statusText: shouldPauseAfterBatch
+            ? `Batch 20 penerima selesai. ${Math.max(0, actualTotal - currentProcessed)} mahasiswa menunggu batch berikutnya.`
+            : hasMore
+              ? `Jeda aman 5 detik sebelum mengirim penerima ${nextBatchStart}-${nextBatchEnd} dari ${actualTotal}...`
+              : 'Seluruh batch pengiriman selesai diproses.',
           isComplete: !hasMore,
+          isPausedBatch: shouldPauseAfterBatch,
+          hasMore,
+          lastBatchSent: data.stats.chunkSent,
+          lastBatchFailed: data.stats.chunkFailed,
           lastError: chunkLastError || prev?.lastError,
         }));
 
-        if (!hasMore) {
+        if (shouldPauseAfterBatch) {
+          setBroadcastCursor({
+            targetGroup: params.activeTarget,
+            offset,
+            lastNim: currentLastNim,
+            cumulativeSent,
+            cumulativeFailed,
+            actualTotal,
+          });
           break;
         }
+
+        if (!hasMore) {
+          setBroadcastCursor(null);
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
 
       setBroadcastResult({
@@ -1261,9 +1300,84 @@ export default function AdminDashboardPage() {
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan koneksi saat memproses broadcast email.';
       setBroadcastError(errorMessage);
+      if (offset === 0) {
+        setIsConfirmBroadcastOpen(false);
+        setBroadcastProgress(null);
+        setBroadcastCursor(null);
+      } else {
+        setBroadcastCursor({
+          targetGroup: params.activeTarget,
+          offset,
+          lastNim: currentLastNim,
+          cumulativeSent,
+          cumulativeFailed,
+          actualTotal,
+        });
+        setBroadcastProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                isPausedBatch: true,
+                hasMore: true,
+                lastError: errorMessage,
+              }
+            : null,
+        );
+      }
     } finally {
       setIsBroadcasting(false);
     }
+  };
+
+  const handleExecuteBroadcast = async (overrideTargetGroup?: BroadcastTargetGroup) => {
+    const activeTarget = overrideTargetGroup || broadcastTargetGroup;
+    const targetTotal =
+      overrideTargetGroup === 'failed_email' && broadcastProgress?.failed
+        ? broadcastProgress.failed
+        : (broadcastTargetCount || 0);
+
+    setBroadcastCursor(null);
+    setBroadcastProgress({
+      current: 0,
+      total: targetTotal,
+      sent: 0,
+      failed: 0,
+      percentage: 0,
+      statusText: 'Mengirimkan 20 email pada batch pertama...',
+      isComplete: false,
+      isPausedBatch: false,
+      hasMore: true,
+    });
+
+    await runBroadcastBatches({
+      activeTarget,
+      offset: 0,
+      cumulativeSent: 0,
+      cumulativeFailed: 0,
+      actualTotal: targetTotal,
+    });
+  };
+
+  const handleContinueNextBatch = async () => {
+    if (!broadcastCursor || isBroadcasting) return;
+    setBroadcastProgress((prev) =>
+      prev
+        ? {
+            ...prev,
+            isPausedBatch: false,
+            statusText: `Mengirimkan 20 email berikutnya (${broadcastCursor.offset + 1}-${Math.min(broadcastCursor.offset + 20, broadcastCursor.actualTotal)} dari ${broadcastCursor.actualTotal})...`,
+          }
+        : prev,
+    );
+
+    await runBroadcastBatches({
+      activeTarget: broadcastCursor.targetGroup,
+      offset: broadcastCursor.offset,
+      lastNim: broadcastCursor.lastNim,
+      cumulativeSent: broadcastCursor.cumulativeSent,
+      cumulativeFailed: broadcastCursor.cumulativeFailed,
+      actualTotal: broadcastCursor.actualTotal,
+    });
   };
 
   // Handle File Import DPT (.csv, .txt, .xlsx, .xls)
@@ -2083,6 +2197,7 @@ export default function AdminDashboardPage() {
                   searchQuery={searchQuery}
                   selectedGeneration={selectedGeneration}
                   selectedStatus={selectedStatus}
+                  selectedEmailStatus={selectedEmailStatus}
                   availableGenerations={availableGenerations}
                   voters={voters}
                   loadingVoters={loadingVoters}
@@ -2118,6 +2233,10 @@ export default function AdminDashboardPage() {
                   }}
                   onStatusChange={(value) => {
                     setSelectedStatus(value);
+                    setDptPage(1);
+                  }}
+                  onEmailStatusChange={(value) => {
+                    setSelectedEmailStatus(value);
                     setDptPage(1);
                   }}
                   onClearSelectedVoters={() => setSelectedVoterIds([])}
@@ -2186,6 +2305,7 @@ export default function AdminDashboardPage() {
                   availableGenerations={availableGenerations}
                   loadingBroadcastCount={loadingBroadcastCount}
                   broadcastTargetCount={broadcastTargetCount}
+                  deliveryStats={broadcastDeliveryStats}
                   broadcastSubject={broadcastSubject}
                   broadcastHeadline={broadcastHeadline}
                   broadcastBody={broadcastBody}
@@ -2324,10 +2444,14 @@ export default function AdminDashboardPage() {
           availableGenerations={availableGenerations}
           broadcastSubject={broadcastSubject}
           broadcastTemplate={broadcastTemplate}
+          autoContinue={broadcastAutoContinue}
+          onToggleAutoContinue={setBroadcastAutoContinue}
+          onContinueNextBatch={handleContinueNextBatch}
           onClose={() => {
             if (!isBroadcasting) {
               setIsConfirmBroadcastOpen(false);
               setBroadcastProgress(null);
+              setBroadcastCursor(null);
             }
           }}
           onExecute={() => handleExecuteBroadcast()}

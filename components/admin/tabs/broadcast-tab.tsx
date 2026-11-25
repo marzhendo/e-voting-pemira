@@ -10,6 +10,10 @@ import {
   Send,
   Users,
 } from "lucide-react";
+import type {
+  BroadcastTargetGroup,
+  DeliveryStatsSummary,
+} from "@/lib/dpt/broadcast-targeting";
 
 export interface BroadcastResultSummary {
   sentCount: number;
@@ -23,11 +27,12 @@ export interface BroadcastTabProps {
   broadcastResult: BroadcastResultSummary | null;
   broadcastError: string | null;
   broadcastTemplate: "credentials" | "reminder" | "invitation" | "custom";
-  broadcastTargetGroup: "not_voted" | "all" | "voted" | "failed_email" | "uncontacted";
+  broadcastTargetGroup: BroadcastTargetGroup;
   broadcastGeneration: string;
   availableGenerations: number[];
   loadingBroadcastCount: boolean;
   broadcastTargetCount: number | null;
+  deliveryStats?: DeliveryStatsSummary | null;
   broadcastSubject: string;
   broadcastHeadline: string;
   broadcastBody: string;
@@ -36,7 +41,7 @@ export interface BroadcastTabProps {
   isBroadcasting: boolean;
   onRefreshQuota: () => void;
   onSelectTemplate: (template: "credentials" | "reminder" | "invitation" | "custom") => void;
-  onTargetGroupChange: (group: "not_voted" | "all" | "voted" | "failed_email" | "uncontacted") => void;
+  onTargetGroupChange: (group: BroadcastTargetGroup) => void;
   onGenerationChange: (generation: string) => void;
   onSubjectChange: (subject: string) => void;
   onHeadlineChange: (headline: string) => void;
@@ -57,6 +62,7 @@ export function BroadcastTab({
   availableGenerations,
   loadingBroadcastCount,
   broadcastTargetCount,
+  deliveryStats,
   broadcastSubject,
   broadcastHeadline,
   broadcastBody,
@@ -281,14 +287,15 @@ export function BroadcastTab({
                 <select
                   value={broadcastTargetGroup}
                   onChange={(e) =>
-                    onTargetGroupChange(
-                      e.target.value as "not_voted" | "all" | "voted" | "failed_email" | "uncontacted",
-                    )
+                    onTargetGroupChange(e.target.value as BroadcastTargetGroup)
                   }
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3.5 py-2.5 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                  className="w-full min-h-[44px] bg-surface-container-lowest text-xs rounded-xl px-3.5 py-2.5 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
                 >
+                  <option value="pending_unvoted">
+                    Belum Terkirim &amp; Belum Memilih (Disarankan Lanjut)
+                  </option>
                   <option value="not_voted">
-                    Belum memilih (Disarankan)
+                    Semua yang Belum Memilih
                   </option>
                   <option value="all">Seluruh mahasiswa di DPT</option>
                   <option value="voted">Sudah memilih</option>
@@ -304,12 +311,12 @@ export function BroadcastTab({
                 <select
                   value={broadcastGeneration}
                   onChange={(e) => onGenerationChange(e.target.value)}
-                  className="w-full bg-surface-container-lowest text-xs rounded-xl px-3.5 py-2.5 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                  className="w-full min-h-[44px] bg-surface-container-lowest text-xs rounded-xl px-3.5 py-2.5 border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
                 >
                   <option value="all">
                     Semua angkatan{" "}
                     {availableGenerations.length > 0
-                      ? `(${availableGenerations[0]} – ${availableGenerations[availableGenerations.length - 1]})`
+                      ? `(${availableGenerations[0]} - ${availableGenerations[availableGenerations.length - 1]})`
                       : ""}
                   </option>
                   {availableGenerations.map((gen) => (
@@ -321,11 +328,30 @@ export function BroadcastTab({
               </div>
             </div>
 
+            {deliveryStats && (
+              <div className="bg-surface-container-lowest rounded-xl px-3.5 py-2.5 border border-outline-variant/20 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <span className="text-on-surface-variant font-medium">
+                  Status email {broadcastGeneration === "all" ? "semua angkatan" : `Angkatan ${broadcastGeneration}`} ({deliveryStats.total.toLocaleString("id-ID")} DPT):
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                    {deliveryStats.sent.toLocaleString("id-ID")} Terkirim
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-error/10 text-error font-semibold border border-error/20">
+                    {deliveryStats.failed.toLocaleString("id-ID")} Gagal
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-container-high text-on-surface-variant font-semibold border border-outline-variant/30">
+                    {deliveryStats.uncontacted.toLocaleString("id-ID")} Belum Dikirim
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Target Counter Indicator */}
-            <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline-variant/20 flex items-center justify-between text-xs">
+            <div className="bg-surface-container-low rounded-xl px-4 py-3 border border-outline-variant/20 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-2 text-on-surface-variant">
-                <Users className="w-4 h-4 text-primary" />
-                <span>Estimasi penerima sasaran:</span>
+                <Users className="w-4 h-4 text-primary shrink-0" />
+                <span>Estimasi penerima sasaran (maks. 20/batch):</span>
               </div>
               <div className="font-semibold text-primary tabular-nums">
                 {loadingBroadcastCount ? (

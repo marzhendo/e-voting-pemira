@@ -9,6 +9,7 @@ import {
   resetVotersStore,
   markVoterAsVoted,
   recordEmailDelivery,
+  queryVoters,
 } from '../lib/dpt/store.ts';
 import {
   getAllBallots,
@@ -243,5 +244,46 @@ test.describe('Superadmin DPT Management & Ballot Secrecy Invariants', () => {
     // Invariant check: ballots table is completely empty and untouched
     const ballots = getAllBallots();
     assert.strictEqual(ballots.length, 0, 'Email delivery recording must never create or touch ballots');
+  });
+
+  test('6. queryVoters filters accurately by emailStatus (sent, failed, uncontacted)', async () => {
+    const nimSent = '103012999201';
+    const nimFailed = '103012999202';
+    const nimNone = '103012999203';
+
+    addSingleVoter({
+      nim: nimSent,
+      name: 'Pemilih Terkirim',
+      email: 'sent201@student.telkomuniversity.ac.id',
+      generation: 2024,
+    });
+    addSingleVoter({
+      nim: nimFailed,
+      name: 'Pemilih Gagal',
+      email: 'failed202@student.telkomuniversity.ac.id',
+      generation: 2024,
+    });
+    addSingleVoter({
+      nim: nimNone,
+      name: 'Pemilih Belum',
+      email: 'none203@student.telkomuniversity.ac.id',
+      generation: 2024,
+    });
+
+    await recordEmailDelivery(nimSent, { success: true });
+    await recordEmailDelivery(nimFailed, {
+      success: false,
+      error: '550 Daily limit exceeded',
+    });
+
+    const sentRes = queryVoters({ emailStatus: 'sent', search: '10301299920' });
+    assert.deepStrictEqual(sentRes.voters.map((v) => v.nim), [nimSent]);
+
+    const failedRes = queryVoters({ emailStatus: 'failed', search: '10301299920' });
+    assert.deepStrictEqual(failedRes.voters.map((v) => v.nim), [nimFailed]);
+    assert.strictEqual(failedRes.voters[0].last_email_error, '550 Daily limit exceeded');
+
+    const uncontactedRes = queryVoters({ emailStatus: 'uncontacted', search: '10301299920' });
+    assert.deepStrictEqual(uncontactedRes.voters.map((v) => v.nim), [nimNone]);
   });
 });

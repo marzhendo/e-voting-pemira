@@ -159,6 +159,7 @@ export function queryVoters(params?: {
   search?: string;
   generation?: string | number;
   status?: 'voted' | 'not_voted' | 'all' | null;
+  emailStatus?: 'all' | 'sent' | 'failed' | 'uncontacted' | null;
   limit?: number;
   offset?: number;
 }): { voters: VoterRecord[]; total: number } {
@@ -186,6 +187,14 @@ export function queryVoters(params?: {
     filtered = filtered.filter((v) => v.has_voted);
   } else if (params?.status === 'not_voted') {
     filtered = filtered.filter((v) => !v.has_voted);
+  }
+
+  if (params?.emailStatus === 'sent') {
+    filtered = filtered.filter((v) => v.last_email_status === 'sent');
+  } else if (params?.emailStatus === 'failed') {
+    filtered = filtered.filter((v) => v.last_email_status === 'failed');
+  } else if (params?.emailStatus === 'uncontacted') {
+    filtered = filtered.filter((v) => !v.last_email_status);
   }
 
   filtered.sort((a, b) => a.nim.localeCompare(b.nim));

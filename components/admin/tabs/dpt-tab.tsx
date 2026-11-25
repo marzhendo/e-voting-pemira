@@ -37,6 +37,7 @@ export interface DptTabProps {
   searchQuery: string;
   selectedGeneration: string;
   selectedStatus: string;
+  selectedEmailStatus: string;
   availableGenerations: number[];
   voters: VoterRow[];
   loadingVoters: boolean;
@@ -58,6 +59,7 @@ export interface DptTabProps {
   onSearchChange: (value: string) => void;
   onGenerationChange: (value: string) => void;
   onStatusChange: (value: string) => void;
+  onEmailStatusChange: (value: string) => void;
   onClearSelectedVoters: () => void;
   onOpenBatchDeleteModal: () => void;
   onToggleSelectAllVoters: () => void;
@@ -85,6 +87,7 @@ export function DptTab({
   searchQuery,
   selectedGeneration,
   selectedStatus,
+  selectedEmailStatus,
   availableGenerations,
   voters,
   loadingVoters,
@@ -106,6 +109,7 @@ export function DptTab({
   onSearchChange,
   onGenerationChange,
   onStatusChange,
+  onEmailStatusChange,
   onClearSelectedVoters,
   onOpenBatchDeleteModal,
   onToggleSelectAllVoters,
@@ -346,7 +350,7 @@ export function DptTab({
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <select
             value={selectedGeneration}
             onChange={(e) => onGenerationChange(e.target.value)}
@@ -368,6 +372,17 @@ export function DptTab({
             <option value="all">Semua Status</option>
             <option value="voted">Sudah Memilih</option>
             <option value="not_voted">Belum Memilih</option>
+          </select>
+
+          <select
+            value={selectedEmailStatus}
+            onChange={(e) => onEmailStatusChange(e.target.value)}
+            className="bg-surface-container-lowest text-xs rounded-xl px-3 py-2.5 min-h-[44px] border border-outline-variant/30 text-on-surface focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+          >
+            <option value="all">Semua Status Email</option>
+            <option value="sent">Email Terkirim</option>
+            <option value="failed">Email Gagal</option>
+            <option value="uncontacted">Belum Dikirim</option>
           </select>
         </div>
       </div>
@@ -429,6 +444,7 @@ export function DptTab({
                 <th className="py-3 px-5">Angkatan</th>
                 <th className="py-3 px-5">Hak Suara</th>
                 <th className="py-3 px-5">Sandi Pemilih</th>
+                <th className="py-3 px-5">Status Email</th>
                 <th className="py-3 px-5 text-right w-24">Aksi</th>
               </tr>
             </thead>
@@ -436,7 +452,7 @@ export function DptTab({
               {loadingVoters ? (
                 <tr>
                   <td
-                    colSpan={userRole === "super_admin" ? 8 : 7}
+                    colSpan={userRole === "super_admin" ? 9 : 8}
                     className="py-8 text-center text-on-surface-variant"
                   >
                     Memuat data pemilih...
@@ -445,7 +461,7 @@ export function DptTab({
               ) : voters.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={userRole === "super_admin" ? 8 : 7}
+                    colSpan={userRole === "super_admin" ? 9 : 8}
                     className="py-8 text-center text-on-surface-variant"
                   >
                     Tidak ada data yang cocok dengan pencarian.
@@ -504,6 +520,30 @@ export function DptTab({
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[11px] font-semibold">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                           Belum Terbit
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-5">
+                      {v.last_email_status === "sent" ? (
+                        <span
+                          title={v.last_email_sent_at ? `Terkirim: ${new Date(v.last_email_sent_at).toLocaleString("id-ID")}` : "Email berhasil dikirim"}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold whitespace-nowrap"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Terkirim
+                        </span>
+                      ) : v.last_email_status === "failed" ? (
+                        <span
+                          title={v.last_email_error || "Pengiriman email terakhir gagal"}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error/15 text-error text-[11px] font-semibold whitespace-nowrap cursor-help"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-error" />
+                          Gagal
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[11px] whitespace-nowrap">
+                          <span className="w-1.5 h-1.5 rounded-full bg-outline-variant" />
+                          Belum
                         </span>
                       )}
                     </td>

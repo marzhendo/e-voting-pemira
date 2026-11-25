@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
+import { fetchAllPaginatedRows } from '../lib/dpt/supabase-reader.ts';
+import {
+  computeDeliveryStats,
+  filterBroadcastRecipients,
+} from '../lib/dpt/broadcast-targeting.ts';
 
 test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
   await t.test('1. Extracts unique generations sorted ascending from DPT data', () => {
@@ -178,5 +183,104 @@ test('Broadcast & DPT Generation Dynamic Extraction', async (t) => {
     // Ensure every single NIM 1..35 was processed exactly once
     const uniqueProcessed = new Set(retryProcessedNims);
     assert.strictEqual(uniqueProcessed.size, 35);
+  });
+
+  await t.test('7. fetchAllPaginatedRows retrieves all rows past Supabase 1,000-row cap', async () => {
+    const TOTAL = 2350;
+    const allRows = Array.from({ length: TOTAL }, (_, idx) => ({
+      nim: `10311240${String(idx + 1).padStart(4, '0')}`,
+      generation: 2024,
+    }));
+    const requestedRanges = [];
+
+    const collected = await fetchAllPaginatedRows(async (from, to) => {
+      requestedRanges.push([from, to]);
+      return {
+        data: allRows.slice(from, to + 1),
+        error: null,
+      };
+    });
+
+    assert.strictEqual(collected.length, TOTAL);
+    assert.deepStrictEqual(requestedRanges, [
+      [0, 999],
+      [1000, 1999],
+      [2000, 2999],
+    ]);
+    assert.strictEqual(collected[0].nim, allRows[0].nim);
+    assert.strictEqual(collected[TOTAL - 1].nim, allRows[TOTAL - 1].nim);
+  });
+
+  await t.test('8. computeDeliveryStats & pending_unvoted skip voted and sent voters', () => {
+    const dataset = [
+      { nim: '103112400001', generation: 2024, has_voted: true, last_email_status: 'sent' },
+      { nim: '103112400002', generation: 2024, has_voted: true, last_email_status: null },
+      { nim: '103112400003', generation: 2024, has_voted: false, last_email_status: 'sent' },
+      { nim: '103112400004', generation: 2024, has_voted: false, last_email_status: 'failed' },
+      { nim: '103112400005', generation: 2024, has_voted: false, last_email_status: null },
+      { nim: '103112500001', generation: 2025, has_voted: false, last_email_status: 'failed' },
+    ];
+
+    const stats2024 = computeDeliveryStats(dataset, '2024');
+    assert.deepStrictEqual(stats2024, {
+      total: 5,
+      sent: 2,
+      failed: 1,
+      uncontacted: 2,
+      pendingUnvoted: 2,
+    });
+    assert.strictEqual(
+      stats2024.sent + stats2024.failed + stats2024.uncontacted,
+      stats2024.total,
+    );
+
+    const targets2024 = filterBroadcastRecipients(dataset, {
+      targetGroup: 'pending_unvoted',
+      generation: '2024',
+    });
+    assert.deepStrictEqual(
+      targets2024.map((v) => v.nim),
+      ['103112400004', '103112400005'],
+    );
+  });
+
+  await t.test('9. Controlled 20-recipient stepping across 45 pending_unvoted voters has zero drift', () => {
+    const candidates = Array.from({ length: 48 }, (_, i) => ({
+      nim: `103112400${String(i + 1).padStart(3, '0')}`,
+      generation: 2024,
+      has_voted: i < 3, // first 3 already voted -> always skipped
+      last_email_status: null,
+    }));
+
+    const CHUNK_LIMIT = 20;
+    const batches = [];
+    let lastNim = undefined;
+
+    while (true) {
+      const remaining = filterBroadcastRecipients(candidates, {
+        targetGroup: 'pending_unvoted',
+        generation: '2024',
+        lastNim,
+      });
+      const slice = remaining.slice(0, CHUNK_LIMIT);
+      if (slice.length === 0) break;
+
+      batches.push(slice.length);
+      slice.forEach((v) => {
+        v.last_email_status = 'sent';
+      });
+      lastNim = slice[slice.length - 1].nim;
+      if (remaining.length <= CHUNK_LIMIT) break;
+    }
+
+    assert.deepStrictEqual(batches, [20, 20, 5]);
+    assert.strictEqual(
+      candidates.filter((c) => !c.has_voted && c.last_email_status === 'sent').length,
+      45,
+    );
+    assert.strictEqual(
+      candidates.filter((c) => c.has_voted && c.last_email_status !== null).length,
+      0,
+    );
   });
 });
