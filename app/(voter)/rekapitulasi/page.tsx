@@ -16,6 +16,7 @@ import type { ElectionRecapPayload } from "@/lib/ballots/recap-contract";
 import { TurnoutGauge } from "@/components/recap/turnout-gauge";
 import { CohortTurnoutBars } from "@/components/recap/cohort-turnout-bars";
 import { RecapResultsView } from "@/components/recap/recap-results-view";
+import { ClosedParticipationCard } from "@/components/recap/closed-participation-card";
 
 const POLLING_INTERVAL_MS = 30_000;
 
@@ -215,25 +216,23 @@ export default function RekapitulasiPage() {
             </div>
 
             <h1 className="font-bebas text-3xl sm:text-5xl tracking-wide uppercase text-on-surface text-balance leading-tight">
-              {isClosed
-                ? "Rekapitulasi Suara Pemira HMIF"
-                : "Pantauan Partisipasi Pemilih"}
+              {isClosed ? "Rekapitulasi Suara" : "Pantauan Partisipasi Pemilih"}
             </h1>
 
-            <p className="text-xs sm:text-sm text-on-surface-variant text-pretty max-w-2xl">
-              {isClosed
-                ? "Publikasi resmi hasil penghitungan suara sah seluruh pasangan calon Chairman & Vice Chairman serta partisipasi Daftar Pemilih Tetap (DPT)."
-                : "Pantauan partisipasi DPT secara berkala. Perolehan suara tiap pasangan calon baru dipublikasikan setelah bilik suara resmi ditutup."}
-            </p>
+            {!isClosed && (
+              <p className="text-xs sm:text-sm text-on-surface-variant text-pretty max-w-2xl">
+                Pantauan partisipasi DPT secara berkala. Perolehan suara tiap pasangan calon baru dipublikasikan setelah bilik suara resmi ditutup.
+              </p>
+            )}
           </div>
 
           {/* Timing & Polling Metadata */}
           {recap && (
-            <div className="rounded-xl bg-surface-container border border-outline-variant/25 px-4 py-3 text-xs space-y-1 shrink-0 md:text-right">
+            <div className="text-xs space-y-1 shrink-0 md:text-right">
               {!isClosed && countdownText && (
-                <div className="flex items-center md:justify-end gap-2 text-on-surface">
+                <div className="inline-flex items-center gap-2 rounded-xl bg-surface-container border border-outline-variant/25 px-3.5 py-2 text-on-surface">
                   <Clock className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
-                  <span className="text-on-surface-variant">Sisa waktu voting:</span>
+                  <span className="text-on-surface-variant">Sisa waktu:</span>
                   <span className="font-mono font-bold text-primary tabular-nums">
                     {countdownText}
                   </span>
@@ -297,17 +296,14 @@ export default function RekapitulasiPage() {
                 <RecapResultsView
                   results={recap.results}
                   totalVotes={recap.turnout.totalVotes}
-                  totalDpt={recap.turnout.totalDpt}
                 />
 
-                <TurnoutGauge
+                <ClosedParticipationCard
                   totalDpt={recap.turnout.totalDpt}
                   totalVotes={recap.turnout.totalVotes}
                   turnoutPercentage={recap.turnout.turnoutPercentage}
-                  isClosed={true}
+                  cohorts={recap.turnout.byGeneration}
                 />
-
-                <CohortTurnoutBars cohorts={recap.turnout.byGeneration} />
               </>
             ) : (
               <>
@@ -347,8 +343,8 @@ export default function RekapitulasiPage() {
       {/* Footer */}
       <footer className="w-full border-t border-outline-variant/20 bg-surface-container-low/50 py-5 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-on-surface-variant text-center sm:text-left">
-          <p>&copy; 2026 HMIF Telkom University Purwokerto.</p>
-          <p>Komisi Pemilihan Raya (KPR) HMIF</p>
+          <p>Surat Suara Anonim terpisah dari identitas pemilih.</p>
+          <p>Komisi Pemilihan Raya (KPR) HMIF Telkom University Purwokerto</p>
         </div>
       </footer>
     </div>

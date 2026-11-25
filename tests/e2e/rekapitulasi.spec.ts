@@ -82,7 +82,7 @@ test.describe('Halaman Rekapitulasi Suara & Partisipasi Pemilih (/rekapitulasi)'
     expect(overflow).toBe(false);
   });
 
-  test('3. Renders ranked official results and BAST verification link when election is closed', async ({
+  test('3. Renders clean official results and cohort turnout summary when election is closed', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -140,14 +140,14 @@ test.describe('Halaman Rekapitulasi Suara & Partisipasi Pemilih (/rekapitulasi)'
     await page.locator('button[type="submit"]').click();
     await page.waitForURL('/rekapitulasi');
 
-    await expect(page.getByText('Rekapitulasi Suara Pemira HMIF')).toBeVisible();
-    await expect(page.getByText('Hasil Resmi Rekapitulasi Suara')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rekapitulasi Suara', exact: true })).toBeVisible();
+    await expect(page.getByText('Paslon 01 Meraih Suara Terbanyak')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Nehemia Pandu I. & Barret Fairuz A.', exact: true })
     ).toBeVisible();
     await expect(page.getByText('810 Suara')).toBeVisible();
     await expect(page.getByText('Kotak Kosong').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: /Verifikasi BAST/i })).toBeVisible();
+    await expect(page.getByText('Angkatan 2024')).toBeVisible();
 
     const overflowDesktop = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth
