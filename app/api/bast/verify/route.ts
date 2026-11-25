@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           valid: false,
-          error: 'Hash integritas dokumen Berita Acara tidak valid atau tidak disertakan.',
+          error: 'Format kode verifikasi tidak valid. Pastikan berisi 64 karakter huruf dan angka.',
         },
         { status: 400 }
       );
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         {
           valid: false,
           isExactMatch: false,
-          error: 'Tanda tangan digital SHA-256 tidak cocok dengan rekapitulasi resmi sistem saat ini.',
+          error: 'Kode verifikasi dokumen tidak cocok dengan catatan resmi sistem saat ini.',
         },
         { status: 404 }
       );
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
         turnoutPercentage,
         tally: tallyData,
       },
-      secrecyNotice: 'Dokumen rekapitulasi ini terverifikasi asli dari sistem digital bilik suara. Seluruh suara dihitung secara anonim tanpa kaitan ke identitas pemilih (*Ballot Secrecy*).',
+      secrecyNotice: 'Hasil dihitung dari Surat Suara Anonim yang tersimpan terpisah tanpa identitas pemilih.',
     });
   } catch (err) {
     console.error('[BastVerifyApi] Exception:', err);

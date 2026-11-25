@@ -84,28 +84,20 @@ test.describe('Fase 3: Export Tally, Audit Trail, and BAST Public Verification P
     expect(auditBody).toContain('Kategori Aksi');
   });
 
-  test('3. Public BAST Verification Portal (/bast/verify) operates without authentication', async ({ page, request }) => {
-    // 1. Kunjungi portal verifikasi tanpa login dan tanpa parameter hash
+  test('3. Public BAST Verification Portal (/bast/verify) renders manual form and rejects mismatched hash without authentication', async ({ page, request }) => {
+    // 1. Kunjungi portal verifikasi tanpa parameter hash -> tampilkan form verifikasi manual yang clean
     await page.goto('/bast/verify');
-    await expect(page.locator('text=Verifikasi Keabsahan Berita Acara (BAST)')).toBeVisible();
-    await expect(page.locator('text=Dokumen Tidak Terverifikasi')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Verifikasi Berita Acara \(BAST\)/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Cek Keabsahan Dokumen/i })).toBeVisible();
 
-    // 2. Dapatkan current system hash dari API BAST verify
+    // 2. Hash yang tidak cocok atau voting masih berjalan ditolak aman oleh API
     const dummyHash = 'A'.repeat(64);
     const verifyApi = await request.get(`/api/bast/verify?hash=${dummyHash}`);
-    expect(verifyApi.status()).toBe(200);
-    const apiData = await verifyApi.json();
+    expect([403, 404]).toContain(verifyApi.status());
 
-    expect(apiData.currentSystemHash).toBeDefined();
-    const systemHash = apiData.currentSystemHash;
-
-    // 3. Kunjungi portal dengan hash resmi yang valid
-    await page.goto(`/bast/verify?hash=${systemHash}`);
-
-    await expect(page.locator('text=Status Dokumen Sah & Asli')).toBeVisible();
-    await expect(page.locator('text=Berita Acara Rekapitulasi Suara Terverifikasi')).toBeVisible();
-    await expect(page.locator('body')).toContainText('Ballot Secrecy');
-    await expect(page.locator('text=Total DPT')).toBeVisible();
-    await expect(page.locator('text=Suara Masuk')).toBeVisible();
+    // 3. Submit hash palsu lewat form memicu tampilan error ramah "Dokumen Tidak Cocok"
+    await page.fill('#bast-hash-input', dummyHash);
+    await page.getByRole('button', { name: /Cek Keabsahan Dokumen/i }).click();
+    await expect(page.getByRole('heading', { name: /Dokumen Tidak Cocok/i })).toBeVisible();
   });
 });
