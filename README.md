@@ -153,28 +153,163 @@ Catatan: saat server lokal (`pnpm dev`) sedang aktif, gunakan `pnpm tsc --noEmit
 
 ## Arsitektur Produksi dan Teknologi
 
-Di lingkungan produksi ([pemirahmif.com](https://pemirahmif.com)), aplikasi berjalan di **VPS Ubuntu 22.04 LTS** dengan alur sebagai berikut:
+Di lingkungan produksi ([pemirahmif.com](https://pemirahmif.com)), aplikasi berjalan di **VPS Ubuntu 22.04 LTS** dengan Nginx di depan klaster Node.js (PM2) dan Supabase PostgreSQL sebagai basis data.
 
-```text
-Peramban Pengguna (HTTPS)
-        |
-        v
-  Nginx (Reverse Proxy, Load Balancer, Rate Limit, SSL, & Berkas Statis)
-        |
-        v
-  PM2 Cluster (Next.js Standalone di Node.js 20 LTS)
-       / \
-      v   v
-Supabase   SMTP (Pengiriman Kata Sandi Pemilih)
-(PostgreSQL)
+### 1. Arsitektur Sistem Lengkap
+
+```mermaid
+flowchart LR
+  subgraph Users["Pengguna"]
+    V["Mahasiswa Pemilih<br/>(/vote, /receipt, /rekapitulasi)"]
+    A["Panitia & Pengawas<br/>(/admin/dashboard)"]
+    P["Publik & Saksi<br/>(/bast/verify, /rekapitulasi)"]
+  end
+
+  subgraph Edge["VPS Ubuntu 22.04 LTS & Layanan Luar"]
+    NX["Nginx<br/>Reverse Proxy, Load Balancer, SSL, Rate Limit"]
+    SSO["Microsoft Entra ID<br/>SSO Telkom University"]
+    SMTP["SMTP Mailer<br/>Kirim Kata Sandi Pemilih (Batch 20)"]
+  end
+
+  subgraph Runtime["Next.js 14 Runtime (PM2 Cluster)"]
+    MW["Middleware<br/>Penjaga Rute & IP Asli"]
+    UI["App Router<br/>Antarmuka Pemilih & Admin"]
+    API["Server Actions & API Routes<br/>Autentikasi, Voting, Rekap, BAST"]
+  end
+
+  subgraph DB["Supabase PostgreSQL"]
+    RPC["Atomic RPC & Trigger<br/>Transaksi Atomik & Append-Only"]
+    DPT[("voters_whitelist<br/>DPT, Sandi Hash, Status Pilih")]
+    BAL[("ballots<br/>Surat Suara Anonim")]
+    CAN[("candidates<br/>Profil & Visi Misi Paslon")]
+    GOV[("election_settings, admin_users, audit_logs<br/>Jadwal, Panitia, Log Aktivitas")]
+  end
+
+  V -->|"HTTPS"| NX
+  A -->|"HTTPS"| NX
+  P -->|"HTTPS"| NX
+  NX -->|"X-Forwarded-For"| MW
+  SSO -->|"OIDC Callback"| UI
+  MW --> UI
+  UI --> API
+  API -->|"Broadcast Email"| SMTP
+  API -->|"Service Role RPC"| RPC
+  RPC -->|"Kunci Baris & Set has_voted"| DPT
+  RPC -->|"Simpan Terpisah"| BAL
+  RPC --> CAN
+  RPC --> GOV
+```
+
+### 2. Alur Keamanan dan Pemilihan Atomik
+
+Diagram berikut menjelaskan perjalanan pemilih dari halaman masuk sampai menerima Tanda Terima Pemilihan, sekaligus menjaga agar satu mahasiswa hanya bisa memilih satu kali tanpa meninggalkan jejak pilihan di data pemilih.
+
+```mermaid
+sequenceDiagram
+  actor M as Mahasiswa Pemilih
+  participant MW as Next.js Middleware
+  participant SRV as Auth & Ballot Service
+  participant RPC as PostgreSQL RPC
+  participant DPT as voters_whitelist
+  participant BAL as ballots (Append-Only)
+
+  Note over M,BAL: 1. Verifikasi Identitas Pemilih
+  M->>SRV: Kirim NIM dan Kata Sandi Pemilih (atau OTP)
+  SRV->>RPC: Periksa kecocokan sandi hash dan batas percobaan
+  RPC->>DPT: Kunci baris pemilih dan cek status has_voted
+  RPC-->>SRV: Identitas sah, terbitkan cookie sesi JWT
+
+  Note over M,BAL: 2. Masuk Bilik Suara Digital dan Kirim Suara
+  M->>MW: Buka /vote dengan cookie sesi
+  MW-->>M: Izinkan akses halaman Bilik Suara Digital
+  M->>SRV: Kirim pilihan kandidat (candidateId)
+  SRV->>RPC: Jalankan cast_ballot_secure(nim, candidateId, receiptHash)
+  RPC->>DPT: SELECT FOR UPDATE dan ubah has_voted = true
+  RPC->>BAL: INSERT surat suara anonim (tanpa NIM dan tanpa user ID)
+  RPC-->>SRV: Transaksi atomik berhasil
+  SRV-->>M: Tampilkan kode Tanda Terima Pemilihan (SHA-256)
+
+  Note over M,BAL: 3. Akses Pasca-Pemilihan
+  M->>MW: Buka /receipt atau /rekapitulasi (/vote otomatis terkunci)
+```
+
+### 3. Skema Basis Data (ERD)
+
+Tabel `voters_whitelist` dan `ballots` dibuat terpisah tanpa relasi (tanpa foreign key) agar pilihan suara tidak bisa ditelusuri kembali ke pemilik NIM. Tabel `ballots` dan `audit_logs` juga dipasangi trigger `prevent_append_only_modification()` yang menolak perintah `UPDATE` maupun `DELETE` langsung di tingkat basis data.
+
+```mermaid
+erDiagram
+  voters_whitelist {
+    uuid id PK
+    varchar nim UK
+    varchar email UK
+    varchar name
+    int generation
+    boolean has_voted
+    timestamptz voted_at
+    varchar receipt_hash
+    text password_hash
+    int login_attempts
+    timestamptz locked_until
+    text otp_hash
+    timestamptz otp_expires_at
+    timestamptz last_email_sent_at
+    text last_email_status
+  }
+
+  candidates {
+    uuid id PK
+    int candidate_number UK
+    varchar leader_name
+    varchar vice_leader_name
+    text vision
+    text_array mission
+    text photo_url
+    boolean is_active
+  }
+
+  ballots {
+    uuid id PK
+    uuid candidate_id FK
+    date voting_session_date
+  }
+
+  election_settings {
+    int id PK
+    boolean is_voting_open
+    timestamptz start_time
+    timestamptz end_time
+    boolean maintenance_mode
+    boolean allow_kotak_kosong_multi
+  }
+
+  admin_users {
+    uuid id PK
+    varchar email UK
+    varchar role
+    uuid entra_tenant_id
+    uuid entra_object_id
+    boolean is_active
+  }
+
+  audit_logs {
+    uuid id PK
+    varchar actor_email
+    varchar action
+    jsonb details
+    varchar ip_address
+    timestamptz created_at
+  }
+
+  candidates ||--o{ ballots : "pilihan suara"
 ```
 
 ### Infrastruktur Produksi
 - **Server:** VPS dengan sistem operasi Ubuntu 22.04 LTS, dilengkapi firewall `ufw` dan proteksi `fail2ban` (konfigurasi di `setup.sh` dan `deploy.sh`).
-- **Nginx:** bertindak sebagai reverse proxy dan load balancer di depan aplikasi, menangani sertifikat HTTPS (Certbot), kompresi Gzip, pembatasan permintaan untuk mencegah spam, serta melayani berkas statis secara langsung.
+- **Nginx:** bertindak sebagai reverse proxy dan load balancer di depan aplikasi, menangani sertifikat HTTPS (Certbot), kompresi Gzip, pembatasan permintaan untuk mencegah spam, serta melayani berkas statis secara langsung (`nginx.conf.example`).
 - **PM2 Cluster:** menjalankan hasil build Next.js standalone di beberapa proses sesuai jumlah core CPU agar aplikasi tetap stabil saat banyak mahasiswa masuk bersamaan, dan otomatis memulai ulang proses jika terjadi gangguan (`ecosystem.config.cjs`).
-- **Basis data:** Supabase (PostgreSQL) untuk menyimpan data DPT, pasangan calon, surat suara anonim, jadwal pemilihan, dan catatan aktivitas.
-- **Email:** server SMTP melalui `nodemailer` untuk mengirimkan Kata Sandi Pemilih ke email kampus mahasiswa.
+- **Basis data:** Supabase (PostgreSQL) dengan transaksi atomik `SELECT ... FOR UPDATE`, penyimpanan append-only pada `ballots` dan `audit_logs`, serta proteksi akun Superadmin utama (`protect_superadmin_immutability()`).
+- **Email:** server SMTP melalui `nodemailer` untuk mengirimkan Kata Sandi Pemilih secara bertahap (batch 20 email) dengan catatan status pengiriman per pemilih.
 
 ### Teknologi Aplikasi
 - **Framework web:** Next.js (App Router) dengan TypeScript
