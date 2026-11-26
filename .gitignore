@@ -68,6 +68,8 @@ coverage/
 /playwright/.cache/
 
 # agent & archify artifacts
+.agents/
+skills-lock.json
 .archify/
 .system_generated/
 
