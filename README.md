@@ -2,6 +2,8 @@
 
 Aplikasi web pemilihan raya (Pemira) untuk memilih **Chairman & Vice Chairman** Himpunan Mahasiswa Informatika (HMIF) Telkom University Purwokerto.
 
+- **Situs produksi:** [https://pemirahmif.com](https://pemirahmif.com)
+
 Aplikasi ini dibuat agar mahasiswa aktif Informatika dapat memilih dari mana saja secara aman, sementara pilihan suara tetap rahasia dan hasil akhirnya bisa diperiksa bersama oleh panitia maupun publik.
 
 ---
@@ -149,12 +151,36 @@ Catatan: saat server lokal (`pnpm dev`) sedang aktif, gunakan `pnpm tsc --noEmit
 
 ---
 
-## Teknologi yang Digunakan
+## Arsitektur Produksi dan Teknologi
 
+Di lingkungan produksi ([pemirahmif.com](https://pemirahmif.com)), aplikasi berjalan di **VPS Ubuntu 22.04 LTS** dengan alur sebagai berikut:
+
+```text
+Peramban Pengguna (HTTPS)
+        |
+        v
+  Nginx (Reverse Proxy, Load Balancer, Rate Limit, SSL, & Berkas Statis)
+        |
+        v
+  PM2 Cluster (Next.js Standalone di Node.js 20 LTS)
+       / \
+      v   v
+Supabase   SMTP (Pengiriman Kata Sandi Pemilih)
+(PostgreSQL)
+```
+
+### Infrastruktur Produksi
+- **Server:** VPS dengan sistem operasi Ubuntu 22.04 LTS, dilengkapi firewall `ufw` dan proteksi `fail2ban` (konfigurasi di `setup.sh` dan `deploy.sh`).
+- **Nginx:** bertindak sebagai reverse proxy dan load balancer di depan aplikasi, menangani sertifikat HTTPS (Certbot), kompresi Gzip, pembatasan permintaan untuk mencegah spam, serta melayani berkas statis secara langsung.
+- **PM2 Cluster:** menjalankan hasil build Next.js standalone di beberapa proses sesuai jumlah core CPU agar aplikasi tetap stabil saat banyak mahasiswa masuk bersamaan, dan otomatis memulai ulang proses jika terjadi gangguan (`ecosystem.config.cjs`).
+- **Basis data:** Supabase (PostgreSQL) untuk menyimpan data DPT, pasangan calon, surat suara anonim, jadwal pemilihan, dan catatan aktivitas.
+- **Email:** server SMTP melalui `nodemailer` untuk mengirimkan Kata Sandi Pemilih ke email kampus mahasiswa.
+
+### Teknologi Aplikasi
 - **Framework web:** Next.js (App Router) dengan TypeScript
 - **Tampilan:** Tailwind CSS, Framer Motion, Plus Jakarta Sans, dan IBM Plex Mono
-- **Basis data:** Supabase (PostgreSQL)
 - **Validasi data:** Zod
+- **Pembuatan dokumen & QR:** `qrcode` dan `xlsx` (impor DPT CSV/Excel serta QR verifikasi BAST)
 - **Pengujian:** Playwright dan Node Test Runner
 
 ---
@@ -190,4 +216,5 @@ Dokumen pelengkap lainnya tersimpan di folder `docs/`:
 - [Skema Basis Data](docs/DATABASE.md)
 - [Keamanan Sistem](docs/SECURITY.md)
 - [Panduan Deployment](docs/DEPLOYMENT.md)
+- [Panduan Deployment VPS Ubuntu 22.04](DEPLOYMENT_UBUNTU22.md)
 - [Kamus Istilah Domain](GLOSSARY.md)
