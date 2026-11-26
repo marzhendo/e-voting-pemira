@@ -3,9 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('E-Voting Basic Smoke Tests', () => {
   test('Landing page renders properly with branding and CTAs', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Satu Suara');
-    await expect(page.locator('h1')).toContainText('Bawa Perubahan untuk Informatika');
-    await expect(page.getByRole('link', { name: /Masuk ke Bilik Suara/i })).toBeVisible();
+    await expect(page.locator('h1')).toContainText('Pemilihan Raya HMIF');
+    await expect(page.locator('body')).toContainText('Chairman & Vice Chairman HMIF');
+    await expect(page.getByRole('region', { name: /Status resmi pemilihan/i }).or(page.locator('aside[aria-label="Status resmi pemilihan"]'))).toBeVisible();
   });
 
   test('Login page renders PIN request form, updated copy, and campus email notice', async ({ page }) => {

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portal } from "@/components/ui/portal";
 import {
@@ -12,7 +11,6 @@ import {
   CheckCircle2,
   Users,
   Vote,
-  Award,
 } from "lucide-react";
 import type { CandidateItem } from "@/components/ballot/candidate-card";
 import { sanitizeCandidateAssetUrl } from "@/lib/security/url-validation";
@@ -113,7 +111,7 @@ export function CandidateDetailModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="candidate-detail-title"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/70"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 onClose();
@@ -129,12 +127,12 @@ export function CandidateDetailModal({
                 transition={{ type: "tween", ease: "easeOut", duration: 0.18 }}
                 ref={modalRef}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col min-h-0 bg-surface-container rounded-2xl sm:rounded-3xl border border-outline-variant/40 overflow-hidden my-auto"
+                className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col min-h-0 bg-surface-container rounded-2xl border border-outline-variant shadow-xl overflow-hidden my-auto"
               >
-                {/* TOP NAVBAR / HEADER */}
-                <div className="shrink-0 px-4 sm:px-8 py-3.5 sm:py-4 bg-surface-container/95 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between gap-4">
+                {/* TOP HEADER */}
+                <div className="shrink-0 px-4 sm:px-7 py-3.5 bg-surface-container border-b border-outline-variant flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2.5">
-                    <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-bold uppercase tracking-wider">
+                    <span className="px-3 py-1 rounded-lg bg-primary text-on-primary font-mono text-xs font-bold tabular-nums">
                       Nomor Urut {numberStr}
                     </span>
                     <span className="text-xs text-on-surface-variant font-medium hidden sm:inline">
@@ -146,18 +144,17 @@ export function CandidateDetailModal({
                     type="button"
                     onClick={onClose}
                     aria-label="Tutup Detail"
-                    className="w-10 h-10 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </div>
 
                 {/* SCROLLABLE MAIN CONTENT */}
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-8 py-5 sm:py-6 space-y-6 sm:space-y-8 touch-pan-y">
-                  {/* HERO BANNER & IDENTITY */}
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-surface-container-low p-6 rounded-2xl border border-outline-variant/20">
-                    {/* Foto Paslon */}
-                    <div className="relative w-40 h-48 sm:w-48 sm:h-56 shrink-0 rounded-2xl overflow-hidden bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center shadow-md">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-7 py-5 sm:py-6 space-y-6 touch-pan-y">
+                  {/* IDENTITY BANNER */}
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-surface-container-low p-5 sm:p-6 rounded-xl border border-outline-variant">
+                    <div className="relative w-40 h-48 sm:w-44 sm:h-52 shrink-0 rounded-xl overflow-hidden bg-surface-container-high ring-1 ring-inset ring-black/10 dark:ring-white/10 flex items-center justify-center">
                       {!modalImgFailed && modalImgSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -168,7 +165,7 @@ export function CandidateDetailModal({
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-2 text-on-surface-variant p-4 text-center">
-                          <Users className="w-12 h-12 text-primary/70" />
+                          <Users className="w-10 h-10" strokeWidth={1.75} aria-hidden="true" />
                           <span className="text-xs font-medium">
                             Foto Paslon {numberStr}
                           </span>
@@ -176,21 +173,19 @@ export function CandidateDetailModal({
                       )}
                     </div>
 
-                    {/* Nama & Deskripsi */}
-                    <div className="flex-1 text-center sm:text-left space-y-3">
-                      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant/30 text-[11px] font-bold uppercase tracking-widest text-primary">
-                        <Award className="w-3.5 h-3.5" />
-                        <span>Pemira HMIF 2026/2027</span>
-                      </div>
+                    <div className="flex-1 text-center sm:text-left space-y-2.5">
+                      <p className="text-xs font-semibold text-tertiary">
+                        Pemira HMIF 2026/2027
+                      </p>
 
-                      <h1
+                      <h2
                         id="candidate-detail-title"
-                        className="font-bebas text-3xl sm:text-4xl lg:text-5xl tracking-wide uppercase text-on-surface leading-tight"
+                        className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-on-surface leading-tight"
                       >
                         {candidate.leader_name}{" "}
                         <br className="hidden sm:inline" />
                         <span>&amp; {candidate.vice_leader_name}</span>
-                      </h1>
+                      </h2>
 
                       <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed max-w-xl">
                         Pasangan calon Chairman &amp; Vice Chairman HMIF Telkom
@@ -199,79 +194,69 @@ export function CandidateDetailModal({
                     </div>
                   </div>
 
-                  {/* DUAL PROFILE CARDS & SEPARATE CV DOWNLOAD BUTTONS */}
+                  {/* DUAL PROFILE CARDS & CV DOWNLOAD */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-sm font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span>Profil Kandidat &amp; CV</span>
-                      </h2>
-                    </div>
+                    <h3 className="text-xs font-bold text-tertiary flex items-center gap-2 mb-3.5">
+                      <Users className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
+                      <span>Profil Kandidat &amp; CV</span>
+                    </h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* CARD CHAIRMAN */}
-                      <div className="bg-surface-container-high rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between gap-5 relative overflow-hidden group">
-                        <div className="space-y-3">
-                          <div className="flex items-center">
-                            <span className="px-2.5 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 text-[11px] font-extrabold tracking-wider uppercase">
-                              Calon Chairman
-                            </span>
-                          </div>
-
+                      <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant flex flex-col justify-between gap-4">
+                        <div className="space-y-2">
+                          <span className="inline-block px-2.5 py-1 rounded-md bg-primary text-on-primary text-[11px] font-bold">
+                            Calon Chairman
+                          </span>
                           <div>
-                            <h3 className="text-lg font-bold text-on-surface">
+                            <h4 className="text-base sm:text-lg font-bold text-on-surface">
                               {candidate.leader_name}
-                            </h3>
+                            </h4>
                             <p className="text-xs text-on-surface-variant mt-0.5">
                               Kandidat Chairman HMIF
                             </p>
                           </div>
                         </div>
 
-                        {/* DEDICATED CHAIRMAN CV DOWNLOAD BUTTON */}
-                        <div className="pt-3 border-t border-outline-variant/20">
+                        <div className="pt-3 border-t border-outline-variant">
                           <a
                             href={chairmanCvUrl}
                             download={chairmanDownloadName}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full h-11 min-h-[44px] px-4 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant/30 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer group/btn active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                            className="w-full min-h-[44px] px-4 rounded-xl bg-surface-container hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant text-xs sm:text-sm font-semibold transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.96] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           >
-                            <Download className="w-4 h-4 text-primary group-hover/btn:text-on-primary transition-all" />
+                            <Download className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
                             <span>Unduh CV Chairman (PDF)</span>
                           </a>
                         </div>
                       </div>
 
                       {/* CARD VICE CHAIRMAN */}
-                      <div className="bg-surface-container-high rounded-2xl p-5 border border-outline-variant/30 flex flex-col justify-between gap-5 relative overflow-hidden group">
-                        <div className="space-y-3">
-                          <div className="flex items-center">
-                            <span className="px-2.5 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 text-[11px] font-extrabold tracking-wider uppercase">
-                              Calon Vice Chairman
-                            </span>
-                          </div>
-
+                      <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant flex flex-col justify-between gap-4">
+                        <div className="space-y-2">
+                          <span className="inline-block px-2.5 py-1 rounded-md bg-primary text-on-primary text-[11px] font-bold">
+                            Calon Vice Chairman
+                          </span>
                           <div>
-                            <h3 className="text-lg font-bold text-on-surface">
+                            <h4 className="text-base sm:text-lg font-bold text-on-surface">
                               {candidate.vice_leader_name}
-                            </h3>
+                            </h4>
                             <p className="text-xs text-on-surface-variant mt-0.5">
                               Kandidat Vice Chairman HMIF
                             </p>
                           </div>
                         </div>
 
-                        {/* DEDICATED VICE CHAIRMAN CV DOWNLOAD BUTTON */}
-                        <div className="pt-3 border-t border-outline-variant/20">
+                        <div className="pt-3 border-t border-outline-variant">
                           <a
                             href={viceChairmanCvUrl}
                             download={viceChairmanDownloadName}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full h-11 min-h-[44px] px-4 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant/30 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer group/btn active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                            className="w-full min-h-[44px] px-4 rounded-xl bg-surface-container hover:bg-primary hover:text-on-primary text-on-surface border border-outline-variant text-xs sm:text-sm font-semibold transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.96] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           >
-                            <Download className="w-4 h-4 text-primary group-hover/btn:text-on-primary transition-all" />
+                            <Download className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
                             <span>Unduh CV Vice Chairman (PDF)</span>
                           </a>
                         </div>
@@ -279,54 +264,46 @@ export function CandidateDetailModal({
                     </div>
                   </div>
 
-                  {/* VISI & MISI DETAIL SECTION */}
-                  <div className="space-y-6">
-                    {/* Visi */}
-                    <div className="bg-surface-container-low rounded-2xl p-6 sm:p-7 border border-outline-variant/30 space-y-3">
-                      <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
-                        <Target className="w-4 h-4" />
+                  {/* VISI & MISI */}
+                  <div className="space-y-5">
+                    <div className="bg-surface-highlight rounded-xl p-5 sm:p-6 border border-outline-variant space-y-2.5">
+                      <div className="flex items-center gap-2 text-tertiary font-bold text-xs">
+                        <Target className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
                         <span>Visi Kepengurusan 2026/2027</span>
                       </div>
-                      <p className="text-base sm:text-lg text-on-surface font-medium leading-relaxed italic border-l-2 border-primary pl-4 py-1">
+                      <p className="text-base sm:text-lg text-on-surface font-medium leading-relaxed">
                         &ldquo;{candidate.vision}&rdquo;
                       </p>
                     </div>
 
-                    {/* Misi */}
-                    <div className="bg-surface-container-low rounded-2xl p-6 sm:p-7 border border-outline-variant/30 space-y-4">
-                      <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Misi Program Unggulan</span>
+                    <div className="bg-surface-container-low rounded-xl p-5 sm:p-6 border border-outline-variant space-y-4">
+                      <div className="flex items-center gap-2 text-tertiary font-bold text-xs">
+                        <CheckCircle2 className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
+                        <span>Misi</span>
                       </div>
 
-                      <div className="space-y-3">
+                      <ol className="space-y-2.5">
                         {candidate.mission.map((item, index) => (
-                          <div
+                          <li
                             key={index}
-                            className="flex items-start gap-3.5 bg-surface-container-high/60 rounded-xl p-3.5 sm:p-4 border border-outline-variant/25 transition-colors hover:border-outline-variant/50"
+                            className="flex items-start gap-3 bg-surface-container rounded-xl p-3.5 sm:p-4 border border-outline-variant"
                           >
-                            <span className="w-6 h-6 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold text-xs shrink-0 mt-0.5">
+                            <span className="w-6 h-6 rounded-lg bg-primary text-on-primary font-mono font-bold text-xs tabular-nums flex items-center justify-center shrink-0 mt-0.5">
                               {index + 1}
                             </span>
                             <p className="text-sm sm:text-base text-on-surface leading-relaxed">
                               {item}
                             </p>
-                          </div>
+                          </li>
                         ))}
-                      </div>
+                      </ol>
                     </div>
                   </div>
                 </div>
 
                 {/* BOTTOM ACTION BAR */}
-                <div className="shrink-0 px-5 sm:px-8 py-4 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/30 flex items-center justify-end">
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    transition={{
-                      type: "tween",
-                      ease: "easeOut",
-                      duration: 0.1,
-                    }}
+                <div className="shrink-0 px-4 sm:px-7 py-4 bg-surface-container border-t border-outline-variant flex items-center justify-end">
+                  <button
                     type="button"
                     onClick={() => {
                       if (!isSelected) {
@@ -334,24 +311,24 @@ export function CandidateDetailModal({
                       }
                       onClose();
                     }}
-                    className={`w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
+                    className={`w-full sm:w-auto min-h-[44px] px-6 rounded-xl text-sm font-bold transition-[color,background-color,transform] duration-150 active:scale-[0.96] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       isSelected
-                        ? "bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25"
-                        : "bg-primary text-on-primary hover:bg-secondary-fixed"
+                        ? "bg-surface-container-high text-on-surface border border-primary hover:bg-surface-bright"
+                        : "bg-primary text-on-primary hover:bg-secondary"
                     }`}
                   >
                     {isSelected ? (
                       <>
-                        <Check className="w-4 h-4 stroke-[3]" />
+                        <Check className="w-4 h-4 stroke-[2.5]" aria-hidden="true" />
                         <span>Terpilih &bull; Kembali ke Bilik Suara</span>
                       </>
                     ) : (
                       <>
-                        <Vote className="w-4 h-4" />
+                        <Vote className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
                         <span>Pilih Paslon {numberStr}</span>
                       </>
                     )}
-                  </motion.button>
+                  </button>
                 </div>
               </motion.div>
             </div>

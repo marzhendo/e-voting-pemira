@@ -1,5 +1,7 @@
 import type { Config } from "tailwindcss";
 
+const withOpacity = (cssVar: string) => `rgb(var(${cssVar}) / <alpha-value>)`;
+
 const config: Config = {
   darkMode: "class",
   content: [
@@ -9,51 +11,51 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Palet Resmi HMIF Telkom University Purwokerto
+        // Palet Resmi HMIF Telkom University Purwokerto (Konstanta Brand)
         hmif: {
-          dark: "#1E1E1E", // Gelap utama pengganti hitam (header/dark card, heading). Dilarang #000000
-          gold: "#EBBD1C", // Brand Primary (tombol submit suara, highlight paslon terpilih, badge no urut)
-          yellow: "#F3EC51", // Brand Secondary / Hover state & aksen glow
-          cream: "#F8FAE0", // Background alternatif kartu pemilih, callout info, kontainer visi-misi
-          red: "#B71B25", // Merah resmi: hanya untuk bidang solid dengan teks putih (lihat error-solid). Jangan dipakai sebagai teks di atas surface gelap
-          blue: "#29388B", // Tombol SSO Microsoft Entra dan navigasi sekunder
+          dark: "#1E1E1E",
+          gold: "#EBBD1C",
+          yellow: "#F3EC51",
+          cream: "#F8FAE0",
+          red: "#B71B25",
+          blue: "#29388B",
           "blue-hover": "#212E72",
-          "gray-dark": "#5E5E5E", // Teks sekunder (deskripsi paslon, timestamp, metadata)
-          "gray-light": "#8B8A8B", // Border kartu, pembatas tabel DPT, status non-aktif
-          white: "#FFFFFF", // Background kartu utama bilik suara & teks di atas latar gelap
+          "gray-dark": "#5E5E5E",
+          "gray-light": "#8B8A8B",
+          white: "#FFFFFF",
         },
-        // Stitch Aura Civic Electoral Design Tokens (Aligned with HMIF Brand Identity)
-        "surface-container-lowest": "#0A0A0A",
-        "surface-container-low": "#161616",
-        "surface-container": "#1E1E1E",
-        "surface-container-high": "#262626",
-        "surface-container-highest": "#303030",
-        surface: "#121212",
-        "surface-bright": "#383838",
-        "surface-dim": "#121212",
-        "on-surface": "#FFFFFF",
-        "on-surface-variant": "#B5B5B5",
-        outline: "#707070",
-        "outline-variant": "#2E2E2E",
-        primary: "#EBBD1C",
-        "primary-container": "#EBBD1C",
-        "on-primary": "#1E1E1E",
-        secondary: "#F3EC51",
-        "secondary-container": "#D2CB31",
-        "secondary-fixed": "#F3EC51",
-        "secondary-fixed-dim": "#D2CB31",
-        tertiary: "#29388B",
-        "tertiary-container": "#212E72",
-        // Error semantik: foreground/aksen di atas surface gelap (6,0:1 pada #1E1E1E, AA teks normal)
-        error: "#FF6B72",
-        // Merah resmi HMIF untuk bidang solid berteks putih (6,56:1)
-        "error-solid": "#B71B25",
-        "error-container": "#93000A",
-        "on-error": "#FFFFFF",
+        // Semantic Design Tokens (Dual-Theme: Light default + Dark class)
+        "surface-container-lowest": withOpacity("--surface-container-lowest"),
+        "surface-container-low": withOpacity("--surface-container-low"),
+        "surface-container": withOpacity("--surface-container"),
+        "surface-container-high": withOpacity("--surface-container-high"),
+        "surface-container-highest": withOpacity("--surface-container-highest"),
+        "surface-highlight": withOpacity("--surface-highlight"),
+        surface: withOpacity("--surface"),
+        "surface-bright": withOpacity("--surface-bright"),
+        "surface-dim": withOpacity("--surface-dim"),
+        "on-surface": withOpacity("--on-surface"),
+        "on-surface-variant": withOpacity("--on-surface-variant"),
+        outline: withOpacity("--outline"),
+        "outline-variant": withOpacity("--outline-variant"),
+        primary: withOpacity("--primary"),
+        "primary-container": withOpacity("--primary-container"),
+        "on-primary": withOpacity("--on-primary"),
+        secondary: withOpacity("--secondary"),
+        "secondary-container": withOpacity("--secondary-container"),
+        "secondary-fixed": withOpacity("--secondary-fixed"),
+        "secondary-fixed-dim": withOpacity("--secondary-fixed-dim"),
+        tertiary: withOpacity("--tertiary"),
+        "tertiary-container": withOpacity("--tertiary-container"),
+        "on-tertiary": withOpacity("--on-tertiary"),
+        error: withOpacity("--error"),
+        "error-solid": withOpacity("--error-solid"),
+        "error-container": withOpacity("--error-container"),
+        "on-error": withOpacity("--on-error"),
         // Brand shortcut aliases
         brand: {
           charcoal: "#1E1E1E",
-          darker: "#161616",
+          darker: "#141414",
           surface: "#242424",
           gold: "#EBBD1C",
           yellow: "#F3EC51",
@@ -61,31 +63,60 @@ const config: Config = {
           blue: "#29388B",
           "blue-hover": "#212E72",
           gray: "#5E5E5E",
-          muted: "#A0A0A0",
+          muted: "#A8A8A3",
         },
       },
       fontFamily: {
-        bebas: ["var(--font-bebas)", "Bebas Neue", "Impact", "sans-serif"],
-        montserrat: [
-          "var(--font-montserrat)",
-          "Montserrat",
+        jakarta: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
           "-apple-system",
           "BlinkMacSystemFont",
           '"Segoe UI"',
           "Roboto",
-          '"Helvetica Neue"',
-          "Arial",
           "sans-serif",
         ],
         sans: [
-          "var(--font-montserrat)",
-          "Montserrat",
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
           "-apple-system",
           "BlinkMacSystemFont",
           '"Segoe UI"',
           "Roboto",
-          '"Helvetica Neue"',
-          "Arial",
+          "sans-serif",
+        ],
+        display: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"Segoe UI"',
+          "Roboto",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-plex-mono)",
+          "IBM Plex Mono",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "monospace",
+        ],
+        // Legacy aliases diarahkan ke Plus Jakarta Sans agar transisi halaman lain konsisten
+        bebas: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "sans-serif",
+        ],
+        montserrat: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
+          "-apple-system",
+          "BlinkMacSystemFont",
           "sans-serif",
         ],
       },
@@ -102,7 +133,7 @@ const config: Config = {
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
         popIn: {
-          "0%": { opacity: "0", transform: "scale(0.85)" },
+          "0%": { opacity: "0", transform: "scale(0.92)" },
           "100%": { opacity: "1", transform: "scale(1)" },
         },
         modalEnter: {
@@ -111,12 +142,12 @@ const config: Config = {
         },
       },
       animation: {
-        "page-enter": "pageEnter 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "page-enter": "pageEnter 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
         "slide-fade-in":
-          "slideFadeIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
-        "pop-in": "popIn 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+          "slideFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "pop-in": "popIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
         "modal-enter":
-          "modalEnter 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+          "modalEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
         shimmer: "shimmer 1.8s infinite",
       },
     },

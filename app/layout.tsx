@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
-import { Bebas_Neue, Montserrat } from 'next/font/google';
+import { Plus_Jakarta_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { NavigationProgress } from '@/components/ui/navigation-progress';
+import { ThemeProvider, THEME_INIT_SCRIPT } from '@/components/theme/theme-provider';
 import {
   getSiteUrl,
   SEO_CONFIG,
@@ -9,20 +10,20 @@ import {
 } from '@/lib/seo/constants';
 import './globals.css';
 
-const bebas = Bebas_Neue({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-bebas',
-  display: 'swap',
-  fallback: ['Impact', 'sans-serif'],
-});
-
-const montserrat = Montserrat({
+const plusJakartaSans = Plus_Jakarta_Sans({
   weight: ['400', '500', '600', '700', '800'],
   subsets: ['latin'],
-  variable: '--font-montserrat',
+  variable: '--font-jakarta',
   display: 'swap',
-  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ['500', '600'],
+  subsets: ['latin'],
+  variable: '--font-plex-mono',
+  display: 'swap',
+  fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
 });
 
 export const metadata: Metadata = {
@@ -90,8 +91,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className={`dark ${bebas.variable} ${montserrat.variable}`}>
+    <html
+      lang="id"
+      suppressHydrationWarning
+      className={`${plusJakartaSans.variable} ${ibmPlexMono.variable}`}
+    >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: THEME_INIT_SCRIPT,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -105,9 +115,17 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-surface text-on-surface font-montserrat antialiased selection:bg-primary-container selection:text-on-primary">
-        <NavigationProgress />
-        {children}
+      <body className="min-h-screen bg-surface text-on-surface font-sans antialiased selection:bg-primary selection:text-on-primary">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2.5 focus:rounded-xl focus:bg-primary focus:text-on-primary focus:text-sm focus:font-bold focus:outline-none focus:ring-2 focus:ring-on-surface"
+        >
+          Langsung ke konten utama
+        </a>
+        <ThemeProvider>
+          <NavigationProgress />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

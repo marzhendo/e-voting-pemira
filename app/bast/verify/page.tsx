@@ -2,19 +2,18 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2,
   AlertTriangle,
   ShieldCheck,
-  ArrowLeft,
   Loader2,
   Copy,
   Check,
   Search,
 } from 'lucide-react';
+import { SiteHeader } from '@/components/layout/site-header';
+import { SiteFooter } from '@/components/layout/site-footer';
 
 interface VerificationResult {
   valid: boolean;
@@ -111,43 +110,11 @@ function BastVerificationContent() {
   const hasQueryHash = Boolean(hashParam);
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface font-montserrat antialiased flex flex-col justify-between overflow-x-hidden selection:bg-primary selection:text-on-primary">
-      {/* Top Header */}
-      <header className="w-full border-b border-outline-variant/20 bg-surface/90 backdrop-blur-md">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
-              <Image
-                src="/assets/img/hmif-logo.png"
-                alt="Logo HMIF"
-                width={32}
-                height={32}
-                priority
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs sm:text-sm font-bold text-on-surface uppercase tracking-wider block leading-tight truncate">
-                Pemira HMIF 2026/2027
-              </span>
-              <span className="text-[11px] text-on-surface-variant font-medium block leading-tight truncate">
-                Verifikasi Berita Acara (BAST)
-              </span>
-            </div>
-          </div>
+    <div className="min-h-[100dvh] bg-surface text-on-surface font-sans antialiased flex flex-col justify-between overflow-x-hidden selection:bg-primary selection:text-on-primary">
+      <SiteHeader subtitle="Verifikasi Berita Acara (BAST)" />
 
-          <Link
-            href="/"
-            className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-xs font-semibold text-on-surface-variant hover:text-on-surface inline-flex items-center justify-center gap-1.5 transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Beranda</span>
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Viewport Content */}
       <motion.main
+        id="main-content"
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'tween', ease: 'easeOut', duration: 0.18 }}
@@ -155,67 +122,65 @@ function BastVerificationContent() {
       >
         {/* Loading State */}
         {loading && (
-          <div className="p-10 sm:p-12 text-center rounded-2xl bg-surface-container border border-outline-variant/30 space-y-3">
-            <Loader2 className="w-7 h-7 animate-spin mx-auto text-primary" aria-hidden="true" />
+          <div className="p-10 sm:p-12 text-center rounded-2xl bg-surface-container border border-outline-variant space-y-3">
+            <Loader2 className="w-7 h-7 animate-spin mx-auto text-tertiary" strokeWidth={1.75} aria-hidden="true" />
             <p className="text-xs sm:text-sm font-medium text-on-surface-variant">
-              Memeriksa keaslian dokumen...
+              Memeriksa keaslian dokumen Berita Acara...
             </p>
             {hashParam && (
-              <p className="text-[11px] text-on-surface-variant/80 font-mono break-all max-w-md mx-auto">
+              <p className="text-[11px] text-on-surface-variant font-mono break-all max-w-md mx-auto">
                 {hashParam}
               </p>
             )}
           </div>
         )}
 
-        {/* Empty State (Visited without ?hash=): Clean Manual Check Form */}
+        {/* Empty State: Manual Check Form */}
         {!loading && !hasQueryHash && !error && !data && (
           <section
             aria-label="Cek Kode Berita Acara"
-            className="rounded-2xl bg-surface-container border border-outline-variant/30 p-6 sm:p-8 space-y-6"
+            className="rounded-2xl bg-surface-container border border-outline-variant p-6 sm:p-8 space-y-6"
           >
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
-                <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <div className="inline-flex items-center gap-2 text-xs font-bold text-tertiary">
+                <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
                 <span>Pemeriksaan Dokumen Resmi</span>
               </div>
-              <h1 className="font-bebas text-3xl sm:text-4xl tracking-wide uppercase text-on-surface text-balance leading-tight">
+              <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface leading-tight">
                 Verifikasi Berita Acara (BAST)
               </h1>
-              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed text-pretty">
-                Pindai QR Code pada dokumen Berita Acara cetak dari Panitia KPR, atau masukkan 64 karakter kode verifikasi dokumen di bawah ini.
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                Pindai QR Code pada dokumen Berita Acara cetak dari Panitia KPR HMIF, atau masukkan 64 karakter kode verifikasi dokumen di bawah ini.
               </p>
             </div>
 
-            <form onSubmit={handleManualSubmit} className="space-y-3">
+            <form onSubmit={handleManualSubmit} className="space-y-3.5" noValidate>
               <div>
                 <label
                   htmlFor="bast-hash-input"
-                  className="text-xs font-semibold text-on-surface block mb-2"
+                  className="text-xs font-semibold text-on-surface block mb-1.5"
                 >
-                  Kode Verifikasi Dokumen (64 Karakter)
+                  Kode Verifikasi Dokumen (64 Karakter SHA-256)
                 </label>
                 <input
                   id="bast-hash-input"
                   type="text"
                   value={manualHash}
                   onChange={(e) => setManualHash(e.target.value)}
-                  placeholder="Contoh: 8F3A19C0..."
+                  placeholder="Tempel 64 karakter kode verifikasi SHA-256"
                   spellCheck={false}
                   autoComplete="off"
-                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/40 text-xs sm:text-sm font-mono text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full min-h-[48px] px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant text-xs sm:text-sm font-mono text-on-surface placeholder:text-on-surface-variant/70 focus:bg-surface-container focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 transition-[color,background-color,border-color,box-shadow] duration-150"
                 />
               </div>
 
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+              <button
                 type="submit"
-                className="w-full min-h-[44px] px-5 py-2.5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                className="w-full min-h-[48px] px-5 py-2.5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold inline-flex items-center justify-center gap-2 transition-[color,background-color,transform] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <Search className="w-4 h-4" aria-hidden="true" />
+                <Search className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
                 <span>Cek Keabsahan Dokumen</span>
-              </motion.button>
+              </button>
             </form>
           </section>
         )}
@@ -223,36 +188,35 @@ function BastVerificationContent() {
         {/* Error / Mismatch State */}
         {!loading && error && (
           <section
+            role="alert"
             aria-label="Hasil Verifikasi Gagal"
-            className="rounded-2xl bg-surface-container border border-error/30 p-6 sm:p-8 text-center space-y-5"
+            className="rounded-2xl bg-surface-container border border-error/40 p-6 sm:p-8 text-center space-y-5"
           >
-            <div className="w-12 h-12 rounded-xl bg-error/10 border border-error/25 flex items-center justify-center mx-auto text-error">
-              <AlertTriangle className="w-6 h-6" aria-hidden="true" />
+            <div className="w-12 h-12 rounded-xl bg-error-container dark:bg-error-container/40 border border-error/30 flex items-center justify-center mx-auto text-error">
+              <AlertTriangle className="w-6 h-6" strokeWidth={1.75} aria-hidden="true" />
             </div>
 
             <div className="space-y-1.5 max-w-md mx-auto">
-              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface">
+              <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface">
                 Dokumen Tidak Cocok
               </h1>
-              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed text-pretty">
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                 {error}
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+              <button
                 type="button"
                 onClick={() => {
                   setError(null);
                   setManualHash('');
                   router.replace('/bast/verify');
                 }}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-bright border border-outline-variant/30 text-xs font-semibold text-on-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-xs sm:text-sm font-semibold text-on-surface transition-[color,background-color,transform] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 Masukkan Kode Lain
-              </motion.button>
+              </button>
             </div>
           </section>
         )}
@@ -260,102 +224,96 @@ function BastVerificationContent() {
         {/* Success / Verified State */}
         {!loading && data && (
           <div className="space-y-6">
-            {/* Block 1: Authentic Status & Reference Code */}
             <section
               aria-label="Status Keabsahan Berita Acara"
-              className="rounded-2xl bg-surface-container border border-emerald-500/35 p-5 sm:p-7 space-y-5"
+              className="rounded-2xl bg-surface-container border border-emerald-600/40 dark:border-emerald-500/40 p-5 sm:p-7 space-y-5"
             >
               <div className="flex items-start gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-400" aria-hidden="true" />
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-600/30 dark:border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-700 dark:text-emerald-400" strokeWidth={2} aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block">
                     Dokumen Resmi Terverifikasi
                   </span>
-                  <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface mt-0.5 leading-tight text-balance">
+                  <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface mt-0.5 leading-tight">
                     Berita Acara Sah &amp; Sesuai Sistem
                   </h1>
                 </div>
               </div>
 
-              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed text-pretty">
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                 Berita Acara ini resmi diterbitkan oleh{' '}
                 <strong className="text-on-surface">{data.organizer}</strong> dan datanya cocok dengan catatan sistem.
               </p>
 
-              {/* Document Verification Code Box */}
-              <div className="p-3.5 sm:p-4 rounded-xl bg-surface-container-low border border-outline-variant/30 space-y-1.5">
-                <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
-                  <span className="font-semibold uppercase tracking-wider">
-                    Kode Verifikasi (SHA-256)
-                  </span>
-                  <motion.button
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+              <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-xs text-on-surface-variant">
+                  <span className="font-semibold">Kode Verifikasi (SHA-256)</span>
+                  <button
                     type="button"
                     onClick={handleCopyHash}
                     aria-label={copied ? 'Kode verifikasi berhasil disalin' : 'Salin kode verifikasi'}
-                    className="min-h-[44px] px-2.5 -my-2 rounded-lg hover:bg-surface-container-high hover:text-on-surface transition-colors inline-flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    className="min-h-[44px] px-3 -my-2 rounded-lg hover:bg-surface-container-high hover:text-on-surface transition-colors inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     {copied ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-                        <span className="text-emerald-400 font-semibold">Tersalin</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" strokeWidth={2} aria-hidden="true" />
+                        <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Tersalin</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                        <Copy className="w-3.5 h-3.5" strokeWidth={1.75} aria-hidden="true" />
                         <span>Salin</span>
                       </>
                     )}
-                  </motion.button>
+                  </button>
                 </div>
-                <div className="font-mono text-xs text-primary break-all select-all">
+                <div className="font-mono text-xs text-tertiary font-medium break-all select-all">
                   {data.verifiedHash}
                 </div>
               </div>
             </section>
 
-            {/* Block 2: Clean Vote Tally Summary */}
+            {/* Rekapitulasi Suara pada BAST */}
             <section
               aria-label="Rekapitulasi Suara pada Berita Acara"
-              className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden"
+              className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden"
             >
-              <div className="p-5 sm:p-7 space-y-4 border-b border-outline-variant/20">
-                <h2 className="font-bebas text-2xl tracking-wide uppercase text-on-surface">
+              <div className="p-5 sm:p-7 space-y-4 border-b border-outline-variant">
+                <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
                   Rekapitulasi Suara Resmi
                 </h2>
 
                 <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-                  <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/25">
-                    <span className="text-[10px] sm:text-[11px] text-on-surface-variant block uppercase font-semibold tracking-wider">
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant">
+                    <span className="text-[11px] text-on-surface-variant block font-semibold">
                       Total DPT
                     </span>
-                    <span className="font-bebas text-2xl sm:text-3xl text-on-surface tabular-nums leading-none mt-1 block">
+                    <span className="font-mono text-xl sm:text-2xl font-bold text-on-surface tabular-nums leading-none mt-1.5 block">
                       {data.summary.totalDpt.toLocaleString('id-ID')}
                     </span>
                   </div>
-                  <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/25">
-                    <span className="text-[10px] sm:text-[11px] text-on-surface-variant block uppercase font-semibold tracking-wider">
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant">
+                    <span className="text-[11px] text-on-surface-variant block font-semibold">
                       Suara Masuk
                     </span>
-                    <span className="font-bebas text-2xl sm:text-3xl text-emerald-400 tabular-nums leading-none mt-1 block">
+                    <span className="font-mono text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums leading-none mt-1.5 block">
                       {data.summary.totalVotes.toLocaleString('id-ID')}
                     </span>
                   </div>
-                  <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/25">
-                    <span className="text-[10px] sm:text-[11px] text-on-surface-variant block uppercase font-semibold tracking-wider">
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant">
+                    <span className="text-[11px] text-on-surface-variant block font-semibold">
                       Partisipasi
                     </span>
-                    <span className="font-bebas text-2xl sm:text-3xl text-primary tabular-nums leading-none mt-1 block">
+                    <span className="font-mono text-xl sm:text-2xl font-bold text-tertiary tabular-nums leading-none mt-1.5 block">
                       {data.summary.turnoutPercentage}%
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="divide-y divide-outline-variant/20">
+              <div className="divide-y divide-outline-variant">
                 {data.summary.tally.map((item) => {
                   const isKotakKosong = item.candidateNumber === 0;
                   return (
@@ -364,7 +322,13 @@ function BastVerificationContent() {
                       className="px-5 py-4 sm:px-7 flex items-center justify-between gap-4 text-xs sm:text-sm"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-8 h-8 rounded-lg bg-surface-container-high border border-outline-variant/30 flex items-center justify-center font-bebas text-lg text-primary shrink-0 tabular-nums">
+                        <span
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold shrink-0 tabular-nums ${
+                            isKotakKosong
+                              ? 'bg-surface-container-high border border-outline-variant text-on-surface-variant'
+                              : 'bg-primary text-on-primary'
+                          }`}
+                        >
                           {isKotakKosong ? '00' : String(item.candidateNumber).padStart(2, '0')}
                         </span>
                         <span className="font-semibold text-on-surface break-words">
@@ -374,11 +338,11 @@ function BastVerificationContent() {
                         </span>
                       </div>
 
-                      <div className="text-right shrink-0 tabular-nums">
+                      <div className="text-right shrink-0 font-mono tabular-nums">
                         <span className="font-bold text-on-surface block">
                           {item.voteCount.toLocaleString('id-ID')} suara
                         </span>
-                        <span className="text-xs text-primary font-semibold">
+                        <span className="text-xs text-tertiary font-semibold">
                           {item.percentage}%
                         </span>
                       </div>
@@ -387,7 +351,7 @@ function BastVerificationContent() {
                 })}
               </div>
 
-              <div className="px-5 py-3.5 sm:px-7 bg-surface-container-low/60 border-t border-outline-variant/20 text-[11px] text-on-surface-variant">
+              <div className="px-5 py-3.5 sm:px-7 bg-surface-container-low border-t border-outline-variant text-xs text-on-surface-variant">
                 Dihitung dari Surat Suara Anonim tanpa catatan identitas maupun NIM pemilih.
               </div>
             </section>
@@ -395,13 +359,7 @@ function BastVerificationContent() {
         )}
       </motion.main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-outline-variant/20 bg-surface-container-low/50 py-5 px-4 sm:px-6">
-        <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-on-surface-variant text-center sm:text-left">
-          <p>Surat Suara Anonim terpisah dari identitas pemilih.</p>
-          <p>Komisi Pemilihan Raya (KPR) HMIF Telkom University Purwokerto</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
@@ -411,7 +369,7 @@ export default function BastVerifyPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-surface flex items-center justify-center text-on-surface">
-          <Loader2 className="w-7 h-7 animate-spin text-primary" aria-hidden="true" />
+          <Loader2 className="w-7 h-7 animate-spin text-tertiary" strokeWidth={1.75} aria-hidden="true" />
         </div>
       }
     >

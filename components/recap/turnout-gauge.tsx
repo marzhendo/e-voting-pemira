@@ -27,7 +27,7 @@ export function TurnoutGauge({
   return (
     <section
       aria-label="Ringkasan Partisipasi Pemilih DPT"
-      className="rounded-2xl bg-surface-container border border-outline-variant/30 p-5 sm:p-7"
+      className="rounded-2xl bg-surface-container border border-outline-variant p-5 sm:p-7"
     >
       <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
         {/* SVG Circular Gauge */}
@@ -43,7 +43,7 @@ export function TurnoutGauge({
               cy="90"
               r={radius}
               fill="none"
-              stroke="#262626"
+              stroke="rgb(var(--surface-container-highest))"
               strokeWidth="14"
             />
             <motion.circle
@@ -61,10 +61,10 @@ export function TurnoutGauge({
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-3">
-            <span className="font-bebas text-4xl sm:text-[42px] leading-none text-primary tabular-nums">
+            <span className="font-mono text-3xl sm:text-4xl font-bold leading-none text-on-surface tabular-nums">
               {safePercentage.toFixed(1)}%
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mt-1">
+            <span className="text-xs font-semibold text-on-surface-variant mt-1">
               Partisipasi
             </span>
           </div>
@@ -73,43 +73,43 @@ export function TurnoutGauge({
         {/* Metrics Summary */}
         <div className="flex-1 min-w-0 space-y-4">
           <div>
-            <h2 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface text-balance">
+            <h2 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface">
               Partisipasi Pemilih DPT
             </h2>
-            <p className="text-xs sm:text-sm text-on-surface-variant mt-1 leading-relaxed text-pretty">
+            <p className="text-xs sm:text-sm text-on-surface-variant mt-1 leading-relaxed">
               {isClosed
-                ? "Tingkat keikutsertaan mahasiswa aktif Informatika dalam Daftar Pemilih Tetap (DPT) hingga penutupan bilik suara."
+                ? "Tingkat keikutsertaan mahasiswa aktif Informatika dalam Daftar Pemilih Tetap (DPT) hingga penutupan Bilik Suara Digital."
                 : "Pantauan jumlah pemilih dalam Daftar Pemilih Tetap (DPT) yang telah menyalurkan hak suara."}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-xl bg-surface-container-low border border-outline-variant/25 p-3.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
+            <div className="rounded-xl bg-surface-container-low border border-outline-variant p-3.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" strokeWidth={1.75} aria-hidden="true" />
                 <span>Sudah Memilih</span>
               </div>
-              <p className="font-bebas text-2xl sm:text-3xl text-on-surface mt-1 tabular-nums leading-none">
+              <p className="font-mono text-2xl sm:text-3xl font-bold text-on-surface mt-1.5 tabular-nums leading-none">
                 {totalVotes.toLocaleString("id-ID")}
               </p>
             </div>
 
-            <div className="rounded-xl bg-surface-container-low border border-outline-variant/25 p-3.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                <Clock className="w-3.5 h-3.5 text-on-surface-variant shrink-0" aria-hidden="true" />
+            <div className="rounded-xl bg-surface-container-low border border-outline-variant p-3.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
+                <Clock className="w-3.5 h-3.5 text-on-surface-variant shrink-0" strokeWidth={1.75} aria-hidden="true" />
                 <span>Belum Memilih</span>
               </div>
-              <p className="font-bebas text-2xl sm:text-3xl text-on-surface-variant mt-1 tabular-nums leading-none">
+              <p className="font-mono text-2xl sm:text-3xl font-bold text-on-surface-variant mt-1.5 tabular-nums leading-none">
                 {notVotedCount.toLocaleString("id-ID")}
               </p>
             </div>
 
-            <div className="rounded-xl bg-surface-container-low border border-outline-variant/25 p-3.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                <Users className="w-3.5 h-3.5 text-brand-cream shrink-0" aria-hidden="true" />
+            <div className="rounded-xl bg-surface-container-low border border-outline-variant p-3.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
+                <Users className="w-3.5 h-3.5 text-tertiary shrink-0" strokeWidth={1.75} aria-hidden="true" />
                 <span>Total DPT</span>
               </div>
-              <p className="font-bebas text-2xl sm:text-3xl text-brand-cream mt-1 tabular-nums leading-none">
+              <p className="font-mono text-2xl sm:text-3xl font-bold text-tertiary mt-1.5 tabular-nums leading-none">
                 {totalDpt.toLocaleString("id-ID")}
               </p>
             </div>

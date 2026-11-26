@@ -3,17 +3,110 @@
 @tailwind utilities;
 
 @layer base {
-  html, body {
+  /* Mode Terang (Default): HMIF Civic Editorial Clean (WCAG 2.2 AA verified) */
+  :root {
+    --surface: 250 250 247; /* #FAFAF7 */
+    --surface-dim: 243 243 238; /* #F3F3EE */
+    --surface-container-lowest: 255 255 255; /* #FFFFFF */
+    --surface-container-low: 246 246 242; /* #F6F6F2 */
+    --surface-container: 255 255 255; /* #FFFFFF */
+    --surface-container-high: 242 242 236; /* #F2F2EC */
+    --surface-container-highest: 234 234 227; /* #EAEAE3 */
+    --surface-bright: 226 226 218; /* #E2E2DA */
+    --surface-highlight: 248 250 224; /* #F8FAE0 - HMIF Cream */
+
+    --on-surface: 30 30 30; /* #1E1E1E - HMIF Charcoal (>15:1 on #FFFFFF) */
+    --on-surface-variant: 94 94 94; /* #5E5E5E - HMIF Gray Dark (6.48:1 on #FFFFFF) */
+
+    --outline: 118 117 118; /* #767576 (4.6:1 on #FFFFFF) */
+    --outline-variant: 218 218 212; /* #DADAD4 - 1px structural border */
+
+    --primary: 235 189 28; /* #EBBD1C - HMIF Gold */
+    --primary-container: 235 189 28; /* #EBBD1C */
+    --on-primary: 30 30 30; /* #1E1E1E (9.4:1 on #EBBD1C) */
+
+    --secondary: 243 236 81; /* #F3EC51 - HMIF Yellow hover */
+    --secondary-container: 210 203 49; /* #D2CB31 */
+    --secondary-fixed: 243 236 81;
+    --secondary-fixed-dim: 210 203 49;
+
+    --tertiary: 41 56 139; /* #29388B - HMIF Blue (10.1:1 on #FFFFFF) */
+    --tertiary-container: 33 46 114; /* #212E72 */
+    --on-tertiary: 255 255 255; /* #FFFFFF */
+
+    --error: 183 27 37; /* #B71B25 - HMIF Red (6.56:1 on #FFFFFF) */
+    --error-solid: 183 27 37; /* #B71B25 */
+    --error-container: 253 236 237; /* #FDECED */
+    --on-error: 255 255 255; /* #FFFFFF */
+
+    color-scheme: light;
+  }
+
+  /* Mode Gelap (Toggle Opsional): HMIF Charcoal Dark (WCAG 2.2 AA verified) */
+  .dark {
+    --surface: 20 20 20; /* #141414 */
+    --surface-dim: 16 16 16; /* #101010 */
+    --surface-container-lowest: 14 14 14; /* #0E0E0E */
+    --surface-container-low: 24 24 24; /* #181818 */
+    --surface-container: 30 30 30; /* #1E1E1E - HMIF Charcoal */
+    --surface-container-high: 38 38 38; /* #262626 */
+    --surface-container-highest: 48 48 48; /* #303030 */
+    --surface-bright: 56 56 56; /* #383838 */
+    --surface-highlight: 41 39 24; /* #292718 */
+
+    --on-surface: 245 245 242; /* #F5F5F2 (>14.5:1 on #1E1E1E) */
+    --on-surface-variant: 168 168 163; /* #A8A8A3 (7.1:1 on #1E1E1E) */
+
+    --outline: 112 112 112; /* #707070 */
+    --outline-variant: 46 46 46; /* #2E2E2E */
+
+    --primary: 235 189 28; /* #EBBD1C */
+    --primary-container: 235 189 28;
+    --on-primary: 30 30 30; /* #1E1E1E */
+
+    --secondary: 243 236 81; /* #F3EC51 */
+    --secondary-container: 210 203 49;
+    --secondary-fixed: 243 236 81;
+    --secondary-fixed-dim: 210 203 49;
+
+    --tertiary: 123 145 255; /* #7B91FF (6.1:1 on #1E1E1E) */
+    --tertiary-container: 41 56 139; /* #29388B */
+    --on-tertiary: 255 255 255;
+
+    --error: 255 107 114; /* #FF6B72 (6.0:1 on #1E1E1E) */
+    --error-solid: 183 27 37; /* #B71B25 */
+    --error-container: 147 0 10; /* #93000A */
+    --on-error: 255 255 255;
+
+    color-scheme: dark;
+  }
+
+  html,
+  body {
     margin: 0;
     padding: 0;
   }
+
   body {
     overscroll-behavior: none;
-    background-color: #121212;
-    color: #ffffff;
+    background-color: rgb(var(--surface));
+    color: rgb(var(--on-surface));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Interaction Affordances (Hard Gate R-39 & WCAG 2.2): Cursor pointer untuk semua kontrol aktif */
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Interaction Affordances (Hard Gate R-39 & WCAG 2.2) */
   button,
   a[href],
   summary,
@@ -50,10 +143,10 @@
   transform: translateX(-100%);
   background-image: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0) 0,
-    rgba(255, 255, 255, 0.05) 30%,
-    rgba(255, 255, 255, 0.08) 50%,
-    rgba(255, 255, 255, 0) 100%
+    rgb(var(--on-surface) / 0) 0,
+    rgb(var(--on-surface) / 0.04) 30%,
+    rgb(var(--on-surface) / 0.08) 50%,
+    rgb(var(--on-surface) / 0) 100%
   );
   animation: shimmer 1.8s infinite;
   content: '';
@@ -68,28 +161,28 @@
   }
 }
 
-/* Custom Scrollbar Aksesibel (Pengganti display:none demi Usability & Orientasi Konten) */
+/* Custom Scrollbar Aksesibel yang mengikuti tema aktif */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #161616;
+  background: rgb(var(--surface-dim));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2E2E2E;
+  background: rgb(var(--outline-variant));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #707070;
+  background: rgb(var(--outline));
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2E2E2E #161616;
+  scrollbar-color: rgb(var(--outline-variant)) rgb(var(--surface-dim));
 }
 
 /* Aksesibilitas Gerakan (Hard Gate R-39): Hormati preferensi reduced-motion */

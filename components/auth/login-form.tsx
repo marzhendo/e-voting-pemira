@@ -17,13 +17,13 @@ import {
   CheckCircle2,
   RefreshCw,
 } from "lucide-react";
+import { KPR_WHATSAPP_URL } from "@/components/layout/site-header";
 
 function getAuthErrorDisplay(
   urlError: string | null,
   urlMessage: string | null,
   errorMessage: string | null,
 ): { title: string; message: string } | null {
-  // 1. Error dari respons API login
   if (errorMessage) {
     const lower = errorMessage.toLowerCase();
 
@@ -39,13 +39,13 @@ function getAuthErrorDisplay(
     }
     if (lower.includes("sandi") || lower.includes("password")) {
       return {
-        title: "Kata Sandi Tidak Sesuai",
+        title: "Kata Sandi Pemilih Tidak Sesuai",
         message: errorMessage,
       };
     }
     if (lower.includes("pemeliharaan") || lower.includes("maintenance")) {
       return {
-        title: "Bilik Suara Dalam Pemeliharaan",
+        title: "Bilik Suara Digital Dalam Pemeliharaan",
         message: errorMessage,
       };
     }
@@ -67,7 +67,6 @@ function getAuthErrorDisplay(
     };
   }
 
-  // 2. Pemetaan error pengalihan middleware
   if (
     urlError === "ADMIN_AUTH_REQUIRED" ||
     (urlError === "AUTH_REQUIRED" && urlMessage?.includes("panitia"))
@@ -75,7 +74,7 @@ function getAuthErrorDisplay(
     return {
       title: "Perlu Akun Panitia",
       message:
-        "Halaman dashboard hanya dapat diakses oleh Panitia KPR. Jika kamu pemilih, silakan masuk ke bilik suara menggunakan NIM dan kata sandi pemilih.",
+        "Halaman dashboard hanya dapat diakses oleh Panitia KPR. Pemilih dapat masuk ke Bilik Suara Digital menggunakan NIM dan Kata Sandi Pemilih.",
     };
   }
 
@@ -83,7 +82,7 @@ function getAuthErrorDisplay(
     return {
       title: "Akses Terbatas",
       message:
-        "Akunmu terdaftar sebagai pemilih, bukan panitia. Silakan kembali ke Bilik Suara.",
+        "Akun ini terdaftar sebagai pemilih, bukan panitia. Silakan kembali ke Bilik Suara Digital.",
     };
   }
 
@@ -91,7 +90,7 @@ function getAuthErrorDisplay(
     return {
       title: "Masuk untuk Melihat Rekapitulasi",
       message:
-        "Masukkan NIM dan Kata Sandi Pemilih kamu untuk membuka halaman Partisipasi Pemilih dan Rekapitulasi Suara.",
+        "Masukkan NIM dan Kata Sandi Pemilih untuk membuka halaman Partisipasi Pemilih dan Rekapitulasi Suara.",
     };
   }
 
@@ -103,7 +102,7 @@ function getAuthErrorDisplay(
     return {
       title: "Sesi Berakhir",
       message:
-        "Waktu sesi pemilihan kamu telah selesai. Silakan masukkan kembali NIM dan kata sandi pemilih.",
+        "Waktu sesi pemilihan telah selesai. Masukkan kembali NIM dan Kata Sandi Pemilih kamu.",
     };
   }
 
@@ -111,7 +110,7 @@ function getAuthErrorDisplay(
     return {
       title: "NIM Belum Terdaftar di DPT",
       message:
-        "NIM kamu belum tercatat di daftar pemilih tetap. Mahasiswa aktif Informatika dapat konfirmasi langsung ke Panitia KPR.",
+        "NIM belum tercatat di Daftar Pemilih Tetap (DPT). Mahasiswa aktif Informatika dapat melakukan konfirmasi ke Panitia KPR.",
     };
   }
 
@@ -147,9 +146,7 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
-  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(
-    null,
-  );
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
   const [lockoutMinutes, setLockoutMinutes] = useState<number | null>(null);
 
   // Status Pemeliharaan & Mode Admin Tersembunyi (Secret Trigger 3x Logo)
@@ -161,9 +158,7 @@ export function LoginForm({
   );
   const [logoClicks, setLogoClicks] = useState<number[]>([]);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-  const [checkStatusNotice, setCheckStatusNotice] = useState<string | null>(
-    null,
-  );
+  const [checkStatusNotice, setCheckStatusNotice] = useState<string | null>(null);
 
   // Dev Mock Accounts
   const [dummyAccounts, setDummyAccounts] = useState<DummyAccount[]>([]);
@@ -171,7 +166,6 @@ export function LoginForm({
   const [showDummyAccounts, setShowDummyAccounts] = useState(false);
   const [loadingAccountId, setLoadingAccountId] = useState<string | null>(null);
 
-  // Sinkronisasi status jika props server diperbarui
   useEffect(() => {
     setIsMaintenance(initialMaintenance);
   }, [initialMaintenance]);
@@ -218,7 +212,6 @@ export function LoginForm({
     }
   };
 
-  // Cek Status Pemilihan secara manual oleh pemilih saat pemeliharaan aktif
   const handleCheckStatus = async () => {
     setIsCheckingStatus(true);
     try {
@@ -228,7 +221,7 @@ export function LoginForm({
         if (!data.electionStatus.maintenanceMode) {
           setIsMaintenance(false);
           setSuccessNotice(
-            "Pemeliharaan sistem telah selesai. Silakan masukkan NIM dan kata sandi kamu.",
+            "Pemeliharaan sistem telah selesai. Masukkan NIM dan Kata Sandi Pemilih kamu.",
           );
         } else {
           const now = new Date();
@@ -246,7 +239,6 @@ export function LoginForm({
     }
   };
 
-  // Submit Login dengan NIM dan Kata Sandi Pemilih
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const cleanNim = identifier.trim();
@@ -255,14 +247,14 @@ export function LoginForm({
     if (!cleanNim || cleanNim.length < 4) {
       setErrorMessage(
         isAdminMode
-          ? "Masukkan email atau NIM admin yang valid."
+          ? "Masukkan email atau NIM panitia yang valid."
           : "Masukkan NIM yang valid.",
       );
       return;
     }
 
     if (!cleanPassword || cleanPassword.length < 4) {
-      setErrorMessage("Masukkan kata sandi pemilih minimal 4 karakter.");
+      setErrorMessage("Masukkan Kata Sandi Pemilih minimal 4 karakter.");
       return;
     }
 
@@ -295,13 +287,15 @@ export function LoginForm({
         if (typeof data?.lockoutMinutes === "number") {
           setLockoutMinutes(data.lockoutMinutes);
         }
-        setErrorMessage(data?.error || "Gagal masuk. Periksa kembali NIM dan kata sandi kamu.");
+        setErrorMessage(
+          data?.error ||
+            "Gagal masuk. Periksa kembali NIM dan Kata Sandi Pemilih kamu.",
+        );
         return;
       }
 
       const isStaff = data.user?.role && data.user.role !== "voter";
       const hasVoted = Boolean(data.user?.hasVoted);
-
       const isRecapDest = data.redirectUrl === "/rekapitulasi";
 
       setSuccessNotice(
@@ -310,13 +304,14 @@ export function LoginForm({
           : isStaff
           ? "Terverifikasi sebagai administrator. Membuka dashboard..."
           : hasVoted
-          ? "Terverifikasi. Membuka tanda terima pemilihan..."
-          : "Terverifikasi. Membuka bilik suara...",
+          ? "Terverifikasi. Membuka Tanda Terima Pemilihan..."
+          : "Terverifikasi. Membuka Bilik Suara Digital...",
       );
 
       setTimeout(() => {
         window.location.href =
-          data.redirectUrl || (isStaff ? "/admin/dashboard" : hasVoted ? "/receipt" : "/vote");
+          data.redirectUrl ||
+          (isStaff ? "/admin/dashboard" : hasVoted ? "/receipt" : "/vote");
       }, 500);
     } catch {
       setErrorMessage("Terjadi gangguan jaringan saat memproses login.");
@@ -325,7 +320,6 @@ export function LoginForm({
     }
   }
 
-  // Handle Dummy Login (Instant Bypass for Dev Testing)
   async function handleDummyLogin(accountId: string) {
     setLoadingAccountId(accountId);
     setErrorMessage(null);
@@ -363,90 +357,93 @@ export function LoginForm({
 
   return (
     <div className="w-full flex flex-col justify-between">
-      {/* 1. Card Header: Logo, Identity, & Dynamic Headline */}
-      <div className="text-center flex flex-col items-center space-y-2 mb-4">
+      {/* 1. Card Header */}
+      <div className="text-center flex flex-col items-center space-y-2.5 mb-6">
         <div
           onClick={handleLogoClick}
-          className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center select-none cursor-default"
-          title={isAdminMode ? "Mode Admin Aktif" : "Logo HMIF (Klik 3x untuk Akses Admin)"}
+          className="relative w-12 h-12 shrink-0 flex items-center justify-center select-none cursor-default"
+          title={
+            isAdminMode
+              ? "Mode Admin Aktif"
+              : "Logo HMIF (Klik 3x untuk Akses Panitia)"
+          }
         >
           <Image
             src="/assets/img/hmif-logo.png"
             alt="Logo HMIF Telkom University Purwokerto"
-            width={56}
-            height={56}
+            width={48}
+            height={48}
             priority
             className="w-full h-full object-contain pointer-events-none"
           />
         </div>
 
-        <div>
-          <p className="text-xs sm:text-sm font-bold tracking-wider uppercase text-on-surface">
-            PEMIRA HMIF 2026/2027
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-tertiary tracking-tight">
+            Pemilihan Chairman &amp; Vice Chairman HMIF 2026/2027
           </p>
-          <p className="text-[11px] sm:text-xs font-medium text-on-surface-variant">
-            Telkom University Purwokerto
-          </p>
-        </div>
 
-        <div className="pt-0.5">
           {isMaintenance && !isAdminMode ? (
             <>
-              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface leading-none text-balance">
-                Sedang Ada Pemeriksaan Sistem
+              <h1 className="font-display text-2xl sm:text-[1.75rem] font-extrabold tracking-tight text-on-surface leading-tight">
+                Bilik Suara Dalam Pemeliharaan
               </h1>
-              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mt-1 max-w-xs mx-auto text-pretty">
-                Sistem pemilihan sedang dalam penyesuaian berkala oleh Panitia
-                KPR. Pemungutan suara akan segera dibuka kembali.
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed max-w-sm mx-auto">
+                Sistem sedang dalam penyesuaian berkala oleh Panitia KPR. Pemungutan suara akan segera dibuka kembali.
               </p>
             </>
           ) : isAdminMode ? (
             <>
-              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface leading-none">
-                Masuk Administrator
+              <h1 className="font-display text-2xl sm:text-[1.75rem] font-extrabold tracking-tight text-on-surface leading-tight">
+                Masuk Panitia KPR
               </h1>
-              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mt-1 max-w-xs mx-auto">
-                Masukkan NIM atau email panitia dan kata sandi akun untuk mengelola sistem.
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed max-w-sm mx-auto">
+                Masukkan NIM atau email panitia serta kata sandi akun untuk mengelola sistem pemilihan.
               </p>
             </>
           ) : (
             <>
-              <h1 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface leading-none">
-                Waktunya Memilih.
+              <h1 className="font-display text-2xl sm:text-[1.75rem] font-extrabold tracking-tight text-on-surface leading-tight">
+                Masuk ke Bilik Suara Digital
               </h1>
-              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mt-1 max-w-xs mx-auto text-pretty">
-                Masukkan NIM dan kata sandi pemilih yang telah dikirimkan ke email resmi kampus kamu.
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed max-w-sm mx-auto">
+                Verifikasi NIM yang tercatat di Daftar Pemilih Tetap (DPT) dan Kata Sandi Pemilih dari email kampus kamu.
               </p>
             </>
           )}
         </div>
       </div>
 
-      {/* 2. Interactive Feedback Banners (Error / Success) */}
-      <div className="space-y-3 mb-4">
+      {/* 2. Interactive Feedback Banners */}
+      <div className="space-y-3 mb-4" aria-live="polite">
         <AnimatePresence>
           {errorDisplay && (
             <motion.div
               key="error-banner"
+              role="alert"
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
-              className="rounded-xl border border-error/40 bg-error-container/20 p-3.5 text-sm text-error flex items-start gap-2.5"
+              className="rounded-xl border border-error/40 bg-error-container dark:bg-error-container/30 p-3.5 text-xs sm:text-sm flex items-start gap-2.5"
             >
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-error" />
-              <div className="flex-1">
-                <div className="font-bold">{errorDisplay.title}</div>
-                <div className="mt-0.5 text-on-surface-variant leading-relaxed">
+              <AlertTriangle
+                className="w-4 h-4 mt-0.5 shrink-0 text-error"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-error">{errorDisplay.title}</div>
+                <div className="mt-0.5 text-on-surface leading-relaxed">
                   {errorDisplay.message}
                 </div>
                 {remainingAttempts !== null && remainingAttempts > 0 && (
-                  <p className="mt-1 text-xs font-semibold text-error">
-                    Sisa kesempatan login: {remainingAttempts} kali sebelum akun terkunci.
+                  <p className="mt-1 text-xs font-semibold text-error tabular-nums">
+                    Sisa kesempatan masuk: {remainingAttempts} kali sebelum akun terkunci.
                   </p>
                 )}
                 {lockoutMinutes !== null && lockoutMinutes > 0 && (
-                  <p className="mt-1 text-xs font-semibold text-error">
+                  <p className="mt-1 text-xs font-semibold text-error tabular-nums">
                     Akun terkunci selama {lockoutMinutes} menit demi keamanan.
                   </p>
                 )}
@@ -459,33 +456,34 @@ export function LoginForm({
           {successNotice && (
             <motion.div
               key="success-banner"
+              role="status"
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ type: "tween", ease: "easeOut", duration: 0.15 }}
-              className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-300 flex items-start gap-2.5"
+              className="rounded-xl border border-emerald-600/30 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-200 p-3.5 text-xs sm:text-sm flex items-start gap-2.5"
             >
-              <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" />
+              <CheckCircle2
+                className="w-4 h-4 mt-0.5 text-emerald-700 dark:text-emerald-400 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
               <span className="flex-1 leading-relaxed">{successNotice}</span>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* 3. Main Content: Maintenance State vs Single-Screen Login Form */}
+      {/* 3. Main Content */}
       {isMaintenance && !isAdminMode ? (
         <div className="space-y-4 pt-1 flex flex-col justify-end">
           <div className="min-h-[20px] flex items-center justify-center text-xs text-center text-on-surface-variant font-medium">
             {isCheckingStatus ? (
-              <span className="text-on-surface-variant/80">
-                Menghubungkan ke server...
-              </span>
+              <span>Menghubungkan ke server...</span>
             ) : checkStatusNotice ? (
-              <span>{checkStatusNotice}</span>
+              <span className="tabular-nums">{checkStatusNotice}</span>
             ) : (
-              <span className="text-on-surface-variant/50">
-                Klik tombol untuk memeriksa status bilik suara
-              </span>
+              <span>Tekan tombol di bawah untuk memeriksa status terbaru.</span>
             )}
           </div>
 
@@ -493,23 +491,25 @@ export function LoginForm({
             type="button"
             onClick={handleCheckStatus}
             disabled={isCheckingStatus}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-transform duration-100 active:scale-[0.98] shadow-sm disabled:opacity-60 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none min-h-[44px]"
+            className="w-full min-h-[48px] px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-[color,background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
           >
             <RefreshCw
               className={`w-4 h-4 ${isCheckingStatus ? "animate-spin" : ""}`}
+              strokeWidth={1.75}
+              aria-hidden="true"
             />
             <span>
-              {isCheckingStatus ? "Memeriksa Status..." : "Cek Status Sekarang"}
+              {isCheckingStatus ? "Memeriksa Status..." : "Periksa Status Sekarang"}
             </span>
           </button>
         </div>
       ) : (
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4" noValidate>
           {/* Input NIM / Identitas */}
           <div>
             <label
               htmlFor="identifier"
-              className="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1.5"
+              className="block text-xs font-semibold text-on-surface mb-1.5"
             >
               {isAdminMode ? "NIM atau Email Panitia" : "NIM"}
             </label>
@@ -525,26 +525,28 @@ export function LoginForm({
                 }}
                 placeholder={
                   isAdminMode
-                    ? "Contoh: panitia@telkomuniversity.ac.id"
-                    : "Contoh: 103012300001"
+                    ? "Masukkan NIM atau email panitia"
+                    : "Masukkan NIM kamu"
                 }
                 disabled={isLoading || isInputLocked}
-                className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:ring-primary text-sm font-medium transition-all outline-none min-h-[44px] disabled:opacity-50"
+                className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-outline-variant bg-surface-container-low text-on-surface placeholder:text-on-surface-variant/70 focus:bg-surface-container focus:border-primary focus:ring-2 focus:ring-primary/25 text-sm font-medium font-mono tabular-nums transition-[color,background-color,border-color,box-shadow] duration-150 outline-none disabled:opacity-50"
               />
-              <User className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+              <User
+                className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
             </div>
           </div>
 
           {/* Input Kata Sandi Pemilih */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor="password"
-                className="block text-xs font-bold uppercase tracking-wider text-on-surface"
-              >
-                {isAdminMode ? "Kata Sandi Akun" : "Kata Sandi Pemilih"}
-              </label>
-            </div>
+            <label
+              htmlFor="password"
+              className="block text-xs font-semibold text-on-surface mb-1.5"
+            >
+              {isAdminMode ? "Kata Sandi Akun" : "Kata Sandi Pemilih"}
+            </label>
             <div className="relative">
               <input
                 id="password"
@@ -556,38 +558,51 @@ export function LoginForm({
                   if (errorMessage) setErrorMessage(null);
                   setPassword(e.target.value);
                 }}
-                placeholder={isAdminMode ? "Masukkan kata sandi" : "Contoh: 7K9P-2M4X"}
+                placeholder={
+                  isAdminMode
+                    ? "Masukkan kata sandi akun"
+                    : "Masukkan Kata Sandi Pemilih"
+                }
                 disabled={isLoading || isInputLocked}
-                className="w-full h-12 pl-11 pr-12 rounded-xl border border-outline-variant/40 bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:bg-surface-container-highest focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:ring-primary text-sm font-mono tracking-wider transition-all outline-none min-h-[44px] disabled:opacity-50"
+                className="w-full min-h-[48px] pl-11 pr-12 rounded-xl border border-outline-variant bg-surface-container-low text-on-surface placeholder:text-on-surface-variant/70 focus:bg-surface-container focus:border-primary focus:ring-2 focus:ring-primary/25 text-sm font-mono tracking-wider transition-[color,background-color,border-color,box-shadow] duration-150 outline-none disabled:opacity-50"
               />
-              <KeyRound className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+              <KeyRound
+                className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface rounded-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
-                aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                tabIndex={-1}
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label={
+                  showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"
+                }
               >
                 {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
+                  <EyeOff className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
                 ) : (
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
                 )}
               </button>
             </div>
           </div>
 
           {/* Tombol Masuk */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
+          <button
             type="submit"
-            disabled={isLoading || !identifier.trim() || !password.trim() || isInputLocked}
-            className="w-full h-12 px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-transform duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px] shadow-sm"
+            disabled={
+              isLoading || !identifier.trim() || !password.trim() || isInputLocked
+            }
+            className="w-full min-h-[48px] px-5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-sm font-bold flex items-center justify-center gap-2 transition-[color,background-color,transform] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                <Loader2
+                  className="w-4 h-4 animate-spin text-on-primary"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
                 <span>Memverifikasi...</span>
               </>
             ) : (
@@ -595,19 +610,19 @@ export function LoginForm({
                 {isAdminMode ? "Masuk ke Dashboard" : "Masuk ke Bilik Suara"}
               </span>
             )}
-          </motion.button>
+          </button>
         </form>
       )}
 
       {/* 4. Card Footer: Panitia Support */}
-      <div className="pt-3 border-t border-outline-variant/20 text-center mt-3.5">
+      <div className="pt-4 border-t border-outline-variant text-center mt-5">
         <p className="text-xs text-on-surface-variant font-medium">
-          Kendala DPT atau kata sandi?{" "}
+          Kendala Daftar Pemilih Tetap (DPT) atau Kata Sandi Pemilih?{" "}
           <a
-            href="https://wa.me/6281809300406"
+            href={KPR_WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-primary hover:underline inline-flex items-center min-h-[36px] px-1 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+            className="font-semibold text-tertiary hover:underline inline-flex items-center min-h-[44px] px-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             Hubungi Panitia KPR
           </a>
@@ -618,29 +633,34 @@ export function LoginForm({
       {dummyEnabled &&
         (searchParams.get("dev") === "true" ||
           searchParams.get("dev") === "1") && (
-          <div className="mt-4 rounded-xl border border-outline-variant/30 bg-surface-container-low overflow-hidden text-on-surface">
+          <div className="mt-4 rounded-xl border border-outline-variant bg-surface-container-low overflow-hidden text-on-surface">
             <button
               type="button"
               onClick={() => setShowDummyAccounts(!showDummyAccounts)}
-              className="w-full p-3 min-h-[44px] flex items-center justify-between text-left hover:bg-surface-container transition-colors"
+              className="w-full px-3.5 py-2.5 min-h-[44px] flex items-center justify-between text-left hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                <span className="text-xs font-bold text-primary">
-                  Mode Uji Coba Cepat (Dev)
-                </span>
-              </div>
+              <span className="text-xs font-bold text-tertiary">
+                Mode Uji Coba Cepat (Dev)
+              </span>
               {showDummyAccounts ? (
-                <ChevronUp className="w-4 h-4 text-on-surface-variant" />
+                <ChevronUp
+                  className="w-4 h-4 text-on-surface-variant"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
               ) : (
-                <ChevronDown className="w-4 h-4 text-on-surface-variant" />
+                <ChevronDown
+                  className="w-4 h-4 text-on-surface-variant"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
               )}
             </button>
 
             {showDummyAccounts && (
-              <div className="p-3 pt-0 border-t border-outline-variant/20 space-y-2 max-h-56 overflow-y-auto">
-                <p className="text-[11px] text-on-surface-variant pb-1">
-                  Pilih akun simulasi untuk login instan:
+              <div className="p-3 pt-2 border-t border-outline-variant space-y-2 max-h-56 overflow-y-auto">
+                <p className="text-[11px] text-on-surface-variant">
+                  Pilih akun simulasi untuk login cepat:
                 </p>
                 {dummyAccounts.map((account) => (
                   <button
@@ -648,18 +668,18 @@ export function LoginForm({
                     type="button"
                     disabled={loadingAccountId !== null}
                     onClick={() => handleDummyLogin(account.id)}
-                    className="w-full min-h-[48px] p-2.5 rounded-lg bg-surface-container hover:bg-surface-container-highest hover:border-primary/50 border border-outline-variant/30 text-left transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                    className="w-full min-h-[48px] p-2.5 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant text-left transition-colors flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <div className="min-w-0">
                       <span className="text-xs font-semibold text-on-surface block truncate">
                         {account.name}
                       </span>
-                      <span className="text-[11px] text-on-surface-variant block truncate">
+                      <span className="text-[11px] text-on-surface-variant font-mono tabular-nums block truncate">
                         {account.role.toUpperCase()}{" "}
                         {account.nim ? `• ${account.nim}` : ""}
                       </span>
                     </div>
-                    <span className="text-[11px] text-primary font-semibold shrink-0">
+                    <span className="text-xs text-tertiary font-semibold shrink-0">
                       {loadingAccountId === account.id ? "Masuk..." : "Pilih"}
                     </span>
                   </button>

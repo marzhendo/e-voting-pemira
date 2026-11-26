@@ -6,11 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Vote,
-  ArrowRight,
   AlertTriangle,
   HelpCircle,
-  Shield,
   Loader2,
   LogOut,
 } from "lucide-react";
@@ -25,6 +22,8 @@ import { LogoutModal } from "@/components/ballot/logout-modal";
 import { CandidateDetailModal } from "@/components/candidates/candidate-detail-modal";
 import { castBallotAction } from "@/lib/actions/ballot";
 import { MaintenanceBooth } from "@/components/maintenance/maintenance-booth";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { KPR_WHATSAPP_URL } from "@/components/layout/site-header";
 
 export default function VotePage() {
   const router = useRouter();
@@ -107,7 +106,6 @@ export default function VotePage() {
       }
     }
 
-    // 1. Muat data kandidat dari endpoint master data pemilihan
     const loadCandidates = () => {
       fetch("/api/election", { cache: "no-store" })
         .then((res) => res.json())
@@ -150,7 +148,7 @@ export default function VotePage() {
         })
         .catch(() => {
           setElectionError(
-            "Terjadi kesalahan koneksi saat memuat bilik suara.",
+            "Terjadi kesalahan koneksi saat memuat Bilik Suara Digital.",
           );
         })
         .finally(() => {
@@ -160,11 +158,9 @@ export default function VotePage() {
 
     loadCandidates();
 
-    // Re-fetch saat tab aktif kembali
     const handleFocus = () => loadCandidates();
     window.addEventListener("focus", handleFocus);
 
-    // 2. Timer countdown sesi bilik suara
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -225,7 +221,7 @@ export default function VotePage() {
         router.push("/receipt");
       } else {
         setIsModalOpen(false);
-        setElectionError(res.message || "Gagal mengirim surat suara.");
+        setElectionError(res.message || "Gagal mengirim Surat Suara Anonim.");
         if (res.code === "ALREADY_VOTED") {
           setTimeout(() => {
             router.push("/receipt");
@@ -242,7 +238,6 @@ export default function VotePage() {
     }
   };
 
-  // Fullscreen Interstitial View saat mode pemeliharaan sistem aktif
   if (maintenanceMode) {
     return (
       <MaintenanceBooth
@@ -258,59 +253,64 @@ export default function VotePage() {
   const isSingleCandidate = regularCandidates.length === 1;
 
   return (
-    <div className="bg-surface font-montserrat text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary selection:text-on-primary">
-      {/* Fixed Sticky Header */}
-      <header className="fixed top-0 w-full z-40 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 shadow-sm">
-        <div className="h-16 max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+    <div className="bg-surface font-sans text-on-surface antialiased min-h-[100dvh] flex flex-col justify-between selection:bg-primary selection:text-on-primary overflow-x-hidden">
+      {/* Top Header */}
+      <header className="fixed top-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-sm border-b border-outline-variant">
+        <div className="h-16 max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
               <Image
                 src="/assets/img/hmif-logo.png"
-                alt="Logo HMIF"
+                alt="Logo HMIF Telkom University Purwokerto"
                 width={36}
                 height={36}
                 priority
                 className="w-full h-full object-contain"
               />
             </div>
-            <div>
-              <span className="text-sm font-bold tracking-wider text-on-surface uppercase block">
+            <div className="min-w-0">
+              <span className="text-xs sm:text-sm font-bold tracking-tight text-on-surface block truncate">
                 Pemira HMIF 2026/2027
               </span>
-              <span className="text-xs text-on-surface-variant font-medium hidden sm:block">
-                Bilik Suara
+              <span className="text-[11px] sm:text-xs text-on-surface-variant font-medium hidden sm:block truncate">
+                Bilik Suara Digital
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-surface-container/80 px-3.5 py-1.5 rounded-xl border border-outline-variant/30 text-xs">
-              <span className="text-on-surface-variant font-medium hidden sm:inline">
-                Sisa Waktu:
+          <div className="flex items-center gap-2 shrink-0">
+            <div
+              aria-label={`Sisa waktu sesi ${formatTimer(secondsLeft)}`}
+              className="flex items-center gap-2 bg-surface-container px-3 py-2 min-h-[44px] rounded-xl border border-outline-variant text-xs"
+            >
+              <span className="text-on-surface-variant font-medium hidden md:inline">
+                Sisa Waktu
               </span>
-              <span className="font-bebas text-base sm:text-lg text-on-surface tracking-wider font-bold">
+              <span className="font-mono text-sm sm:text-base text-on-surface font-semibold tabular-nums">
                 {formatTimer(secondsLeft)}
               </span>
             </div>
 
+            <ThemeToggle />
+
             <a
-              href="https://wa.me/6281809300406"
+              href={KPR_WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Bantuan KPR via WhatsApp"
-              className="text-on-surface-variant hover:text-on-surface text-sm font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="text-on-surface-variant hover:text-on-surface text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <HelpCircle className="w-4 h-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Bantuan KPR</span>
+              <HelpCircle className="w-4 h-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span className="hidden lg:inline">Bantuan KPR</span>
             </a>
 
             <button
               type="button"
               onClick={() => setIsLogoutModalOpen(true)}
-              aria-label="Keluar dari Bilik Suara"
-              className="text-on-surface-variant hover:text-error hover:bg-error/10 text-sm font-medium transition-colors flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-surface-container/60 hover:border-error/30 border border-outline-variant/20 focus-visible:ring-2 focus-visible:ring-error focus-visible:outline-none cursor-pointer"
+              aria-label="Keluar dari Bilik Suara Digital"
+              className="text-on-surface-variant hover:text-error hover:bg-error-container dark:hover:bg-error-container/30 text-xs sm:text-sm font-semibold transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.96] flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 rounded-xl bg-surface-container border border-outline-variant hover:border-error/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
             >
-              <LogOut className="w-4 h-4" aria-hidden="true" />
+              <LogOut className="w-4 h-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
               <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
@@ -319,36 +319,37 @@ export default function VotePage() {
 
       {/* Main Content */}
       <motion.main
+        id="main-content"
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "tween", ease: "easeOut", duration: 0.18 }}
         className="w-full pt-20 flex-1 flex flex-col"
       >
-        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-28 sm:pb-32">
+        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 pb-36 sm:pb-32">
           {/* Header Title Section & Institutional Schedule */}
-          <div className="mb-6 pb-4 border-b border-outline-variant/20 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-            <div>
-              <h1 className="font-bebas text-3xl sm:text-4xl lg:text-5xl tracking-wide uppercase text-on-surface">
+          <div className="mb-8 pb-5 border-b border-outline-variant flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="space-y-1.5">
+              <h1 className="font-display text-2xl sm:text-4xl font-extrabold tracking-tight text-on-surface">
                 Surat Suara Pemilihan
               </h1>
-              <p className="text-on-surface-variant text-sm sm:text-base mt-1 leading-relaxed">
+              <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed max-w-2xl">
                 {isSingleCandidate
-                  ? "Tentukan pilihanmu: pasangan calon atau kotak kosong."
-                  : "Gunakan hak pilihmu untuk menentukan Chairman & Vice Chairman HMIF 2026/2027."}
+                  ? "Tentukan pilihanmu untuk Chairman & Vice Chairman HMIF 2026/2027: pasangan calon atau Kotak Kosong."
+                  : "Salurkan satu hak suara sah untuk memilih Chairman & Vice Chairman HMIF Periode 2026/2027."}
               </p>
             </div>
 
             {electionSchedule && (
               <div className="text-xs text-on-surface-variant font-medium sm:text-right shrink-0">
-                <span className="block text-[11px] uppercase tracking-wider text-on-surface-variant/70">
-                  Jadwal Pemilihan
+                <span className="block text-[11px] font-semibold text-on-surface-variant">
+                  Jadwal Resmi
                 </span>
-                <span className="text-on-surface font-semibold">
+                <span className="font-mono text-on-surface font-semibold tabular-nums">
                   {new Date(electionSchedule.start).toLocaleDateString(
                     "id-ID",
                     { day: "numeric", month: "short" },
                   )}{" "}
-                  –{" "}
+                  s/d{" "}
                   {new Date(electionSchedule.end).toLocaleDateString("id-ID", {
                     day: "numeric",
                     month: "short",
@@ -361,15 +362,19 @@ export default function VotePage() {
 
           {/* Closed Notice */}
           {!votingActive && (
-            <div className="mb-6 rounded-xl border border-error/40 bg-surface-container p-4 text-on-surface flex items-start gap-3.5">
-              <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-sm text-on-surface">
+            <div className="mb-6 rounded-2xl border border-error/40 bg-error-container dark:bg-error-container/30 p-5 text-on-surface flex items-start gap-3.5">
+              <AlertTriangle
+                className="w-5 h-5 text-error shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <div className="space-y-2">
+                <h2 className="font-bold text-sm sm:text-base text-error">
                   Pemungutan Suara Sedang Ditutup
-                </h4>
-                <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
+                </h2>
+                <p className="text-sm text-on-surface leading-relaxed">
                   {electionSchedule
-                    ? `Bilik suara dibuka sesuai jadwal resmi: ${new Date(
+                    ? `Bilik Suara Digital dibuka sesuai jadwal resmi: ${new Date(
                         electionSchedule.start,
                       ).toLocaleString("id-ID", {
                         dateStyle: "medium",
@@ -378,15 +383,14 @@ export default function VotePage() {
                         "id-ID",
                         { dateStyle: "medium", timeStyle: "short" },
                       )} WIB.`
-                    : "Waktu pemungutan suara telah berakhir atau belum dimulai sesuai ketetapan panitia."}
+                    : "Waktu pemungutan suara telah berakhir atau belum dimulai sesuai ketetapan panitia KPR."}
                 </p>
-                <div className="mt-3">
+                <div className="pt-1">
                   <Link
                     href="/rekapitulasi"
-                    className="min-h-[44px] px-4 py-2 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    className="min-h-[44px] px-5 py-2.5 rounded-xl bg-primary hover:bg-secondary text-on-primary text-xs sm:text-sm font-bold inline-flex items-center justify-center transition-[color,background-color,transform] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <span>Lihat Rekapitulasi Suara</span>
-                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    Lihat Rekapitulasi Suara
                   </Link>
                 </div>
               </div>
@@ -395,22 +399,32 @@ export default function VotePage() {
 
           {/* Error Banner */}
           {electionError && (
-            <div className="mb-6 rounded-xl border border-error/30 bg-error-container/20 p-4 text-sm text-error flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{electionError}</span>
+            <div
+              role="alert"
+              className="mb-6 rounded-xl border border-error/40 bg-error-container dark:bg-error-container/30 p-4 text-sm text-error flex items-start gap-2.5"
+            >
+              <AlertTriangle
+                className="w-4 h-4 shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <span className="text-on-surface font-medium">{electionError}</span>
             </div>
           )}
 
           {/* Loading Candidates State */}
           {loadingElection ? (
             <div className="py-20 flex flex-col items-center justify-center text-center gap-3 text-on-surface-variant">
-              <Loader2 className="w-7 h-7 animate-spin text-primary" />
-              <p className="text-xs">Memuat data pasangan calon...</p>
+              <Loader2
+                className="w-7 h-7 animate-spin text-tertiary"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <p className="text-sm">Memuat daftar pasangan calon...</p>
             </div>
           ) : isSingleCandidate ? (
-            /* REFERENDUM CALON TUNGGAL VS KOTAK KOSONG (HEAD-TO-HEAD LEGA OPSI A) */
             <div className="max-w-5xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-8">
                 {regularCandidates.map((candidate) => (
                   <CandidateCard
                     key={candidate.id}
@@ -434,9 +448,7 @@ export default function VotePage() {
               </div>
             </div>
           ) : (
-            /* MULTI-PASLON (2+ Paslon Grid + Opsi Kotak Kosong Horizontal) */
             <>
-              {/* Grid Paslon Terdaftar */}
               <div
                 className={`grid gap-6 mb-8 ${
                   regularCandidates.length === 2
@@ -455,17 +467,16 @@ export default function VotePage() {
                 ))}
               </div>
 
-              {/* Opsi Kotak Kosong Horizontal Bar untuk Multi-Paslon */}
               {kotakKosongCandidate && (
                 <div
                   className={`mb-8 ${regularCandidates.length === 2 ? "max-w-5xl mx-auto" : ""}`}
                 >
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="h-px flex-1 bg-outline-variant/30" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                    <div className="h-px flex-1 bg-outline-variant" />
+                    <span className="text-xs font-semibold text-on-surface-variant">
                       Opsi Alternatif Sah
                     </span>
-                    <div className="h-px flex-1 bg-outline-variant/30" />
+                    <div className="h-px flex-1 bg-outline-variant" />
                   </div>
 
                   <KotakKosongCard
@@ -482,40 +493,37 @@ export default function VotePage() {
           )}
         </div>
 
-        {/* Bottom Sticky Action Bar */}
-        <div className="fixed bottom-0 inset-x-0 bg-surface/95 backdrop-blur-md z-40 py-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))] border-t border-outline-variant/30 shadow-lg">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        {/* Bottom Sticky Action Bar (Solid surface + subtle top elevation, respects safe-area) */}
+        <div className="fixed bottom-0 inset-x-0 bg-surface-container z-40 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-outline-variant shadow-[0_-4px_20px_rgb(0_0_0/0.06)] dark:shadow-[0_-4px_20px_rgb(0_0_0/0.35)]">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className={`w-2.5 h-2.5 rounded-full ${
-                  selectedCandidate ? "bg-primary" : "bg-outline/50"
+                aria-hidden="true"
+                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  selectedCandidate ? "bg-primary" : "bg-outline-variant"
                 }`}
               />
-              <span className="text-sm font-semibold text-on-surface">
+              <span className="text-sm font-semibold text-on-surface truncate">
                 {selectedCandidate
                   ? selectedCandidate.candidate_number === 0
                     ? "Pilihan: Kotak Kosong"
                     : `Pilihan: Paslon ${selectedCandidate.candidate_number.toString().padStart(2, "0")}`
-                  : "Pilih salah satu kandidat di atas"}
+                  : "Pilih salah satu opsi di atas"}
               </span>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-2.5 justify-end">
               {selectedCandidate && (
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
+                <button
                   type="button"
                   onClick={handleResetSelection}
-                  className="px-4 h-11 min-h-[44px] rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
+                  className="px-4 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high border border-outline-variant transition-[color,background-color,transform] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   Ganti Pilihan
-                </motion.button>
+                </button>
               )}
 
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
+              <button
                 type="button"
                 disabled={
                   !selectedCandidate ||
@@ -524,25 +532,16 @@ export default function VotePage() {
                   isSessionExpired
                 }
                 onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto px-6 h-11 min-h-[44px] rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary transition-colors flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
+                className="flex-1 sm:flex-none px-6 min-h-[44px] rounded-xl text-xs sm:text-sm font-bold text-on-primary bg-primary hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-[color,background-color,transform] duration-150 active:scale-[0.96] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
               >
-                <span>Konfirmasi Pilihan</span>
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
+                Konfirmasi Pilihan
+              </button>
             </div>
           </div>
         </div>
       </motion.main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-outline-variant/20 py-4 text-center text-xs text-on-surface-variant font-medium">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Komisi Pemilihan Raya • HMIF Telkom University Purwokerto</span>
-          <span>Periode 2026/2027</span>
-        </div>
-      </footer>
-
-      {/* Modal Konfirmasi */}
+      {/* Modals */}
       <ConfirmationModal
         isOpen={isModalOpen && !isSessionExpired}
         selectedCandidate={selectedCandidate}
@@ -551,7 +550,6 @@ export default function VotePage() {
         onConfirm={handleConfirmVote}
       />
 
-      {/* Modal Peringatan Sesi Kedaluwarsa */}
       <SessionExpiredModal
         isOpen={isSessionExpired}
         onLoginRedirect={() => {
@@ -559,7 +557,6 @@ export default function VotePage() {
         }}
       />
 
-      {/* Modal Konfirmasi Keluar Bilik Suara */}
       <LogoutModal
         isOpen={isLogoutModalOpen}
         isLoggingOut={isLoggingOut}
@@ -567,7 +564,6 @@ export default function VotePage() {
         onConfirmLogout={handleLogout}
       />
 
-      {/* Modal Detail Paslon & Unduh CV */}
       <CandidateDetailModal
         isOpen={!!detailCandidate}
         candidate={detailCandidate}

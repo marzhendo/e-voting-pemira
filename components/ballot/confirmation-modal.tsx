@@ -69,7 +69,7 @@ export function ConfirmationModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirmation-modal-title"
-            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/70"
             onClick={(e) => {
               if (e.target === e.currentTarget && !isSubmitting) {
                 onClose();
@@ -84,20 +84,23 @@ export function ConfirmationModal({
                 exit={{ opacity: 0, y: 6 }}
                 transition={{ type: 'tween', ease: 'easeOut', duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md bg-surface-container-high rounded-2xl p-6 flex flex-col gap-5 border border-outline-variant/30 my-auto"
+                className="relative w-full max-w-md bg-surface-container rounded-2xl p-6 flex flex-col gap-5 border border-outline-variant shadow-xl my-auto"
               >
                 {/* Modal Header */}
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                      <ShieldCheck className="w-5 h-5" />
+                    <div className="w-10 h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
                     </div>
                     <div>
-                      <h2 id="confirmation-modal-title" className="font-bebas text-2xl tracking-wide uppercase text-on-surface">
+                      <h2
+                        id="confirmation-modal-title"
+                        className="font-display text-xl font-extrabold tracking-tight text-on-surface"
+                      >
                         Konfirmasi Pilihan
                       </h2>
                       <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-                        Pilihanmu bersifat final dan langsung tercatat secara rahasia.
+                        Pilihanmu bersifat final dan langsung tercatat sebagai Surat Suara Anonim.
                       </p>
                     </div>
                   </div>
@@ -107,23 +110,23 @@ export function ConfirmationModal({
                     disabled={isSubmitting}
                     onClick={onClose}
                     aria-label="Tutup Konfirmasi"
-                    className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </div>
 
                 {/* Selected Candidate Summary */}
-                <div className="bg-surface-container rounded-xl p-4 flex items-center gap-4 border border-outline-variant/20">
-                  <div className="w-14 h-14 rounded-xl bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/30">
-                    <span className="font-bebas text-3xl text-primary leading-none">
+                <div className="bg-surface-container-low rounded-xl p-4 flex items-center gap-4 border border-outline-variant">
+                  <div className="w-14 h-14 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0">
+                    <span className="font-mono text-2xl font-bold tabular-nums leading-none">
                       {numberStr}
                     </span>
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <span className="text-[11px] text-on-surface-variant uppercase tracking-wider block font-semibold">
-                      Pilihanmu:
+                    <span className="text-xs text-on-surface-variant block font-semibold">
+                      Pilihanmu
                     </span>
                     <h3 className="text-base text-on-surface font-bold truncate">
                       {title}
@@ -135,35 +138,31 @@ export function ConfirmationModal({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2">
-                  <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-1">
+                  <button
                     type="button"
                     disabled={isSubmitting}
                     onClick={onClose}
-                    className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    className="min-h-[44px] px-5 rounded-xl text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high border border-outline-variant transition-[color,background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     Ubah Pilihan
-                  </motion.button>
+                  </button>
 
-                  <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: 'tween', ease: 'easeOut', duration: 0.1 }}
+                  <button
                     type="button"
                     disabled={isSubmitting}
                     onClick={onConfirm}
-                    className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-secondary transition-colors flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    className="min-h-[44px] px-6 rounded-xl text-sm font-bold text-on-primary bg-primary hover:bg-secondary transition-[color,background-color,transform] duration-150 active:scale-[0.96] flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin text-on-primary" />
+                        <Loader2 className="w-4 h-4 animate-spin text-on-primary" strokeWidth={2} aria-hidden="true" />
                         <span>Mengunci Suara...</span>
                       </>
                     ) : (
                       <span>Kunci Suara</span>
                     )}
-                  </motion.button>
+                  </button>
                 </div>
               </motion.div>
             </div>

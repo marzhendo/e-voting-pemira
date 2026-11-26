@@ -10,7 +10,7 @@ interface RecapResultsViewProps {
   totalVotes: number;
 }
 
-const SEGMENT_COLORS = ["#EBBD1C", "#29388B", "#F3EC51", "#8B8A8B"];
+const SEGMENT_COLORS = ["#EBBD1C", "#29388B", "#B71B25", "#5E5E5E"];
 
 function CandidatePortrait({
   photoUrl,
@@ -42,17 +42,17 @@ function CandidatePortrait({
 
   if (candidateNumber === 0) {
     return (
-      <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl bg-surface-container-high border border-outline-variant/40 flex items-center justify-center shrink-0">
-        <Inbox className="w-6 h-6 text-on-surface-variant" aria-hidden="true" />
+      <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+        <Inbox className="w-6 h-6 text-on-surface-variant" strokeWidth={1.75} aria-hidden="true" />
       </div>
     );
   }
 
   if (!imgSrc || imgFailed) {
     return (
-      <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl bg-surface-container-high border border-outline-variant/40 flex flex-col items-center justify-center shrink-0 text-center p-1">
-        <Users className="w-5 h-5 text-primary/80" aria-hidden="true" />
-        <span className="text-[10px] font-bold text-primary mt-0.5 tabular-nums">
+      <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl bg-surface-container-high border border-outline-variant flex flex-col items-center justify-center shrink-0 text-center p-1">
+        <Users className="w-5 h-5 text-on-surface-variant" strokeWidth={1.75} aria-hidden="true" />
+        <span className="font-mono text-[10px] font-bold text-on-surface mt-0.5 tabular-nums">
           {String(candidateNumber).padStart(2, "0")}
         </span>
       </div>
@@ -60,7 +60,8 @@ function CandidatePortrait({
   }
 
   return (
-    <div className="relative w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden bg-surface-container-high shrink-0 ring-1 ring-white/10">
+    <div className="relative w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden bg-surface-container-high shrink-0 ring-1 ring-inset ring-black/10 dark:ring-white/10">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imgSrc}
         alt={`Pasangan Calon ${String(candidateNumber).padStart(2, "0")}: ${leaderName} dan ${viceLeaderName}`}
@@ -97,25 +98,25 @@ export function RecapResultsView({
   return (
     <section
       aria-label="Hasil Resmi Rekapitulasi Suara"
-      className="rounded-2xl bg-surface-container border border-outline-variant/30 overflow-hidden"
+      className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden"
     >
       {/* Top Summary & Stacked Proportion Bar */}
-      <div className="p-5 sm:p-7 space-y-5 border-b border-outline-variant/20">
+      <div className="p-5 sm:p-7 space-y-5 border-b border-outline-variant">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-primary block">
+            <span className="text-xs font-bold text-tertiary block">
               Hasil Akhir Pemilihan
             </span>
-            <h2 className="font-bebas text-2xl sm:text-4xl tracking-wide uppercase text-brand-cream mt-0.5 text-balance leading-tight">
+            <h2 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface mt-1 leading-tight">
               {summaryHeading}
             </h2>
           </div>
 
           <div className="sm:text-right shrink-0">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant block">
+            <span className="text-xs font-semibold text-on-surface-variant block">
               Total Suara Sah
             </span>
-            <span className="font-bebas text-3xl sm:text-4xl text-on-surface tabular-nums leading-none mt-0.5 block">
+            <span className="font-mono text-2xl sm:text-3xl font-bold text-on-surface tabular-nums leading-none mt-1 block">
               {effectiveDenominator.toLocaleString("id-ID")}
             </span>
           </div>
@@ -158,16 +159,16 @@ export function RecapResultsView({
                 return (
                   <div key={item.candidateId} className="inline-flex items-center gap-2 min-w-0">
                     <span
-                      className="w-2 h-2 rounded-full shrink-0"
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: dotColor }}
                       aria-hidden="true"
                     />
-                    <span className="text-on-surface font-medium truncate">
+                    <span className="text-on-surface font-semibold truncate">
                       {isKotakKosong
                         ? "Kotak Kosong"
                         : `Paslon ${String(item.candidateNumber).padStart(2, "0")}`}
                     </span>
-                    <span className="tabular-nums">{item.percentage}%</span>
+                    <span className="font-mono tabular-nums">{item.percentage}%</span>
                   </div>
                 );
               })}
@@ -176,8 +177,8 @@ export function RecapResultsView({
         )}
       </div>
 
-      {/* Clean Divided Ranked Candidate Rows */}
-      <div className="divide-y divide-outline-variant/20">
+      {/* Ranked Candidate Rows */}
+      <div className="divide-y divide-outline-variant">
         {results.map((item, idx) => {
           const isKotakKosong = item.candidateNumber === 0;
           const isLeading = hasUniqueLeader && idx === 0;
@@ -187,7 +188,7 @@ export function RecapResultsView({
             <div
               key={item.candidateId}
               className={`p-5 sm:px-7 sm:py-5 ${
-                isLeading && !isKotakKosong ? "bg-primary/[0.03]" : ""
+                isLeading && !isKotakKosong ? "bg-surface-highlight/60" : ""
               }`}
             >
               <div className="flex items-start sm:items-center gap-4">
@@ -199,21 +200,21 @@ export function RecapResultsView({
                 />
 
                 <div className="flex-1 min-w-0 space-y-2.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md tabular-nums ${
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-md font-mono tabular-nums ${
                             isKotakKosong
-                              ? "bg-surface-container-high text-on-surface-variant"
-                              : "bg-primary/15 text-primary"
+                              ? "bg-surface-container-high text-on-surface-variant border border-outline-variant"
+                              : "bg-primary text-on-primary"
                           }`}
                         >
                           {isKotakKosong ? "Opsi Abstain Sah" : `Nomor Urut ${numberLabel}`}
                         </span>
                         {isLeading && (
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-cream">
-                            Unggul
+                          <span className="text-xs font-bold text-tertiary">
+                            Suara Terbanyak
                           </span>
                         )}
                       </div>
@@ -230,17 +231,17 @@ export function RecapResultsView({
                       )}
                     </div>
 
-                    <div className="flex sm:flex-col items-baseline sm:items-end gap-2 sm:gap-0 shrink-0">
-                      <span className="font-bebas text-3xl sm:text-4xl text-primary tabular-nums leading-none">
+                    <div className="flex sm:flex-col items-baseline sm:items-end gap-2 sm:gap-0.5 shrink-0 font-mono tabular-nums">
+                      <span className="text-2xl sm:text-3xl font-bold text-on-surface leading-none">
                         {item.percentage}%
                       </span>
-                      <span className="text-xs sm:text-sm font-medium text-on-surface-variant tabular-nums">
+                      <span className="text-xs sm:text-sm font-medium text-on-surface-variant">
                         {item.voteCount.toLocaleString("id-ID")} Suara
                       </span>
                     </div>
                   </div>
 
-                  <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">
+                  <div className="w-full h-2.5 rounded-full bg-surface-container-highest overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.max(0, Math.min(100, item.percentage))}%` }}
@@ -250,7 +251,7 @@ export function RecapResultsView({
                         ease: "easeOut",
                       }}
                       className={`h-full rounded-full ${
-                        isKotakKosong ? "bg-on-surface-variant/50" : "bg-primary"
+                        isKotakKosong ? "bg-on-surface-variant/60" : "bg-primary"
                       }`}
                     />
                   </div>

@@ -13,18 +13,18 @@ export function CohortTurnoutBars({ cohorts }: CohortTurnoutBarsProps) {
   return (
     <section
       aria-label="Partisipasi Pemilih Per Angkatan"
-      className="rounded-2xl bg-surface-container border border-outline-variant/30 p-5 sm:p-7"
+      className="rounded-2xl bg-surface-container border border-outline-variant p-5 sm:p-7"
     >
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 pb-4 mb-5 border-b border-outline-variant/20">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 pb-4 mb-5 border-b border-outline-variant">
         <div>
-          <h2 className="font-bebas text-2xl sm:text-3xl tracking-wide uppercase text-on-surface text-balance">
+          <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
             Partisipasi Per Angkatan
           </h2>
-          <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5 text-pretty">
+          <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
             Perbandingan jumlah pemilih yang telah menggunakan hak suara pada tiap angkatan DPT.
           </p>
         </div>
-        <span className="text-xs font-medium text-on-surface-variant shrink-0 tabular-nums">
+        <span className="font-mono text-xs font-semibold text-on-surface-variant shrink-0 tabular-nums">
           {sortedCohorts.length} Angkatan Terdaftar
         </span>
       </div>
@@ -48,12 +48,12 @@ export function CohortTurnoutBars({ cohorts }: CohortTurnoutBarsProps) {
                   <span className="font-semibold text-on-surface truncate">
                     Angkatan {cohort.generation}
                   </span>
-                  <div className="flex items-center gap-2 shrink-0 tabular-nums">
+                  <div className="flex items-center gap-2 shrink-0 font-mono tabular-nums">
                     <span className="text-xs text-on-surface-variant">
                       {cohort.votedCount.toLocaleString("id-ID")} /{" "}
                       {cohort.totalVoters.toLocaleString("id-ID")}
                     </span>
-                    <span className="font-bold text-primary min-w-[46px] text-right">
+                    <span className="font-bold text-tertiary min-w-[46px] text-right">
                       {safePct.toFixed(1)}%
                     </span>
                   </div>

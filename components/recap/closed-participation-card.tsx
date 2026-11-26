@@ -27,11 +27,11 @@ export function ClosedParticipationCard({
   return (
     <section
       aria-label="Partisipasi Pemilih DPT"
-      className="rounded-2xl bg-surface-container border border-outline-variant/30 p-5 sm:p-7"
+      className="rounded-2xl bg-surface-container border border-outline-variant p-5 sm:p-7"
     >
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
         {/* Left: Compact Overall DPT Ring */}
-        <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-center sm:items-start lg:items-start gap-5 pb-5 lg:pb-0 border-b lg:border-b-0 lg:border-r border-outline-variant/20 lg:pr-6">
+        <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-center sm:items-start lg:items-start gap-5 pb-5 lg:pb-0 border-b lg:border-b-0 lg:border-r border-outline-variant lg:pr-6">
           <div className="relative w-32 h-32 sm:w-36 sm:h-36 shrink-0 flex items-center justify-center">
             <svg
               viewBox="0 0 150 150"
@@ -44,7 +44,7 @@ export function ClosedParticipationCard({
                 cy="75"
                 r={radius}
                 fill="none"
-                stroke="#262626"
+                stroke="rgb(var(--surface-container-highest))"
                 strokeWidth="12"
               />
               <motion.circle
@@ -62,20 +62,20 @@ export function ClosedParticipationCard({
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
-              <span className="font-bebas text-3xl sm:text-4xl leading-none text-primary tabular-nums">
+              <span className="font-mono text-2xl sm:text-3xl font-bold leading-none text-on-surface tabular-nums">
                 {safePct.toFixed(1)}%
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant mt-0.5">
+              <span className="text-[11px] font-semibold text-on-surface-variant mt-1">
                 Partisipasi
               </span>
             </div>
           </div>
 
           <div className="space-y-2 text-center sm:text-left min-w-0">
-            <h2 className="font-bebas text-2xl tracking-wide uppercase text-on-surface">
+            <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
               Partisipasi Pemilih
             </h2>
-            <p className="text-xs text-on-surface-variant leading-relaxed tabular-nums">
+            <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed font-mono tabular-nums">
               <strong className="text-on-surface">{totalVotes.toLocaleString("id-ID")}</strong> dari{" "}
               <strong className="text-on-surface">{totalDpt.toLocaleString("id-ID")}</strong> DPT menggunakan hak suara ({notVotedCount.toLocaleString("id-ID")} tidak memilih).
             </p>
@@ -85,16 +85,16 @@ export function ClosedParticipationCard({
         {/* Right: Per-Cohort Breakdown */}
         <div className="lg:col-span-8 min-w-0 space-y-4">
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+            <h3 className="text-xs font-bold text-on-surface-variant">
               Rincian Per Angkatan
             </h3>
-            <span className="text-xs text-on-surface-variant tabular-nums">
+            <span className="font-mono text-xs text-on-surface-variant tabular-nums">
               {sortedCohorts.length} Angkatan
             </span>
           </div>
 
           {sortedCohorts.length === 0 ? (
-            <p className="text-xs text-on-surface-variant py-4">
+            <p className="text-xs sm:text-sm text-on-surface-variant py-4">
               Belum ada data angkatan DPT.
             </p>
           ) : (
@@ -107,17 +107,17 @@ export function ClosedParticipationCard({
                       <span className="font-semibold text-on-surface truncate">
                         Angkatan {cohort.generation}
                       </span>
-                      <div className="flex items-center gap-2 shrink-0 tabular-nums">
+                      <div className="flex items-center gap-2 shrink-0 font-mono tabular-nums">
                         <span className="text-on-surface-variant">
                           {cohort.votedCount}/{cohort.totalVoters}
                         </span>
-                        <span className="font-bold text-primary min-w-[42px] text-right">
+                        <span className="font-bold text-tertiary min-w-[44px] text-right">
                           {cohortPct.toFixed(1)}%
                         </span>
                       </div>
                     </div>
 
-                    <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">
+                    <div className="w-full h-2.5 rounded-full bg-surface-container-highest overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${cohortPct}%` }}

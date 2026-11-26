@@ -13,5 +13,11 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  // Mengisolasi panel internal Admin pada token tema gelap yang sudah teruji kontrasnya
+  // agar peralihan mode terang di sisi pemilih/publik tidak merusak keterbacaan dashboard panitia.
+  return (
+    <div className="dark min-h-screen bg-surface text-on-surface font-sans antialiased">
+      {children}
+    </div>
+  );
 }
