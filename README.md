@@ -1,288 +1,193 @@
-# E-Voting Pemira HMIF
+# E-Voting Pemira HMIF Telkom University Purwokerto
 
-> Sistem pemungutan suara elektronik untuk Pemilihan Raya (Pemira) Himpunan Mahasiswa Informatika (HMIF).
+Aplikasi web pemilihan raya (Pemira) untuk memilih **Chairman & Vice Chairman** Himpunan Mahasiswa Informatika (HMIF) Telkom University Purwokerto.
 
-**Status proyek:** Documentation and implementation status must be verified  
-**Dokumentasi:** Draft — Requires project team review  
-**Versi aplikasi:** Belum ditetapkan  
-**Pemilik proyek:** HMIF / Panitia Pemira (detail organisasi dan penanggung jawab: TBD)
+Aplikasi ini dibuat agar mahasiswa aktif Informatika dapat memilih dari mana saja secara aman, sementara pilihan suara tetap rahasia dan hasil akhirnya bisa diperiksa bersama oleh panitia maupun publik.
 
 ---
 
-## 1. Tentang Proyek
-
-E-Voting Pemira HMIF dirancang untuk mendukung proses pemilihan Ketua dan Wakil Ketua HMIF secara elektronik.
-
-Sistem dirancang dengan prinsip:
-
-- **One-Man-One-Vote:** satu pemilih yang memenuhi syarat hanya dapat menggunakan hak pilih satu kali.
-- **DPT validation:** kelayakan pemilih diperiksa terhadap Daftar Pemilih Tetap.
-- **Ballot secrecy:** identitas pemilih dipisahkan dari record pilihan suara.
-- **Controlled election period:** pemungutan suara mengikuti jadwal dan status yang ditetapkan.
-- **Private tally during voting:** perolehan suara tidak ditampilkan kepada pemilih umum selama pemungutan suara berlangsung.
-- **Auditability:** tindakan administratif dan kejadian penting perlu dapat ditelusuri.
-
-Pernyataan di atas menggambarkan persyaratan desain dari dokumentasi proyek, bukan sertifikasi bahwa seluruh kontrol telah selesai diimplementasikan.
-
-## 2. Ruang Lingkup Utama
-
-Fitur yang ditetapkan dalam PRD meliputi:
-
-- Login menggunakan Microsoft Entra ID.
-- Pencocokan identitas mahasiswa dengan DPT.
-- Halaman kandidat dan opsi Kotak Kosong.
-- Konfirmasi sebelum pengiriman suara.
-- Pencatatan suara melalui proses server/database yang aman.
-- Receipt setelah proses voting.
-- Dashboard KPR/Admin.
-- Impor DPT melalui CSV/Excel.
-- Pengaturan periode pemungutan suara dan mode pemeliharaan.
-- Monitoring partisipasi dan tally privat.
-- Ekspor laporan PDF/Excel.
-- Audit trail.
-
-Fitur yang tidak termasuk dalam ruang lingkup PRD saat ini antara lain live debate/Q&A di dalam aplikasi dan pendaftaran pemilih secara mandiri.
-
-## 3. Teknologi
-
-Stack yang tercantum dalam spesifikasi/konteks proyek:
-
-| Area | Teknologi |
-|---|---|
-| Web framework | Next.js App Router |
-| Language | TypeScript |
-| Database | Supabase / PostgreSQL |
-| Authentication | Microsoft Entra ID dengan MSAL/provider yang disepakati |
-| Input validation | Zod |
-| E2E testing | Playwright |
-| Package manager | pnpm |
-
-Versi runtime, versi dependency, provider hosting, dan konfigurasi CI/CD harus diverifikasi dari repository dan environment aktual.
-
-## 4. Dokumentasi
-
-Dokumentasi proyek dipisahkan berdasarkan topik agar mudah dipelihara.
-
-| Dokumen | Deskripsi |
-|---|---|
-| `PRD.md` | Kebutuhan produk, tujuan, ruang lingkup, dan alur utama. |
-| `UI.md` | Spesifikasi antarmuka dan pengalaman pengguna. |
-| `ARCHITECTURE.md` | Arsitektur sistem, komponen, alur, dan keputusan teknis. |
-| `DATABASE.md` | Desain database, schema, RPC, dan integritas transaksi. |
-| `DATA_DICTIONARY.md` | Definisi tabel, kolom, constraint, dan sensitivitas data. |
-| `API.md` | Kontrak dan perilaku API. |
-| `AUTHENTICATION.md` | Login, session, identity mapping, dan authorization. |
-| `SECURITY.md` | Threat model, security controls, dan incident response. |
-| `TESTING.md` | Strategi, skenario, dan kriteria pengujian. |
-| `DEPLOYMENT.md` | Deployment, release, rollback, dan konfigurasi operasional. |
-| `ENVIRONMENT.md` | Environment variables dan pemisahan lingkungan. |
-| `OPERATIONS.md` | Prosedur operasional pemilihan. |
-| `USER_GUIDE.md` | Panduan mahasiswa pemilih dan penggunaan umum. |
-| `ADMIN_GUIDE.md` | Panduan administrator dan panitia. |
-| `CONTRIBUTING.md` | Aturan kontribusi developer dan pull request. |
-| `CHANGELOG.md` | Catatan perubahan dan release. |
-
-Dokumen di atas harus disimpan pada lokasi yang sesuai dalam repository. Daftar file aktual dan lokasi folder perlu diverifikasi sebelum publikasi.
-
-## 5. Prasyarat Pengembangan
-
-Secara umum, lingkungan pengembangan memerlukan:
-
-- Git.
-- Node.js dengan versi yang ditetapkan proyek.
-- pnpm.
-- Akses ke repository.
-- Environment variables untuk layanan development.
-- Akses ke Microsoft Entra dan Supabase development jika diperlukan.
-
-Versi Node.js/pnpm dan langkah setup final: **TBD**.
-
-## 6. Menjalankan Proyek Secara Lokal
-
-> Bagian ini merupakan template alur umum. Perintah final harus disesuaikan dengan script yang benar-benar tersedia di `package.json`.
-
-### 6.1 Clone repository
-
-```bash
-git clone <REPOSITORY_URL>
-cd <REPOSITORY_DIRECTORY>
-```
-
-### 6.2 Install dependencies
-
-```bash
-pnpm install
-```
-
-### 6.3 Siapkan environment
-
-Buat konfigurasi lokal berdasarkan template resmi, jika tersedia:
-
-```bash
-cp .env.example .env.local
-```
-
-Isi nilai development yang diperlukan melalui kanal secret/configuration yang disetujui.
-
-Jangan gunakan secret production untuk pengembangan lokal. Jangan commit `.env.local`.
-
-### 6.4 Jalankan aplikasi
-
-Jika script `dev` tersedia di `package.json`:
-
-```bash
-pnpm dev
-```
-
-URL lokal default dan script aktual perlu diverifikasi dari konfigurasi repository.
-
-## 7. Pemeriksaan Kualitas
-
-Typecheck yang ditetapkan dalam proyek:
-
-```bash
-pnpm tsc --noEmit
-```
-
-Script lint, unit test, integration test, dan Playwright mengikuti konfigurasi repository aktual. Jangan mengasumsikan nama script sebelum memeriksa `package.json`.
-
-Skenario penting yang perlu dijaga:
-
-- pemilih yang tidak terdaftar di DPT ditolak;
-- pemilih yang sudah memilih tidak dapat memilih kembali;
-- voting yang tertutup menolak pengiriman suara;
-- kandidat tidak valid/tidak aktif ditolak;
-- lima request konkuren untuk pemilih yang sama menghasilkan tepat satu `SUCCESS` dan empat `ALREADY_VOTED`;
-- hanya satu ballot tersimpan untuk skenario concurrent tersebut;
-- pemilih biasa tidak dapat mengakses tally privat.
-
-Jangan menjalankan pengujian destruktif atau menggunakan data pemilih produksi.
-
-## 8. Keamanan dan Privasi
-
-Beberapa aturan mendasar:
-
-- Jangan menerima NIM dari browser sebagai bukti identitas pemilih.
-- Validasi identitas dan otorisasi pada server.
-- Jangan mengekspos service-role key atau secret ke browser.
-- Jangan menyimpan identitas pemilih pada record ballot.
-- Jangan menambahkan IP/session ID/precise timestamp ke ballot tanpa review arsitektur dan privasi.
-- Jangan menampilkan tally privat kepada pemilih umum selama voting berlangsung.
-- Jangan memasukkan DPT, token, credential, atau data ballot ke Git.
-- Perubahan pada autentikasi, DPT, voting RPC, tally, dan RBAC wajib melalui review keamanan.
-
-Lihat `SECURITY.md`, `AUTHENTICATION.md`, dan `DATABASE.md` untuk rincian.
-
-## 9. Kontribusi
-
-Sebelum mengirim perubahan:
-
-1. Baca PRD dan dokumen teknis yang terkait.
-2. Buat branch kerja.
-3. Jaga perubahan tetap fokus.
-4. Tambahkan atau perbarui pengujian.
-5. Jalankan typecheck dan pemeriksaan lain yang tersedia.
-6. Perbarui dokumentasi bila perilaku atau kontrak berubah.
-7. Buat pull request dengan ringkasan, test evidence, serta analisis risiko.
-
-Lihat `CONTRIBUTING.md` untuk pedoman lebih lengkap.
-
-Branch model, protected branch, jumlah reviewer minimum, dan CI checks wajib: **TBD**.
-
-## 10. Environment dan Deployment
-
-Lingkungan development, staging, dan production harus dipisahkan, termasuk:
-
-- URL aplikasi;
-- Microsoft Entra configuration;
-- Supabase project;
-- credential dan secret;
-- data;
-- logging dan monitoring.
-
-Platform hosting, URL resmi, pipeline CI/CD, serta mekanisme secret manager: **TBD**.
-
-Ikuti `ENVIRONMENT.md` dan `DEPLOYMENT.md`. Jangan melakukan deployment production sebelum checklist release dan persetujuan operasional terpenuhi.
-
-## 11. Status dan Batasan Dokumentasi
-
-Dokumentasi ini disusun dari PRD/UI dan dokumen teknis yang tersedia. Beberapa detail masih menunggu verifikasi terhadap source code dan konfigurasi aktual, termasuk:
-
-- struktur direktori repository;
-- versi Node.js dan dependency;
-- nama script pada `package.json`;
-- nama environment variables yang benar-benar digunakan;
-- provider hosting dan domain;
-- claim Microsoft Entra yang menjadi identifier kanonis;
-- matriks role dan permission final;
-- migration/schema SQL aktual;
-- status implementasi dan hasil pengujian.
-
-**Jangan menganggap sebuah fitur telah selesai hanya karena sudah dijelaskan dalam dokumentasi.** Status implementasi harus didukung oleh source code, pengujian, dan bukti deployment yang relevan.
-
-## 12. Informasi Proyek yang Perlu Dilengkapi
-
-| Item | Status |
-|---|---|
-| URL repository | TBD |
-| URL aplikasi development | TBD |
-| URL aplikasi staging | TBD |
-| URL aplikasi production | TBD |
-| Maintainer/technical owner | TBD |
-| Kontak panitia/helpdesk | TBD |
-| Versi Node.js | TBD |
-| Versi pnpm | TBD |
-| Branch utama | TBD |
-| CI/CD provider | TBD |
-| Hosting provider | TBD |
-| Release version | TBD |
-
-## 13. Dokumen Sumber dan Tata Kelola
-
-Dokumen sumber kebutuhan produk yang menjadi acuan:
-
-- `PRD.md` — Product Requirements Document.
-- `UI.md` — UI specification.
-
-Jika ada konflik antardokumen, jangan menyelesaikannya dengan asumsi pribadi. Catat konflik, identifikasi pemilik keputusan, dan perbarui dokumen terkait setelah keputusan disetujui.
+## Fitur Utama
+
+### Untuk Pemilih (Mahasiswa Informatika)
+- Masuk ke Bilik Suara Digital menggunakan NIM yang tercatat di Daftar Pemilih Tetap (DPT) dan Kata Sandi Pemilih.
+- Melihat profil pasangan calon Chairman & Vice Chairman HMIF, visi dan misi lengkap, serta mengunduh berkas CV masing-masing kandidat.
+- Memilih salah satu pasangan calon atau opsi sah Kotak Kosong, lalu meninjau ulang pilihan pada layar konfirmasi sebelum suara dikunci.
+- Menerima Tanda Terima Pemilihan berkode unik setelah suara masuk, lengkap dengan tombol salin dan cetak.
+- Melihat pantauan Partisipasi Pemilih selama pemilihan berlangsung dan Rekapitulasi Suara setelah pemilihan resmi ditutup.
+- Beralih antara mode terang (default) dan mode gelap sesuai kenyamanan layar.
+
+### Untuk Publik
+- Halaman beranda otomatis menyesuaikan status pemilihan (sebelum dibuka, sedang berlangsung, pemeliharaan, atau sudah selesai).
+- Memeriksa keabsahan dokumen cetak Berita Acara Rekapitulasi Suara (BAST) melalui halaman `/bast/verify` dengan memindai QR Code atau menempelkan kode verifikasi SHA-256.
+
+### Untuk Panitia KPR & Superadmin
+- Mengelola Daftar Pemilih Tetap (DPT): impor data dari CSV/Excel, tambah cepat, filter status pemilihan, dan pembuatan Kata Sandi Pemilih secara massal.
+- Mengirimkan Kata Sandi Pemilih ke email kampus mahasiswa dengan pantauan status pengiriman dan kirim ulang bila diperlukan.
+- Mengelola data pasangan calon, foto resmi, visi-misi, dan dokumen CV.
+- Mengatur jadwal buka dan tutup pemilihan, mengaktifkan mode pemeliharaan, serta memantau partisipasi per angkatan.
+- Mencetak Berita Acara Rekapitulasi Suara (BAST) ber-QR Code dan mengekspor hasil suara serta catatan aktivitas (audit log) ke format CSV.
 
 ---
 
-**Maintainer note:** README ini adalah entry point dokumentasi. Perbarui tautan dan instruksi setup setelah struktur repository serta konfigurasi aktual diverifikasi.
+## Tampilan Aplikasi
 
+### 1. Halaman Beranda (Mode Terang & Mode Gelap)
+Halaman utama menampilkan status pemilihan aktual, jumlah DPT, tingkat partisipasi, dan tombol aksi yang otomatis menyesuaikan fase pemilihan.
 
-## Confirmed identity and deployment decisions (2026-10-31)
+![Beranda Mode Terang](docs/screenshots/01-landing-page.png)
 
-- Entra tenant and app registration are created and personally managed by the project owner.
-- App registration is multitenant, but server-side validation restricts access to the verified Telkom University tenant ID.
-- Voter eligibility is determined by matching the validated institutional identity against the KEMA DPT for cohorts 2023–2026 (`nim`, `email`, `name`, `generation`).
-- Initial DPT matching uses institutional email; proposed stable binding uses verified `tid` + `oid`.
-- Admin dashboard route: `/admin/dashboard`.
-- Hosting direction: Google Cloud Run + Supabase.
+![Beranda Mode Gelap](docs/screenshots/01b-landing-page-dark.png)
 
+### 2. Halaman Masuk
+Pemilih memasukkan NIM dan Kata Sandi Pemilih yang dibagikan ke email kampus.
 
-## Current decisions (2026-10-31)
+![Halaman Masuk](docs/screenshots/02-login-page.png)
 
-- Hosting direction: Cloud Run (application) + Supabase (PostgreSQL).
-- Entra: personally managed project tenant; multitenant App Registration restricted server-side to the verified Telkom University tenant ID.
-- Initial testing: synthetic dummy accounts with isolated mock authentication; dummy auth is prohibited in production. Real Entra integration testing follows after the official Telkom tenant ID is obtained.
-- DPT source: KEMA, cohorts 2023–2026; required fields `nim`, `email`, `name`, `generation`.
-- Admin authorization: database-backed `admin_users` whitelist with `kpr_admin`, `auditor`, and `super_admin`; see `AUTHENTICATION.md` for the permission matrix.
+### 3. Bilik Suara Digital, Detail Kandidat, dan Konfirmasi Pilihan
+Pemilih dapat membandingkan pasangan calon, membuka detail visi-misi beserta berkas CV, lalu mengonfirmasi pilihan sebelum suara dikirim.
 
-## Operational policy status (31 October 2026)
-- KPR Admin controls opening and closing voting.
-- Superadmin controls emergency maintenance and technical recovery.
-- KPR Admin decides whether voting resumes after technical readiness is confirmed.
-- Schedule extensions require KPR and the authorized Pemira authority; the exact authority remains TBD pending official rules.
-- Database state is authoritative for uncertain vote transactions.
-- All incidents must be recorded.
-See `OPERATIONS.md`, `ADMIN_GUIDE.md`, `PRD.md`, and `SECURITY.md`.
+![Bilik Suara Digital](docs/screenshots/03-voting-chamber.png)
 
-## Publication policy status (31 October 2026)
-Official results are announced by KPR Admin on a KPR-scheduled date/time after Auditor review and KPR approval. Publication channels are the public results dashboard and official PDF. Only aggregate candidate totals, turnout, and generation-level participation may be published. Post-publication corrections require KPR approval, Auditor review, and retained version history. See `OPERATIONS.md`, `ADMIN_GUIDE.md`, `PRD.md`, and `SECURITY.md`.
+![Modal Detail Visi Misi dan CV Paslon](docs/screenshots/13-candidate-detail-modal.png)
 
-## Data retention status (31 October 2026)
-DPT and Entra identity mapping are retained for 1 year after result approval; anonymous ballots and minimized audit logs are archived permanently; receipt verification hashes are retained for 1 year. Relevant deletion is suspended during disputes or official examinations. See `OPERATIONS.md`, `SECURITY.md`, `PRD.md`, and `ADMIN_GUIDE.md`.
+![Modal Konfirmasi Pilihan](docs/screenshots/04-voting-confirmation-modal.png)
 
-## Ownership and handover status (31 October 2026)
-HMIF is the organizational owner and long-term operator. Handover requires at least two technical administrators, organizational access to code/infrastructure/backup/domain, MFA, secure secrets, recovery documentation, and restore testing. Personal Entra tenant ownership remains a continuity risk to resolve before production. See `OPERATIONS.md`, `ADMIN_GUIDE.md`, `PRD.md`, and `SECURITY.md`.
+### 4. Tanda Terima Pemilihan
+Setelah suara tercatat, pemilih mendapat kode Tanda Terima Pemilihan yang dapat disalin atau dicetak tanpa mencantumkan nama kandidat yang dipilih.
+
+![Tanda Terima Pemilihan](docs/screenshots/05-digital-receipt.png)
+
+### 5. Rekapitulasi Suara & Verifikasi Berita Acara (BAST)
+Setelah pemungutan suara ditutup resmi, hasil perolehan suara dan partisipasi per angkatan dapat dilihat di halaman Rekapitulasi Suara. Dokumen cetak BAST dari panitia juga bisa diperiksa keasliannya di halaman Verifikasi BAST.
+
+![Rekapitulasi Suara](docs/screenshots/15-rekapitulasi.png)
+
+![Verifikasi Berita Acara BAST](docs/screenshots/14-bast-verify.png)
+
+### 6. Dashboard Panitia KPR (Admin)
+Panel internal bagi panitia untuk memantau partisipasi, mengelola pasangan calon, mengatur DPT, mengirim email kredensial, mengatur jadwal, dan menerbitkan BAST.
+
+![Dashboard Admin Ringkasan](docs/screenshots/06-admin-dashboard-overview.png)
+
+![Dashboard Admin Pasangan Calon](docs/screenshots/07-admin-dashboard-candidates.png)
+
+![Dashboard Admin Manajemen DPT](docs/screenshots/08-admin-dashboard-dpt.png)
+
+![Dashboard Admin Rekapitulasi](docs/screenshots/09-admin-dashboard-tally.png)
+
+![Dashboard Admin Pengaturan](docs/screenshots/10-admin-dashboard-settings.png)
+
+![Dashboard Admin Broadcast Email](docs/screenshots/12-admin-dashboard-broadcast-email.png)
+
+---
+
+## Prinsip Keamanan yang Dijaga
+
+1. **Pilihan suara dipisahkan dari identitas pemilih.** Data surat suara yang masuk tidak menyimpan NIM, nama, user ID, maupun alamat IP pemilih.
+2. **Satu mahasiswa, satu suara.** Penandaan bahwa pemilih sudah memilih dan penyimpanan surat suara dijalankan bersamaan dalam satu transaksi agar pemilih tidak bisa mengirim suara lebih dari sekali.
+3. **Hasil suara terkunci selama pemilihan berjalan.** Selama Bilik Suara Digital masih aktif, perolehan suara tiap pasangan calon tidak ditampilkan ke pemilih maupun publik. Hanya angka partisipasi yang dapat dipantau.
+4. **Akses panitia terpisah dan tercatat.** Halaman admin hanya bisa dibuka oleh akun panitia yang terdaftar, dan setiap tindakan penting panitia tercatat di log aktivitas.
+
+---
+
+## Cara Menjalankan Secara Lokal
+
+### Kebutuhan Awal
+- Node.js (disarankan versi 20 atau lebih baru)
+- `pnpm`
+- Basis data Supabase (PostgreSQL)
+
+### Langkah Menjalankan
+
+1. Salin repositori dan masuk ke folder proyek:
+   ```bash
+   git clone <URL_REPOSITORY>
+   cd e-voting
+   ```
+
+2. Pasang paket yang dibutuhkan:
+   ```bash
+   pnpm install
+   ```
+
+3. Salin berkas contoh variabel lingkungan dan isi nilainya:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Jangan pernah mengunggah `.env.local` ke Git.
+
+4. Jalankan server lokal:
+   ```bash
+   pnpm dev
+   ```
+   Buka `http://localhost:3000` di peramban.
+
+---
+
+## Pengujian dan Pemeriksaan
+
+Perintah berikut tersedia di `package.json`:
+
+- Memeriksa tipe TypeScript:
+  ```bash
+  pnpm tsc --noEmit
+  ```
+- Menjalankan pengujian antarmuka (Playwright):
+  ```bash
+  pnpm test:e2e
+  ```
+- Menjalankan pemeriksaan linter:
+  ```bash
+  pnpm lint
+  ```
+- Menjalankan pengujian unit (contoh untuk logika voting, rekapitulasi, dan BAST):
+  ```bash
+  node --test tests/voting.test.mjs tests/rekapitulasi.test.mjs tests/export-and-bast.test.mjs
+  ```
+
+Catatan: saat server lokal (`pnpm dev`) sedang aktif, gunakan `pnpm tsc --noEmit` untuk mengecek perubahan kode dan hindari menjalankan `pnpm build` bersamaan agar cache server lokal tidak rusak.
+
+---
+
+## Teknologi yang Digunakan
+
+- **Framework web:** Next.js (App Router) dengan TypeScript
+- **Tampilan:** Tailwind CSS, Framer Motion, Plus Jakarta Sans, dan IBM Plex Mono
+- **Basis data:** Supabase (PostgreSQL)
+- **Validasi data:** Zod
+- **Pengujian:** Playwright dan Node Test Runner
+
+---
+
+## Struktur Folder Utama
+
+```text
+app/
+  page.tsx                 Halaman beranda (mengikuti siklus pemilihan)
+  (auth)/login/            Halaman masuk pemilih dan panitia
+  (voter)/vote/            Bilik Suara Digital
+  (voter)/receipt/         Tanda Terima Pemilihan
+  (voter)/rekapitulasi/    Pantauan Partisipasi Pemilih dan Rekapitulasi Suara
+  (admin)/admin/dashboard/ Dashboard Panitia KPR
+  bast/verify/             Verifikasi dokumen Berita Acara (BAST)
+  api/                     Endpoint server untuk autentikasi, voting, dan admin
+components/                Komponen antarmuka (beranda, bilik suara, rekapitulasi, admin)
+lib/                       Logika utama (sesi, DPT, surat suara, rekapitulasi, email)
+docs/                      Dokumentasi proyek dan tangkapan layar
+tests/                     Pengujian unit dan pengujian antarmuka Playwright
+```
+
+---
+
+## Dokumentasi Tambahan
+
+Dokumen pelengkap lainnya tersimpan di folder `docs/`:
+
+- [Panduan Pemilih](docs/USER_GUIDE.md)
+- [Panduan Admin & Panitia KPR](docs/ADMIN_GUIDE.md)
+- [Kebutuhan Produk (PRD)](docs/PRD.md)
+- [Arsitektur Sistem](docs/ARCHITECTURE.md)
+- [Skema Basis Data](docs/DATABASE.md)
+- [Keamanan Sistem](docs/SECURITY.md)
+- [Panduan Deployment](docs/DEPLOYMENT.md)
+- [Kamus Istilah Domain](GLOSSARY.md)
